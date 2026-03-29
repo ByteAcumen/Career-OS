@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6efe5;
+  --paper-strong: #fff9f1;
+  --card: rgba(255, 250, 242, 0.88);
+  --line: rgba(186, 160, 120, 0.28);
+  --ink: #1f2b2d;
+  --muted: #617173;
+  --teal: #0f766e;
+  --teal-soft: #d8efe9;
+  --gold: #f0b64c;
+  --gold-soft: #fff2cc;
+  --rose-soft: #f8d8d2;
+  --navy-soft: #dbe8fa;
+  --green-soft: #dff4e4;
+  --shadow: 0 24px 60px rgba(70, 44, 11, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(240, 182, 76, 0.18), transparent 26%),
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 22%),
+    linear-gradient(180deg, #faf4ea 0%, #f3ebde 52%, #efe4d5 100%);
+}
+
+::selection {
+  background: rgba(15, 118, 110, 0.18);
+}
+
+.glass-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.heading-font {
+  font-family: var(--font-heading), serif;
+}
+
+.field,
+.field-area {
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 150ms ease, transform 150ms ease, background 150ms ease;
+}
+
+.field {
+  min-height: 52px;
+  padding: 0 16px;
+}
+
+.field-area {
+  min-height: 112px;
+  padding: 14px 16px;
+  resize: vertical;
+}
+
+.field:focus,
+.field-area:focus {
+  border-color: rgba(15, 118, 110, 0.42);
+  background: rgba(255, 255, 255, 0.96);
+  transform: translateY(-1px);
+}
+
+.soft-card {
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 18px;
+}
