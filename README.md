@@ -21,8 +21,12 @@ Built for a final-year engineering student actively applying for software roles 
   - Gemini
   - OpenRouter
 - Weekend-aware schedule blocks tuned for an 8 AM to 8 PM office routine
+- Weekly targets with progress tracking
+- Built-in focus timer with browser reminders
+- One-click calendar export for your daily schedule
 - GitHub and LeetCode profile linking
 - Local persistent storage with SQLite
+- API hardening with rate limiting and security headers
 
 ## Tech Stack
 

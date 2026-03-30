@@ -7,13 +7,103 @@ import { getDashboardData } from "@/lib/dashboard";
 const CoachResponseSchema = z.object({
   summary: z.string(),
   biggestRisk: z.string(),
+  focusTheme: z.string(),
   morningPlan: z.string(),
   nightPlan: z.string(),
   applyPlan: z.string(),
   oneCut: z.string(),
+  weekendMission: z.string(),
+});
+
+const MotivationSchema = z.object({
+  quote: z.string(),
+});
+
+const InsightSchema = z.object({
+  insight: z.string(),
+});
+
+const WeaknessSchema = z.object({
+  curriculum: z.string(),
+});
+
+const MatchSchema = z.object({
+  score: z.number().min(0).max(100),
+  analysis: z.string(),
 });
 
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
+
+export async function generateMotivation() {
+  const dashboard = await getDashboardData();
+  const payload = {
+    metrics: dashboard.metrics,
+    todayCompleted: dashboard.today.checkins,
+  };
+
+  const response = await dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    "You are an intense elite engineering coach. Generate a single highly motivating 1-sentence quote based on today's progress to get the user to execute deep work. Be sharp and slightly aggressive.",
+    "Return only a JSON object with a single string field 'quote'.",
+    MotivationSchema
+  );
+  return response.quote;
+}
+
+export async function generateInsight(type: 'dsa' | 'build', title: string, context: string) {
+  const dashboard = await getDashboardData();
+  const payload = { type, title, context };
+  
+  const response = await dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    "You are a principal engineer mentoring a mid-level dev. Generate a 1-2 sentence core technical insight/takeaway based on the problem title and minimal context.",
+    "Return only a JSON object with a single string field 'insight'.",
+    InsightSchema
+  );
+  return response.insight;
+}
+
+export async function generateWeaknessCurriculum() {
+  const dashboard = await getDashboardData();
+  const recentDsa = dashboard.recentDsa;
+  
+  const payload = {
+    recentProblemsAndInsights: recentDsa.map(d => ({ title: d.title, pattern: d.pattern, insight: d.insight }))
+  };
+
+  const response = await dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    "You are an expert technical interviewer. Analyze these recent data structure problems and the user's insights to cluster their WEAKNESSES. Generate a 2-3 sentence strict weekend curriculum focusing on their most frequent blind spots.",
+    "Return only a JSON object with a single string field 'curriculum'.",
+    WeaknessSchema
+  );
+  return response.curriculum;
+}
+
+export async function predictApplicationMatch(company: string, role: string) {
+  const dashboard = await getDashboardData();
+  const payload = {
+    company,
+    role,
+    primaryGoal: dashboard.settings.primaryGoal,
+  };
+
+  const response = await dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    "You are an elite career matching algorithm. Score the match (0-100) between the user's primary goal and this specific job application. Provide a 1-sentence harsh analysis.",
+    "Return only a JSON object with 'score' (number) and 'analysis' (string).",
+    MatchSchema
+  );
+  return response;
+}
 
 export async function generateCoachResponse() {
   const dashboard = await getDashboardData();
@@ -32,18 +122,39 @@ export async function generateCoachResponse() {
     today: dashboard.today,
   };
 
-  if (dashboard.settings.aiProvider === "openai") {
-    return generateWithOpenAI(payload, dashboard.settings.openAiModel);
-  }
-
-  if (dashboard.settings.aiProvider === "gemini") {
-    return generateWithGemini(payload, dashboard.settings.openAiModel);
-  }
-
-  return generateWithOpenRouter(payload, dashboard.settings.openAiModel);
+  return dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    systemPrompt,
+    jsonPromptPrefix,
+    CoachResponseSchema
+  );
 }
 
-async function generateWithOpenAI(payload: unknown, model: string) {
+async function dispatchAiRequest<T extends z.ZodTypeAny>(
+  payload: unknown,
+  provider: string,
+  model: string,
+  sysPrompt: string,
+  jsonPrefix: string,
+  schema: T
+): Promise<z.infer<T>> {
+  if (provider === "openai") {
+    return generateWithOpenAI(payload, model, sysPrompt, schema);
+  }
+  if (provider === "gemini") {
+    return generateWithGemini(payload, model, sysPrompt, jsonPrefix, schema);
+  }
+  return generateWithOpenRouter(payload, model, sysPrompt, jsonPrefix, schema);
+}
+
+async function generateWithOpenAI<T extends z.ZodTypeAny>(
+  payload: unknown, 
+  model: string, 
+  sysPrompt: string,
+  schema: T
+) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
@@ -57,7 +168,7 @@ async function generateWithOpenAI(payload: unknown, model: string) {
     input: [
       {
         role: "system",
-        content: systemPrompt,
+        content: sysPrompt,
       },
       {
         role: "user",
@@ -65,7 +176,7 @@ async function generateWithOpenAI(payload: unknown, model: string) {
       },
     ],
     text: {
-      format: zodTextFormat(CoachResponseSchema, "coach_response"),
+      format: zodTextFormat(schema, "response"),
     },
   });
 
@@ -77,10 +188,16 @@ async function generateWithOpenAI(payload: unknown, model: string) {
     throw new Error("OpenAI response could not be parsed");
   }
 
-  return output.parsed;
+  return output.parsed as z.infer<T>;
 }
 
-async function generateWithGemini(payload: unknown, model: string) {
+async function generateWithGemini<T extends z.ZodTypeAny>(
+  payload: unknown, 
+  model: string, 
+  sysPrompt: string, 
+  jsonPrefix: string,
+  schema: T
+) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
@@ -94,13 +211,13 @@ async function generateWithGemini(payload: unknown, model: string) {
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: systemPrompt }],
+          parts: [{ text: sysPrompt }],
         },
         contents: [
           {
             parts: [
               {
-                text: `${jsonPromptPrefix}\n${JSON.stringify(payload, null, 2)}`,
+                text: `${jsonPrefix}\n${JSON.stringify(payload, null, 2)}`,
               },
             ],
           },
@@ -125,10 +242,16 @@ async function generateWithGemini(payload: unknown, model: string) {
   };
 
   const text = data.candidates?.[0]?.content?.parts?.map((item) => item.text ?? "").join("") ?? "";
-  return parseCoachJson(text);
+  return parseJsonWithSchema(text, schema);
 }
 
-async function generateWithOpenRouter(payload: unknown, model: string) {
+async function generateWithOpenRouter<T extends z.ZodTypeAny>(
+  payload: unknown, 
+  model: string, 
+  sysPrompt: string, 
+  jsonPrefix: string,
+  schema: T
+) {
   if (!process.env.OPENROUTER_API_KEY) {
     throw new Error("OPENROUTER_API_KEY is not configured");
   }
@@ -144,10 +267,10 @@ async function generateWithOpenRouter(payload: unknown, model: string) {
     body: JSON.stringify({
       model: model || "openai/gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: sysPrompt },
         {
           role: "user",
-          content: `${jsonPromptPrefix}\n${JSON.stringify(payload, null, 2)}`,
+          content: `${jsonPrefix}\n${JSON.stringify(payload, null, 2)}`,
         },
       ],
     }),
@@ -166,10 +289,10 @@ async function generateWithOpenRouter(payload: unknown, model: string) {
   };
 
   const text = data.choices?.[0]?.message?.content ?? "";
-  return parseCoachJson(text);
+  return parseJsonWithSchema(text, schema);
 }
 
-function parseCoachJson(text: string) {
+function parseJsonWithSchema<T extends z.ZodTypeAny>(text: string, schema: T): z.infer<T> {
   const cleaned = text.trim();
   const fenced = cleaned.match(/```json\s*([\s\S]*?)```/i);
   const raw = fenced?.[1] ?? cleaned;
@@ -180,11 +303,11 @@ function parseCoachJson(text: string) {
     throw new Error("AI response did not contain JSON");
   }
 
-  return CoachResponseSchema.parse(JSON.parse(raw.slice(start, end + 1)));
+  return schema.parse(JSON.parse(raw.slice(start, end + 1)));
 }
 
 const systemPrompt =
   "You are a strict but caring study coach for a final-year CS student targeting MAANG-style product roles. Be direct, realistic, and actionable. Return concise advice only.";
 
 const jsonPromptPrefix =
-  'Return only a JSON object with these exact string fields: summary, biggestRisk, morningPlan, nightPlan, applyPlan, oneCut.';
+  "Return only a JSON object with these exact string fields: summary, biggestRisk, focusTheme, morningPlan, nightPlan, applyPlan, oneCut, weekendMission.";

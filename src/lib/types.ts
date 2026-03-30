@@ -12,6 +12,17 @@ export type GithubActivity = {
   createdAt: string;
 };
 
+export type AiProvider = "openai" | "gemini" | "openrouter";
+
+export type ScheduleBlock = {
+  key: string;
+  label: string;
+  description: string;
+  timeLabel: string;
+  startIso: string;
+  endIso: string;
+};
+
 export type DashboardData = {
   settings: {
     sheetUrl: string;
@@ -19,20 +30,35 @@ export type DashboardData = {
     githubUrl: string;
     leetcodeUrl: string;
     primaryGoal: string;
-    aiProvider: "openai" | "gemini" | "openrouter";
+    aiProvider: AiProvider;
     googleAppsScriptUrl: string;
     openAiModel: string;
     weekendDsaMinutes: number;
     weekendBuildMinutes: number;
+    weeklyDsaTarget: number;
+    weeklyApplicationTarget: number;
+    weeklyBuildTarget: number;
+    timerFocusMinutes: number;
+    timerBreakMinutes: number;
   };
   metrics: {
     revisionStreak: number;
+    currentStreak: number;
+    maxStreak: number;
+    level: number;
+    levelProgress: number;
+    totalXP: number;
     weekDsa: number;
     weekApplications: number;
     weekBuilds: number;
     todayScore: number;
     syncedApplications: number;
     pendingApplications: number;
+    targetProgress: {
+      dsa: number;
+      applications: number;
+      builds: number;
+    };
   };
   integrations: {
     aiReady: boolean;
@@ -51,10 +77,12 @@ export type DashboardData = {
     ai?: {
       summary: string;
       biggestRisk: string;
+      focusTheme: string;
       morningPlan: string;
       nightPlan: string;
       applyPlan: string;
       oneCut: string;
+      weekendMission: string;
     } | null;
   };
   previousDay: {

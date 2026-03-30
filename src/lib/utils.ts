@@ -10,6 +10,6 @@ export function toDateKey(date = new Date()) {
   return format(date, "yyyy-MM-dd");
 }
 
-export function previousDateKey(days = 1) {
-  return format(subDays(new Date(), days), "yyyy-MM-dd");
+export function previousDateKey(days = 1, baseDate = new Date()) {
+  return format(subDays(baseDate, days), "yyyy-MM-dd");
 }

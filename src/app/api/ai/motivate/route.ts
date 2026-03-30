@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { generateCoachResponse } from "@/lib/ai";
-import { saveCoachResponse } from "@/lib/dashboard";
+import { generateMotivation } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
-import { toDateKey } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const retryAfterSeconds = rateLimit(request, "ai-coach", {
-    limit: 8,
+  const retryAfterSeconds = rateLimit(request, "ai-motivate", {
+    limit: 15,
     windowMs: 60_000,
   });
 
@@ -22,15 +22,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const coach = await generateCoachResponse();
-    saveCoachResponse(toDateKey(), coach);
-
-    return NextResponse.json({ ok: true, coach });
+    const quote = await generateMotivation();
+    return NextResponse.json({ ok: true, quote });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        message: error instanceof Error ? error.message : "AI coach failed",
+        message: error instanceof Error ? error.message : "AI motivation failed",
       },
       { status: 500 },
     );

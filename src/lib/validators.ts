@@ -11,6 +11,11 @@ export const settingsSchema = z.object({
   openAiModel: z.string().min(1),
   weekendDsaMinutes: z.number().int().min(60).max(480),
   weekendBuildMinutes: z.number().int().min(60).max(480),
+  weeklyDsaTarget: z.number().int().min(1).max(50),
+  weeklyApplicationTarget: z.number().int().min(1).max(30),
+  weeklyBuildTarget: z.number().int().min(1).max(20),
+  timerFocusMinutes: z.number().int().min(15).max(180),
+  timerBreakMinutes: z.number().int().min(5).max(60),
 });
 
 export const checkinSchema = z.object({

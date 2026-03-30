@@ -6,8 +6,24 @@ import {
   markApplicationSynced,
 } from "@/lib/dashboard";
 import { pushApplicationToSheet } from "@/lib/google-sheet";
+import { rateLimit } from "@/lib/rate-limit";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const retryAfterSeconds = rateLimit(request, "sheet-sync", {
+    limit: 4,
+    windowMs: 60_000,
+  });
+
+  if (retryAfterSeconds) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: `Too many sync attempts. Try again in ${retryAfterSeconds} seconds.`,
+      },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+    );
+  }
+
   const settings = await ensureSettings();
 
   if (!settings.googleAppsScriptUrl) {

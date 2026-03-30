@@ -1,12 +1,14 @@
 "use client";
 
-import { format, parseISO } from "date-fns";
-import { motion } from "framer-motion";
+import { format, parseISO, subDays } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
   ArrowUpRight,
+  Bell,
   BrainCircuit,
   Briefcase,
+  CalendarRange,
   CheckCircle2,
   Clock3,
   Database,
@@ -15,13 +17,21 @@ import {
   LayoutDashboard,
   Link2,
   LoaderCircle,
+  Pause,
+  Play,
   RefreshCcw,
+  RotateCcw,
   Rocket,
   Target,
+  Sparkles,
+  X
 } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
-import type { CheckinKey, DashboardData } from "@/lib/types";
+import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
+import { getScheduleForDate } from "@/lib/schedule";
+import type { CheckinKey, DashboardData, ScheduleBlock } from "@/lib/types";
 import { cn, toDateKey } from "@/lib/utils";
 
 type SettingsForm = DashboardData["settings"];
@@ -99,41 +109,19 @@ export function TrackerDashboard() {
     note: "",
     tomorrowTask: "",
   });
+  const [motivation, setMotivation] = useState<string | null>(null);
 
   const todayKey = data?.today.dateKey ?? toDateKey();
 
-  const schedule = useMemo<ScheduleItem[]>(() => {
-    const day = new Date(`${todayKey}T00:00:00`).getDay();
-    const weekend = day === 0 || day === 6;
-    const weekendDsa = settings?.weekendDsaMinutes ?? 150;
-    const weekendBuild = settings?.weekendBuildMinutes ?? 180;
+  const scheduleBlocks = useMemo<ScheduleBlock[]>(
+    () => (settings ? getScheduleForDate(todayKey, settings) : []),
+    [settings, todayKey],
+  );
 
-    if (weekend) {
-      return [
-        ["7:30 AM", "Morning revision", "Mandatory memory refresh and pattern recall."],
-        [
-          "9:30 AM",
-          `DSA block (${weekendDsa} min)`,
-          "Timed medium plus one repeat pattern solve.",
-        ],
-        [
-          "2:00 PM",
-          `Build block (${weekendBuild} min)`,
-          "Ship one visible feature to GitHub.",
-        ],
-        ["5:30 PM", "Applications", "Apply, follow up, or tighten resume bullets."],
-        ["8:30 PM", "Weekly review", "Reset next week before sleep."],
-      ];
-    }
-
-    return [
-      ["5:50 AM", "Morning revision", "Non-negotiable daily recall before office."],
-      ["Commute", "Micro revision", "Flashcards or pattern replay only."],
-      ["8:45 PM", "Deep work", "DSA or product work depending on the day."],
-      ["10:05 PM", "Support block", "Applications or DSA reinforcement."],
-      ["10:40 PM", "Shutdown review", "Save note and lock tomorrow's first task."],
-    ];
-  }, [settings?.weekendBuildMinutes, settings?.weekendDsaMinutes, todayKey]);
+  const schedule = useMemo<ScheduleItem[]>(
+    () => scheduleBlocks.map((item) => [item.timeLabel, item.label, item.description]),
+    [scheduleBlocks],
+  );
 
   async function loadDashboard() {
     const payload = await postJson<DashboardData>("/api/dashboard", undefined, {
@@ -184,6 +172,18 @@ export function TrackerDashboard() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    if (data?.integrations.aiReady && !motivation) {
+      postJson<{ quote: string }>("/api/ai/motivate", undefined, { method: "POST" })
+        .then((res) => {
+          if (res && res.quote) setMotivation(res.quote);
+        })
+        .catch(() => {
+          // ignore motivation failure
+        });
+    }
+  }, [data, motivation]);
+
   if (!data || !settings) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -197,34 +197,34 @@ export function TrackerDashboard() {
 
   const metricCards = [
     {
-      label: "Revision streak",
-      value: data.metrics.revisionStreak,
+      label: "Current Streak",
+      value: data.metrics.currentStreak,
       icon: Flame,
-      tone: "bg-[var(--gold-soft)] text-amber-800",
+      tone: "bg-[var(--gold-soft)] text-amber-500",
     },
     {
-      label: "Week DSA",
-      value: data.metrics.weekDsa,
+      label: "Weekly Target",
+      value: `${data.metrics.targetProgress.dsa}%`,
       icon: BrainCircuit,
-      tone: "bg-[var(--teal-soft)] text-teal-800",
+      tone: "bg-[var(--teal-soft)] text-teal-400",
     },
     {
-      label: "Week apps",
+      label: "Applications",
       value: data.metrics.weekApplications,
       icon: Briefcase,
-      tone: "bg-[var(--rose-soft)] text-rose-800",
+      tone: "bg-[var(--rose-soft)] text-rose-400",
     },
     {
-      label: "Week builds",
-      value: data.metrics.weekBuilds,
+      label: "Max Streak",
+      value: data.metrics.maxStreak,
       icon: Rocket,
-      tone: "bg-[var(--navy-soft)] text-sky-900",
+      tone: "bg-[var(--navy-soft)] text-sky-400",
     },
     {
-      label: "Today score",
-      value: `${data.metrics.todayScore}%`,
+      label: "Level " + data.metrics.level,
+      value: `${data.metrics.levelProgress}%`,
       icon: CheckCircle2,
-      tone: "bg-[var(--green-soft)] text-emerald-800",
+      tone: "bg-[var(--green-soft)] text-emerald-400",
     },
   ];
 
@@ -238,19 +238,24 @@ export function TrackerDashboard() {
         >
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--gold-soft)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-900">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--gold-soft)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
                 Career OS for ByteAcumen
               </div>
-              <h1 className="heading-font max-w-3xl text-4xl leading-[0.95] sm:text-5xl lg:text-6xl">
+              <h1 className="heading-font max-w-3xl text-4xl leading-[0.95] sm:text-5xl lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-white to-neutral-400">
                 Proper tracker. Proper storage. Proper momentum.
               </h1>
+              {motivation && (
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-4 italic text-[var(--teal)] font-medium text-lg leading-relaxed">
+                  &quot;{motivation}&quot;
+                </motion.div>
+              )}
               <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-base">
                 This app stores your study data in a real database, keeps GitHub and
                 Google Sheets connected, and adds an AI coach layer from the backend
                 so secrets stay safe. It is built around your weekday office reality
                 and your stronger weekend study windows.
               </p>
-              <div className="mt-4 inline-flex max-w-2xl rounded-full border border-[var(--line)] bg-white/70 px-4 py-2 text-sm text-[var(--ink)]">
+              <div className="mt-4 inline-flex max-w-2xl text-wrap rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--ink)]">
                 {settings.primaryGoal}
               </div>
               <div className="mt-6 flex flex-wrap gap-3">
@@ -291,8 +296,8 @@ export function TrackerDashboard() {
                 className={cn(
                   "flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition",
                   activeTab === tab.id
-                    ? "border-transparent bg-[var(--ink)] text-white"
-                    : "border-[var(--line)] bg-white/70 text-[var(--muted)] hover:bg-white",
+                    ? "border-transparent bg-[var(--ink)] text-[var(--paper)]"
+                    : "border-[var(--line)] bg-transparent text-[var(--muted)] hover:bg-[var(--line)] hover:text-[var(--ink)]",
                 )}
               >
                 <Icon className="size-4" />
@@ -329,40 +334,57 @@ export function TrackerDashboard() {
           })}
         </motion.div>
 
-        {activeTab === "overview" && (
-          <OverviewTab
-            data={data}
-            settings={settings}
-            schedule={schedule}
-            runAction={runAction}
-          />
-        )}
-        {activeTab === "today" && (
-          <TodayTab
-            data={data}
-            todayKey={todayKey}
-            reviewForm={reviewForm}
-            setReviewForm={setReviewForm}
-            dsaForm={dsaForm}
-            setDsaForm={setDsaForm}
-            buildForm={buildForm}
-            setBuildForm={setBuildForm}
-            applicationForm={applicationForm}
-            setApplicationForm={setApplicationForm}
-            runAction={runAction}
-          />
-        )}
-        {activeTab === "history" && <HistoryTab data={data} />}
-        {activeTab === "settings" && (
-          <SettingsTab
-            settings={settings}
-            setSettings={setSettings}
-            runAction={runAction}
-          />
-        )}
+        <div className="mt-2 relative">
+          <AnimatePresence mode="wait">
+            {activeTab === "overview" && (
+              <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                <OverviewTab
+                  data={data}
+                  settings={settings}
+                  schedule={schedule}
+                  runAction={runAction}
+                />
+              </motion.div>
+            )}
+            {activeTab === "today" && (
+              <motion.div key="today" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                <TodayTab
+                  data={data}
+                  settings={settings}
+                  todayKey={todayKey}
+                  scheduleBlocks={scheduleBlocks}
+                  reviewForm={reviewForm}
+                  setReviewForm={setReviewForm}
+                  dsaForm={dsaForm}
+                  setDsaForm={setDsaForm}
+                  buildForm={buildForm}
+                  setBuildForm={setBuildForm}
+                  applicationForm={applicationForm}
+                  setApplicationForm={setApplicationForm}
+                  setToast={setToast}
+                  runAction={runAction}
+                />
+              </motion.div>
+            )}
+            {activeTab === "history" && (
+              <motion.div key="history" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                <HistoryTab data={data} />
+              </motion.div>
+            )}
+            {activeTab === "settings" && (
+              <motion.div key="settings" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                <SettingsTab
+                  settings={settings}
+                  setSettings={setSettings}
+                  runAction={runAction}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {toast ? (
-          <div className="fixed bottom-5 right-5 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-white shadow-xl">
+          <div className="fixed bottom-5 right-5 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper-strong)] shadow-xl">
             {toast}
           </div>
         ) : null}
@@ -387,6 +409,8 @@ function OverviewTab({
   schedule: ScheduleItem[];
   runAction: <T>(label: string, request: () => Promise<T>, successMessage: string) => Promise<void>;
 }) {
+  const [curriculum, setCurriculum] = useState<string | null>(null);
+
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
       <div className="grid gap-5">
@@ -394,9 +418,32 @@ function OverviewTab({
           title="AI coach"
           subtitle="Server-side guidance based on today's real activity."
           action={
-            <button
-              disabled={!data.integrations.aiReady}
-              onClick={() =>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={!data.integrations.aiReady}
+                onClick={(e) => {
+                  e.preventDefault();
+                  runAction(
+                    "cluster-weakness",
+                    async () => {
+                      const res = await getWeaknessCurriculumAction();
+                      if (res.ok && res.curriculum) setCurriculum(res.curriculum);
+                    },
+                    "Weaknesses clustered."
+                  )
+                }}
+                className={cn(
+                  "rounded-full px-4 py-2 text-sm font-medium border transition",
+                  data.integrations.aiReady
+                    ? "border-[var(--teal)] text-[var(--teal)] hover:bg-[var(--teal-soft)]"
+                    : "cursor-not-allowed border-slate-700 text-slate-500",
+                )}
+              >
+                Scan Weaknesses
+              </button>
+              <button
+                disabled={!data.integrations.aiReady}
+                onClick={() =>
                 runAction(
                   "coach",
                   () => postJson("/api/ai/coach", undefined, { method: "POST" }),
@@ -404,7 +451,7 @@ function OverviewTab({
                 )
               }
               className={cn(
-                "rounded-full px-4 py-2 text-sm font-medium text-white",
+                "rounded-full px-4 py-2 text-sm font-medium text-[var(--paper-strong)]",
                 data.integrations.aiReady
                   ? "bg-[var(--teal)]"
                   : "cursor-not-allowed bg-slate-400",
@@ -414,16 +461,19 @@ function OverviewTab({
                 ? `Run ${settings.aiProvider} coach`
                 : `Connect ${settings.aiProvider} first`}
             </button>
+            </div>
           }
         >
           {data.today.ai ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <InsightCard label="Summary" value={data.today.ai.summary} />
               <InsightCard label="Biggest risk" value={data.today.ai.biggestRisk} />
+              <InsightCard label="Focus theme" value={data.today.ai.focusTheme} />
               <InsightCard label="Tomorrow morning" value={data.today.ai.morningPlan} />
               <InsightCard label="Night deep work" value={data.today.ai.nightPlan} />
               <InsightCard label="Application block" value={data.today.ai.applyPlan} />
               <InsightCard label="One thing to cut" value={data.today.ai.oneCut} />
+              <InsightCard label="Weekend mission" value={data.today.ai.weekendMission} />
             </div>
           ) : (
             <EmptyState
@@ -434,28 +484,50 @@ function OverviewTab({
               }
             />
           )}
+
+          <AnimatePresence>
+            {curriculum && (
+              <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: "auto", y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="mt-4 p-4 rounded-xl border border-[var(--rose-soft)] bg-rose-500/5 text-rose-200 text-sm leading-relaxed overflow-hidden">
+                <div className="font-semibold mb-2 flex items-center gap-2 uppercase tracking-widest text-[10px] text-rose-400">
+                  <Target className="size-3.5" /> Identified Weakness Cluster
+                </div>
+                {curriculum}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Panel>
 
         <Panel title="14-day momentum" subtitle="Progress looks better when the data survives each day.">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {data.history.map((item) => (
-              <div key={item.dateKey} className="soft-card">
-                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
-                  {format(parseISO(`${item.dateKey}T00:00:00`), "EEE dd")}
-                </div>
-                <div className="mt-3 h-2 rounded-full bg-[var(--gold-soft)]">
-                  <div
-                    className="h-2 rounded-full bg-[var(--teal)]"
-                    style={{ width: `${(item.completedCount / 5) * 100}%` }}
-                  />
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--muted)]">
-                  <span>DSA {item.dsaCount}</span>
-                  <span>Build {item.buildCount}</span>
-                  <span>Apps {item.appCount}</span>
-                </div>
-              </div>
-            ))}
+          <div className="h-[240px] w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+              <BarChart data={data.history.slice(-14)} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+                <XAxis 
+                  dataKey="dateKey" 
+                  tickFormatter={(v) => format(parseISO(`${v}T00:00:00`), "dd MMM")} 
+                  stroke="var(--muted)" 
+                  fontSize={11} 
+                  tickLine={false} 
+                  axisLine={false} 
+                />
+                <YAxis 
+                  stroke="var(--muted)" 
+                  fontSize={11} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                  contentStyle={{ backgroundColor: 'var(--paper-strong)', borderColor: 'var(--line)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(255,255,255,0.1)' }}
+                  itemStyle={{ color: 'var(--ink)' }}
+                  labelFormatter={(v) => format(parseISO(`${v}T00:00:00`), "EEEE, dd MMM")}
+                />
+                <Bar dataKey="dsaCount" name="DSA" stackId="a" fill="#2dd4bf" radius={[0, 0, 4, 4]} maxBarSize={40} />
+                <Bar dataKey="buildCount" name="Builds" stackId="a" fill="#0ea5e9" maxBarSize={40} />
+                <Bar dataKey="appCount" name="Apps" stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </Panel>
 
@@ -493,6 +565,29 @@ function OverviewTab({
       </div>
 
       <div className="grid gap-5">
+        <Panel title="Weekly targets" subtitle="Track the numbers that actually move your job search forward.">
+          <div className="space-y-3">
+            <TargetProgressRow
+              label="DSA problems"
+              current={data.metrics.weekDsa}
+              target={settings.weeklyDsaTarget}
+              progress={data.metrics.targetProgress.dsa}
+            />
+            <TargetProgressRow
+              label="Applications"
+              current={data.metrics.weekApplications}
+              target={settings.weeklyApplicationTarget}
+              progress={data.metrics.targetProgress.applications}
+            />
+            <TargetProgressRow
+              label="Build outputs"
+              current={data.metrics.weekBuilds}
+              target={settings.weeklyBuildTarget}
+              progress={data.metrics.targetProgress.builds}
+            />
+          </div>
+        </Panel>
+
         <Panel title="Yesterday snapshot" subtitle="Carry context forward instead of resetting daily.">
           {data.previousDay ? (
             <div className="space-y-3 text-sm text-[var(--muted)]">
@@ -525,8 +620,8 @@ function OverviewTab({
               className={cn(
                 "rounded-full border border-[var(--line)] px-4 py-2 text-sm",
                 data.integrations.googleSheetsReady
-                  ? "bg-white/70"
-                  : "cursor-not-allowed bg-slate-100 text-slate-500",
+                  ? "bg-[var(--paper-strong)] text-[var(--ink)] hover:opacity-90"
+                  : "cursor-not-allowed bg-[var(--line)] text-[var(--muted)]",
               )}
             >
               {data.integrations.googleSheetsReady ? "Sync applications" : "Add Apps Script URL first"}
@@ -622,7 +717,9 @@ function OverviewTab({
 
 function TodayTab({
   data,
+  settings,
   todayKey,
+  scheduleBlocks,
   reviewForm,
   setReviewForm,
   dsaForm,
@@ -631,10 +728,13 @@ function TodayTab({
   setBuildForm,
   applicationForm,
   setApplicationForm,
+  setToast,
   runAction,
 }: {
   data: DashboardData;
+  settings: SettingsForm;
   todayKey: string;
+  scheduleBlocks: ScheduleBlock[];
   reviewForm: { note: string; tomorrowTask: string };
   setReviewForm: React.Dispatch<React.SetStateAction<{ note: string; tomorrowTask: string }>>;
   dsaForm: { title: string; difficulty: string; pattern: string; insight: string; repositoryUrl: string };
@@ -667,88 +767,98 @@ function TodayTab({
       roleUrl: string;
     }>
   >;
+  setToast: React.Dispatch<React.SetStateAction<string>>;
   runAction: <T>(label: string, request: () => Promise<T>, successMessage: string) => Promise<void>;
 }) {
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-      <Panel title="Daily execution" subtitle="Track the day in the same place you review it.">
-        <div className="grid gap-4">
-          {checkinCards.map(([key, label, copy]) => (
-            <button
-              key={key}
-              onClick={() =>
-                runAction(
-                  `checkin-${key}`,
-                  () =>
-                    postJson("/api/checkins", {
-                      dateKey: todayKey,
-                      key,
-                      value: !data.today.checkins[key],
-                    }),
-                  `${label} updated.`,
-                )
-              }
-              className={cn(
-                "flex items-center justify-between rounded-[24px] border p-4 text-left transition",
-                data.today.checkins[key]
-                  ? "border-transparent bg-[var(--teal)] text-white"
-                  : "border-[var(--line)] bg-white/70 hover:bg-white",
-              )}
-            >
-              <div>
-                <div className="font-medium">{label}</div>
-                <div
-                  className={cn(
-                    "mt-1 text-sm",
-                    data.today.checkins[key] ? "text-white/80" : "text-[var(--muted)]",
-                  )}
-                >
-                  {copy}
-                </div>
-              </div>
-              <CheckCircle2 className="size-5" />
-            </button>
-          ))}
+      <div className="grid gap-5">
+        <FocusToolsPanel
+          dateKey={todayKey}
+          settings={settings}
+          scheduleBlocks={scheduleBlocks}
+          setToast={setToast}
+        />
 
-          <div className="rounded-[28px] border border-[var(--line)] bg-white/70 p-5">
-            <div className="grid gap-3">
-              <textarea
-                value={reviewForm.note}
-                onChange={(event) =>
-                  setReviewForm((current) => ({ ...current, note: event.target.value }))
-                }
-                className="field-area"
-                placeholder="What blocked you today? What should tomorrow's revision begin with?"
-              />
-              <input
-                value={reviewForm.tomorrowTask}
-                onChange={(event) =>
-                  setReviewForm((current) => ({ ...current, tomorrowTask: event.target.value }))
-                }
-                className="field"
-                placeholder="Tomorrow's first task"
-              />
+        <Panel title="Daily execution" subtitle="Track the day in the same place you review it.">
+          <div className="grid gap-4">
+            {checkinCards.map(([key, label, copy]) => (
               <button
+                key={key}
                 onClick={() =>
                   runAction(
-                    "review",
+                    `checkin-${key}`,
                     () =>
                       postJson("/api/checkins", {
                         dateKey: todayKey,
-                        note: reviewForm.note,
-                        tomorrowTask: reviewForm.tomorrowTask,
+                        key,
+                        value: !data.today.checkins[key],
                       }),
-                    "Daily review saved.",
+                    `${label} updated.`,
                   )
                 }
-                className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-white"
+                className={cn(
+                  "flex items-center justify-between rounded-[24px] border p-4 text-left transition",
+                  data.today.checkins[key]
+                    ? "border-transparent bg-[var(--teal)] text-[var(--paper-strong)]"
+                    : "border-[var(--line)] soft-card hover:bg-[var(--line)]",
+                )}
               >
-                Save daily review
+                <div>
+                  <div className="font-medium">{label}</div>
+                  <div
+                    className={cn(
+                      "mt-1 text-sm",
+                      data.today.checkins[key] ? "text-[var(--paper-strong)]/80" : "text-[var(--muted)]",
+                    )}
+                  >
+                    {copy}
+                  </div>
+                </div>
+                <CheckCircle2 className="size-5" />
               </button>
+            ))}
+
+            <div className="rounded-[28px] border border-[var(--line)] soft-card p-5">
+              <div className="grid gap-3">
+                <textarea
+                  value={reviewForm.note}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, note: event.target.value }))
+                  }
+                  className="field-area"
+                  placeholder="What blocked you today? What should tomorrow's revision begin with?"
+                />
+                <input
+                  value={reviewForm.tomorrowTask}
+                  onChange={(event) =>
+                    setReviewForm((current) => ({ ...current, tomorrowTask: event.target.value }))
+                  }
+                  className="field"
+                  placeholder="Tomorrow's first task"
+                />
+                <button
+                  onClick={() =>
+                    runAction(
+                      "review",
+                      () =>
+                        postJson("/api/checkins", {
+                          dateKey: todayKey,
+                          note: reviewForm.note,
+                          tomorrowTask: reviewForm.tomorrowTask,
+                        }),
+                      "Daily review saved.",
+                    )
+                  }
+                  className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper-strong)]"
+                >
+                  Save daily review
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </div>
 
       <div className="grid gap-5">
         <Panel title="Log DSA" subtitle="Store each solved problem with pattern and insight.">
@@ -791,15 +901,38 @@ function TodayTab({
                   ))}
                 </select>
               </div>,
-              <textarea
-                key="insight"
-                value={dsaForm.insight}
-                onChange={(event) =>
-                  setDsaForm((current) => ({ ...current, insight: event.target.value }))
-                }
-                className="field-area"
-                placeholder="Key insight or mistake"
-              />,
+              <div key="insight-container" className="relative">
+                <textarea
+                  value={dsaForm.insight}
+                  onChange={(event) =>
+                    setDsaForm((current) => ({ ...current, insight: event.target.value }))
+                  }
+                  className="field-area"
+                  placeholder="Key insight or mistake"
+                />
+                {!dsaForm.insight && dsaForm.title && (
+                  <button
+                    type="button"
+                    title="Auto-generate insight with AI"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      runAction(
+                        "auto-insight",
+                        async () => {
+                          const res = await postJson<{insight: string}>("/api/ai/insight", { type: "dsa", title: dsaForm.title, context: dsaForm.pattern });
+                          if (res.insight) {
+                            setDsaForm((current) => ({ ...current, insight: res.insight }));
+                          }
+                        },
+                        "Insight generated."
+                      )
+                    }}
+                    className="absolute top-3 right-3 z-10 text-xs bg-[var(--teal-soft)] text-[var(--teal)] px-2.5 py-1 rounded-full flex items-center gap-1 hover:bg-[var(--teal)] hover:text-white transition shadow-sm"
+                  >
+                    <Sparkles className="size-3" /> Auto Insight
+                  </button>
+                )}
+              </div>,
               <input
                 key="repo"
                 value={dsaForm.repositoryUrl}
@@ -865,15 +998,38 @@ function TodayTab({
                 className="field-area"
                 placeholder="What did you implement?"
               />,
-              <textarea
-                key="impact"
-                value={buildForm.impact}
-                onChange={(event) =>
-                  setBuildForm((current) => ({ ...current, impact: event.target.value }))
-                }
-                className="field-area"
-                placeholder="Why does this matter?"
-              />,
+              <div key="impact-container" className="relative">
+                <textarea
+                  value={buildForm.impact}
+                  onChange={(event) =>
+                    setBuildForm((current) => ({ ...current, impact: event.target.value }))
+                  }
+                  className="field-area"
+                  placeholder="Why does this matter?"
+                />
+                {!buildForm.impact && buildForm.title && (
+                  <button
+                    type="button"
+                    title="Auto-generate impact info with AI"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      runAction(
+                        "auto-impact",
+                        async () => {
+                          const res = await postJson<{insight: string}>("/api/ai/insight", { type: "build", title: buildForm.title, context: buildForm.area });
+                          if (res.insight) {
+                            setBuildForm((current) => ({ ...current, impact: res.insight }));
+                          }
+                        },
+                        "Impact insight generated."
+                      )
+                    }}
+                    className="absolute top-3 right-3 z-10 text-xs bg-[var(--teal-soft)] text-[var(--teal)] px-2.5 py-1 rounded-full flex items-center gap-1 hover:bg-[var(--teal)] hover:text-white transition shadow-sm"
+                  >
+                    <Sparkles className="size-3" /> Auto Impact
+                  </button>
+                )}
+              </div>,
               <input
                 key="repo"
                 value={buildForm.repositoryUrl}
@@ -939,15 +1095,38 @@ function TodayTab({
                   </option>
                 ))}
               </select>,
-              <textarea
-                key="note"
-                value={applicationForm.note}
-                onChange={(event) =>
-                  setApplicationForm((current) => ({ ...current, note: event.target.value }))
-                }
-                className="field-area"
-                placeholder="Referral, recruiter name, follow-up, or result"
-              />,
+              <div key="note-container" className="relative">
+                <textarea
+                  value={applicationForm.note}
+                  onChange={(event) =>
+                    setApplicationForm((current) => ({ ...current, note: event.target.value }))
+                  }
+                  className="field-area"
+                  placeholder="Referral, recruiter name, follow-up, or result"
+                />
+                {!applicationForm.note && applicationForm.company && applicationForm.role && (
+                  <button
+                    type="button"
+                    title="Predict match quality with AI"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      runAction(
+                        "predict-match",
+                        async () => {
+                          const res = await predictMatchAction(applicationForm.company, applicationForm.role);
+                          if (res.ok && res.data) {
+                            setApplicationForm((current) => ({ ...current, note: `Match Score: ${res.data.score}/100. ${res.data.analysis}` }));
+                          }
+                        },
+                        "Match analysis generated."
+                      )
+                    }}
+                    className="absolute top-3 right-3 z-10 text-xs bg-[var(--teal-soft)] text-[var(--teal)] px-2.5 py-1 rounded-full flex items-center gap-1 hover:bg-[var(--teal)] hover:text-white transition shadow-sm"
+                  >
+                    <Sparkles className="size-3" /> Analyze Match
+                  </button>
+                )}
+              </div>,
               <input
                 key="url"
                 value={applicationForm.roleUrl}
@@ -983,23 +1162,59 @@ function TodayTab({
 }
 
 function HistoryTab({ data }: { data: DashboardData }) {
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const stats = {
+    totalDSA: data.history.reduce((acc, h) => acc + h.dsaCount, 0),
+    totalBuilds: data.history.reduce((acc, h) => acc + h.buildCount, 0),
+    totalApps: data.history.reduce((acc, h) => acc + h.appCount, 0),
+  };
+
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr]">
-      <Panel title="Consistency history" subtitle="You need momentum more than motivation.">
-        <div className="space-y-3">
+      <Panel title="Execution graph" subtitle="A 90-day view of your output. Click a day for full logs.">
+        <div className="flex flex-col gap-6">
+          <CalendarHeatmap history={data.history} onSelect={setSelectedDate} />
+          
+          <div className="grid grid-cols-3 gap-3">
+            <div className="soft-card flex flex-col items-center justify-center p-4">
+              <BrainCircuit className="size-5 text-[var(--teal)] mb-2" />
+              <div className="text-xl font-bold">{stats.totalDSA}</div>
+              <div className="text-xs text-[var(--muted)]">90-Day DSA</div>
+            </div>
+            <div className="soft-card flex flex-col items-center justify-center p-4">
+              <Rocket className="size-5 text-[var(--navy)] mb-2" />
+              <div className="text-xl font-bold">{stats.totalBuilds}</div>
+              <div className="text-xs text-[var(--muted)]">90-Day Builds</div>
+            </div>
+            <div className="soft-card flex flex-col items-center justify-center p-4">
+              <Briefcase className="size-5 text-[var(--rose)] mb-2" />
+              <div className="text-xl font-bold">{stats.totalApps}</div>
+              <div className="text-xs text-[var(--muted)]">90-Day Apps</div>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Recent logging" subtitle="You need momentum more than motivation.">
+        <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
           {data.history
-            .slice()
+            .slice(-14)
             .reverse()
             .map((item) => (
-              <div key={item.dateKey} className="soft-card">
+              <div 
+                key={item.dateKey} 
+                className="soft-card cursor-pointer hover:border-[var(--teal-soft)] transition-colors"
+                onClick={() => setSelectedDate(item.dateKey)}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium">{item.dateKey}</div>
+                    <div className="font-medium">{format(parseISO(`${item.dateKey}T00:00:00`), "MMM d, yyyy")}</div>
                     <div className="mt-1 text-sm text-[var(--muted)]">
-                      {item.completedCount}/5 habit blocks completed
+                      {item.completedCount}/5 habit blocks
                     </div>
                   </div>
-                  <div className="rounded-full bg-[var(--gold-soft)] px-3 py-1 text-xs font-semibold text-amber-900">
+                  <div className="rounded-full bg-[var(--gold-soft)] px-3 py-1 text-xs font-semibold text-amber-500">
                     Score {Math.round((item.completedCount / 5) * 100)}%
                   </div>
                 </div>
@@ -1013,30 +1228,9 @@ function HistoryTab({ data }: { data: DashboardData }) {
         </div>
       </Panel>
 
-      <Panel title="What this app stores" subtitle="Your data now lives beyond a single browser tab.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FeatureCard
-            title="Daily snapshots"
-            body="Morning revision, deep work, shutdown review, notes, and tomorrow's first task are all preserved."
-            icon={CheckCircle2}
-          />
-          <FeatureCard
-            title="DSA log"
-            body="Each problem stores title, difficulty, pattern, repo link, and insight so revision gets smarter."
-            icon={BrainCircuit}
-          />
-          <FeatureCard
-            title="Build log"
-            body="Every useful frontend, backend, AI, or system-design task can become visible portfolio proof."
-            icon={Rocket}
-          />
-          <FeatureCard
-            title="Application history"
-            body="Applications stay in the database and can sync outward to Google Sheets instead of getting lost."
-            icon={Briefcase}
-          />
-        </div>
-      </Panel>
+      <AnimatePresence>
+        {selectedDate && <DailyDetailModal dateKey={selectedDate} onClose={() => setSelectedDate(null)} />}
+      </AnimatePresence>
     </section>
   );
 }
@@ -1054,115 +1248,234 @@ function SettingsTab({
     <section className="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
       <Panel title="App settings" subtitle="Customize the app without touching code.">
         <div className="grid gap-4">
-          <textarea
-            value={settings.primaryGoal}
-            onChange={(event) =>
-              setSettings((current) => (current ? { ...current, primaryGoal: event.target.value } : current))
-            }
-            className="field-area"
-            placeholder="Primary goal"
-          />
-          <input
-            value={settings.sheetUrl}
-            onChange={(event) =>
-              setSettings((current) => (current ? { ...current, sheetUrl: event.target.value } : current))
-            }
-            className="field"
-            placeholder="Google Sheet URL"
-          />
-          <input
-            value={settings.resumeUrl}
-            onChange={(event) =>
-              setSettings((current) => (current ? { ...current, resumeUrl: event.target.value } : current))
-            }
-            className="field"
-            placeholder="Resume URL"
-          />
-          <input
-            value={settings.githubUrl}
-            onChange={(event) =>
-              setSettings((current) => (current ? { ...current, githubUrl: event.target.value } : current))
-            }
-            className="field"
-            placeholder="GitHub profile URL"
-          />
-          <input
-            value={settings.leetcodeUrl}
-            onChange={(event) =>
-              setSettings((current) => (current ? { ...current, leetcodeUrl: event.target.value } : current))
-            }
-            className="field"
-            placeholder="LeetCode profile URL"
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <select
-              value={settings.aiProvider}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[var(--ink)] block">Primary Goal</label>
+            <p className="text-xs text-[var(--muted)]">The overarching mission that dictates your application matching and AI coaching.</p>
+            <textarea
+              value={settings.primaryGoal}
               onChange={(event) =>
-                setSettings((current) =>
-                  current
-                    ? {
-                        ...current,
-                        aiProvider: event.target.value as SettingsForm["aiProvider"],
-                        openAiModel:
-                          event.target.value === "gemini"
-                            ? "gemini-2.5-flash"
-                            : event.target.value === "openrouter"
-                              ? "openai/gpt-4o-mini"
-                              : "gpt-4o-mini",
-                      }
-                    : current,
-                )
+                setSettings((current) => (current ? { ...current, primaryGoal: event.target.value } : current))
               }
-              className="field"
-            >
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Gemini</option>
-              <option value="openrouter">OpenRouter</option>
-            </select>
-            <input
-              value={settings.openAiModel}
-              onChange={(event) =>
-                setSettings((current) => (current ? { ...current, openAiModel: event.target.value } : current))
-              }
-              className="field"
-              placeholder="AI model"
+              className="field-area"
+              placeholder="e.g., Actively applying for Senior Frontend roles with React/Next.js"
             />
           </div>
-          <input
-            value={settings.googleAppsScriptUrl}
-            onChange={(event) =>
-              setSettings((current) =>
-                current ? { ...current, googleAppsScriptUrl: event.target.value } : current,
-              )
-            }
-            className="field"
-            placeholder="Google Apps Script URL"
-          />
+
+          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Integrations & Profiles</div>
+          
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              type="number"
-              value={settings.weekendDsaMinutes}
-              onChange={(event) =>
-                setSettings((current) =>
-                  current ? { ...current, weekendDsaMinutes: Number(event.target.value) } : current,
-                )
-              }
-              className="field"
-              placeholder="Weekend DSA minutes"
-            />
-            <input
-              type="number"
-              value={settings.weekendBuildMinutes}
-              onChange={(event) =>
-                setSettings((current) =>
-                  current ? { ...current, weekendBuildMinutes: Number(event.target.value) } : current,
-                )
-              }
-              className="field"
-              placeholder="Weekend build minutes"
-            />
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Google Sheet Webhook URL</label>
+              <input
+                value={settings.sheetUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, sheetUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="Google Sheet URL"
+              />
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Google Apps Script URL</label>
+              <input
+                value={settings.googleAppsScriptUrl}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, googleAppsScriptUrl: event.target.value } : current,
+                  )
+                }
+                className="field"
+                placeholder="Apps Script Endpoint"
+              />
+            </div>
           </div>
-          <div className="rounded-[20px] border border-[var(--line)] bg-[var(--gold-soft)] px-4 py-3 text-sm text-amber-950">
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Resume URL</label>
+              <input
+                value={settings.resumeUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, resumeUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="Resume link (Drive, PDF)"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">GitHub URL</label>
+              <input
+                value={settings.githubUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, githubUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="GitHub Profile"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">LeetCode URL</label>
+              <input
+                value={settings.leetcodeUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, leetcodeUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="LeetCode Profile"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">AI Configuration</div>
+          
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">AI Provider</label>
+              <select
+                value={settings.aiProvider}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current
+                      ? {
+                          ...current,
+                          aiProvider: event.target.value as SettingsForm["aiProvider"],
+                          openAiModel:
+                            event.target.value === "gemini"
+                              ? "gemini-2.5-flash"
+                              : event.target.value === "openrouter"
+                                ? "openai/gpt-4o-mini"
+                                : "gpt-4o-mini",
+                        }
+                      : current,
+                  )
+                }
+                className="field"
+              >
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Gemini</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">AI Model String</label>
+              <input
+                value={settings.openAiModel}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, openAiModel: event.target.value } : current))
+                }
+                className="field"
+                placeholder="e.g. gpt-4o-mini"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Targets & Timeboxing</div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekly DSA Target</label>
+              <input
+                type="number"
+                value={settings.weeklyDsaTarget}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weeklyDsaTarget: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekly Apps Target</label>
+              <input
+                type="number"
+                value={settings.weeklyApplicationTarget}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current
+                      ? { ...current, weeklyApplicationTarget: Number(event.target.value) }
+                      : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekly Build Target</label>
+              <input
+                type="number"
+                value={settings.weeklyBuildTarget}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weeklyBuildTarget: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekend DSA Minutes</label>
+              <input
+                type="number"
+                value={settings.weekendDsaMinutes}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weekendDsaMinutes: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekend Build Minutes</label>
+              <input
+                type="number"
+                value={settings.weekendBuildMinutes}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weekendBuildMinutes: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+          </div>
+          
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Focus Timer Length (min)</label>
+              <input
+                type="number"
+                value={settings.timerFocusMinutes}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, timerFocusMinutes: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Break Timer Length (min)</label>
+              <input
+                type="number"
+                value={settings.timerBreakMinutes}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, timerBreakMinutes: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[20px] border border-[var(--line)] bg-[var(--gold-soft)] px-4 py-3 text-sm text-[var(--gold)]">
             Weekend template reserves {settings.weekendDsaMinutes + settings.weekendBuildMinutes} focused
             minutes across DSA and project work.
           </div>
@@ -1174,7 +1487,7 @@ function SettingsTab({
                 "Settings saved.",
               )
             }
-            className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-white"
+            className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper-strong)]"
           >
             Save settings
           </button>
@@ -1221,6 +1534,283 @@ function SettingsTab({
   );
 }
 
+function FocusToolsPanel({
+  dateKey,
+  settings,
+  scheduleBlocks,
+  setToast,
+}: {
+  dateKey: string;
+  settings: SettingsForm;
+  scheduleBlocks: ScheduleBlock[];
+  setToast: React.Dispatch<React.SetStateAction<string>>;
+}) {
+  const [timerMode, setTimerMode] = useState<"focus" | "break">("focus");
+  const [isRunning, setIsRunning] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(settings.timerFocusMinutes * 60);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [notificationPermission, setNotificationPermission] = useState<
+    NotificationPermission | "unsupported"
+  >(() =>
+    typeof window !== "undefined" && "Notification" in window
+      ? Notification.permission
+      : "unsupported",
+  );
+  const reminderTimeoutsRef = useRef<number[]>([]);
+
+  const targetSeconds =
+    timerMode === "focus"
+      ? settings.timerFocusMinutes * 60
+      : settings.timerBreakMinutes * 60;
+
+  const nextBlock = useMemo(
+    () => scheduleBlocks.find((item) => new Date(item.startIso).getTime() > currentTime) ?? null,
+    [currentTime, scheduleBlocks],
+  );
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const interval = window.setInterval(() => {
+      setSecondsLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(interval);
+          setIsRunning(false);
+          setToast(
+            timerMode === "focus"
+              ? "Focus session complete. Take a short break."
+              : "Break complete. Get back into the next block.",
+          );
+
+          if (notificationPermission === "granted" && "Notification" in window) {
+            new Notification(
+              timerMode === "focus"
+                ? "Career OS focus block finished"
+                : "Career OS break finished",
+              {
+                body:
+                  timerMode === "focus"
+                    ? "Good work. Log the output before switching tasks."
+                    : "Break is over. Start the next deep-work block.",
+              },
+            );
+          }
+
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [isRunning, notificationPermission, setToast, timerMode]);
+
+  useEffect(
+    () => () => {
+      clearReminderTimeouts(reminderTimeoutsRef.current);
+    },
+    [],
+  );
+
+  async function enableNotifications() {
+    if (!("Notification" in window)) {
+      setToast("Browser notifications are not supported here.");
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    setToast(
+      permission === "granted"
+        ? "Notifications enabled for this browser."
+        : "Notifications were not enabled.",
+    );
+  }
+
+  function armTodayReminders() {
+    if (notificationPermission !== "granted") {
+      setToast("Enable notifications first.");
+      return;
+    }
+
+    clearReminderTimeouts(reminderTimeoutsRef.current);
+    reminderTimeoutsRef.current = [];
+
+    const upcoming = scheduleBlocks.filter((item) => new Date(item.startIso).getTime() > Date.now());
+
+    if (!upcoming.length) {
+      setToast("No future blocks remain for today.");
+      return;
+    }
+
+    for (const item of upcoming) {
+      const delay = new Date(item.startIso).getTime() - Date.now();
+      const timeoutId = window.setTimeout(() => {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(`Career OS: ${item.label}`, {
+            body: item.description,
+          });
+        }
+      }, delay);
+
+      reminderTimeoutsRef.current.push(timeoutId);
+    }
+
+    setToast("Today's reminders are armed while this tab stays open.");
+  }
+
+  return (
+    <Panel title="Focus tools" subtitle="Timer, browser reminders, and one-click calendar export.">
+      <div className="grid gap-4">
+        <div className="grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
+          <div className="soft-card">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setTimerMode("focus");
+                  setIsRunning(false);
+                  setSecondsLeft(settings.timerFocusMinutes * 60);
+                }}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-medium",
+                  timerMode === "focus" ? "bg-[var(--ink)] text-[var(--paper)]" : "bg-transparent hover:bg-[var(--line)] text-[var(--ink)]",
+                )}
+              >
+                Focus {settings.timerFocusMinutes}m
+              </button>
+              <button
+                onClick={() => {
+                  setTimerMode("break");
+                  setIsRunning(false);
+                  setSecondsLeft(settings.timerBreakMinutes * 60);
+                }}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-medium",
+                  timerMode === "break" ? "bg-[var(--ink)] text-[var(--paper)]" : "bg-transparent hover:bg-[var(--line)] text-[var(--ink)]",
+                )}
+              >
+                Break {settings.timerBreakMinutes}m
+              </button>
+            </div>
+            <div className="mt-4 text-5xl font-semibold tracking-tight">{formatTimer(secondsLeft)}</div>
+            <div className="mt-2 text-sm text-[var(--muted)]">
+              {timerMode === "focus"
+                ? "Use this for DSA, coding, or application batches."
+                : "Use the break timer so your second session still has energy."}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  if (secondsLeft === 0) {
+                    setSecondsLeft(targetSeconds);
+                  }
+                  setIsRunning((current) => !current);
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] hover:opacity-90"
+              >
+                {isRunning ? <Pause className="size-4" /> : <Play className="size-4" />}
+                {isRunning ? "Pause timer" : "Start timer"}
+              </button>
+              <button
+                onClick={() => {
+                  setIsRunning(false);
+                  setSecondsLeft(targetSeconds);
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-transparent hover:bg-[var(--line)] px-4 py-2 text-sm font-medium"
+              >
+                <RotateCcw className="size-4" />
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="soft-card text-sm text-[var(--muted)]">
+            <div className="font-medium text-[var(--ink)]">Next block</div>
+            <div className="mt-3">
+              {nextBlock ? (
+                <>
+                  <div className="text-lg font-semibold text-[var(--ink)]">{nextBlock.label}</div>
+                  <div className="mt-1">{nextBlock.timeLabel}</div>
+                  <div className="mt-2 leading-6">{nextBlock.description}</div>
+                </>
+              ) : (
+                "No scheduled block remains for today."
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <button
+            onClick={() => void enableNotifications()}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink)] text-[var(--paper)] px-4 py-3 text-sm font-medium hover:opacity-90"
+          >
+            <Bell className="size-4" />
+            {notificationPermission === "granted" ? "Notifications on" : "Enable notifications"}
+          </button>
+          <button
+            onClick={armTodayReminders}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink)] text-[var(--paper)] px-4 py-3 text-sm font-medium hover:opacity-90"
+          >
+            <Clock3 className="size-4" />
+            Arm today&apos;s reminders
+          </button>
+          <a
+            href={`/api/calendar/today?date=${dateKey}`}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink)] text-[var(--paper)] px-4 py-3 text-sm font-medium hover:opacity-90"
+          >
+            <CalendarRange className="size-4" />
+            Download calendar
+          </a>
+        </div>
+
+        <div className="rounded-[20px] border border-[var(--line)] soft-card px-4 py-3 text-sm text-[var(--muted)]">
+          Browser reminders work only while this tab stays open. Use the calendar export for reliable phone
+          or laptop reminders outside the browser.
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function TargetProgressRow({
+  label,
+  current,
+  target,
+  progress,
+}: {
+  label: string;
+  current: number;
+  target: number;
+  progress: number;
+}) {
+  return (
+    <div className="soft-card">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="font-medium text-[var(--ink)]">{label}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">
+            {current}/{target} this week
+          </div>
+        </div>
+        <div className="rounded-full bg-[var(--gold-soft)] px-3 py-1 text-xs font-semibold text-amber-900">
+          {progress}%
+        </div>
+      </div>
+      <div className="mt-3 h-2 rounded-full bg-white">
+        <div className="h-2 rounded-full bg-[var(--teal)]" style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function Panel({
   title,
   subtitle,
@@ -1260,7 +1850,7 @@ function QuickLink({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/75 px-4 py-2.5 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-white"
+      className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--paper-strong)] px-4 py-2.5 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--line)]"
     >
       <Icon className="size-4" />
       {label}
@@ -1279,7 +1869,7 @@ function StatusCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-[24px] border border-[var(--line)] bg-white/75 p-5">
+    <div className="soft-card">
       <div className="mb-3 flex items-center gap-2 text-sm font-medium">
         <Icon className="size-4 text-[var(--teal)]" />
         {title}
@@ -1300,7 +1890,7 @@ function InsightCard({ label, value }: { label: string; value: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-[var(--line)] bg-white/50 px-4 py-5 text-sm text-[var(--muted)]">
+    <div className="rounded-[20px] border border-dashed border-[var(--line)] bg-transparent px-4 py-5 text-sm text-[var(--muted)]">
       {text}
     </div>
   );
@@ -1308,7 +1898,7 @@ function EmptyState({ text }: { text: string }) {
 
 function StatLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-white/60 px-4 py-3">
+    <div className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-[var(--card)] px-4 py-3">
       <span>{label}</span>
       <span className="font-medium text-[var(--ink)]">{value}</span>
     </div>
@@ -1323,7 +1913,7 @@ function LogColumn({
   items: Array<{ title: string; subtitle: string; meta: string; href?: string }>;
 }) {
   return (
-    <div className="rounded-[24px] border border-[var(--line)] bg-white/70 p-4">
+    <div className="soft-card p-4">
       <div className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
         {title}
       </div>
@@ -1332,7 +1922,7 @@ function LogColumn({
           items.map((item, index) => (
             <div
               key={`${item.title}-${index}`}
-              className="rounded-[18px] border border-[var(--line)] bg-white/80 p-3"
+              className="rounded-[18px] border border-[var(--line)] bg-black/20 p-3"
             >
               <div className="font-medium text-[var(--ink)]">{item.title}</div>
               <div className="mt-1 text-sm text-[var(--muted)]">{item.subtitle}</div>
@@ -1342,7 +1932,7 @@ function LogColumn({
                   href={item.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[var(--teal)]"
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[var(--teal)] transition hover:text-white"
                 >
                   Open link
                   <ArrowUpRight className="size-4" />
@@ -1354,26 +1944,6 @@ function LogColumn({
           <EmptyState text={`No ${title.toLowerCase()} entries yet.`} />
         )}
       </div>
-    </div>
-  );
-}
-
-function FeatureCard({
-  title,
-  body,
-  icon: Icon,
-}: {
-  title: string;
-  body: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div className="soft-card">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Icon className="size-4 text-[var(--teal)]" />
-        {title}
-      </div>
-      <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{body}</p>
     </div>
   );
 }
@@ -1392,7 +1962,7 @@ function EntryForm({
       {fields}
       <button
         onClick={onSubmit}
-        className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-white"
+        className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper-strong)]"
       >
         {submitLabel}
       </button>
@@ -1429,4 +1999,179 @@ async function postJson<T>(
   }
 
   return payload as T;
+}
+
+function formatTimer(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function clearReminderTimeouts(timeouts: number[]) {
+  for (const timeout of timeouts) {
+    window.clearTimeout(timeout);
+  }
+  timeouts.length = 0;
+}
+
+function CalendarHeatmap({ history, onSelect }: { history: DashboardData["history"]; onSelect: (date: string) => void }) {
+  const days = useMemo(() => {
+    const list = [];
+    const today = new Date();
+    const map = new Map(history.map(h => [h.dateKey, h]));
+
+    for (let i = 89; i >= 0; i--) {
+      const d = subDays(today, i);
+      const key = format(d, "yyyy-MM-dd");
+      const data = map.get(key);
+      let intensity = 0;
+      
+      if (data) {
+        const totalRaw = data.completedCount + data.dsaCount + data.buildCount + data.appCount;
+        if (totalRaw > 0) intensity = 1;
+        if (totalRaw >= 3) intensity = 2;
+        if (totalRaw >= 6) intensity = 3;
+        if (totalRaw >= 10) intensity = 4;
+      }
+      
+      list.push({ dateKey: key, intensity, raw: data });
+    }
+    return list;
+  }, [history]);
+
+  return (
+    <div className="w-full flex justify-center">
+      <div className="grid grid-flow-col grid-rows-7 gap-1" style={{ width: "max-content" }}>
+        {days.map((day) => {
+          let bg = "bg-white/5";
+          if (day.intensity === 1) bg = "bg-[var(--teal-soft)]";
+          if (day.intensity === 2) bg = "bg-teal-500/40";
+          if (day.intensity === 3) bg = "bg-teal-400/70";
+          if (day.intensity === 4) bg = "bg-[var(--teal)]";
+          
+          return (
+            <div 
+              key={day.dateKey} 
+              onClick={() => onSelect(day.dateKey)}
+              className={cn("w-3.5 h-3.5 rounded-sm cursor-pointer transition-transform hover:scale-125 hover:z-10", bg)}
+              title={`${day.dateKey}`}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DailyDetailModal({ dateKey, onClose }: { dateKey: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<{
+    dateKey: string;
+    checkins: Record<string, boolean>;
+    note: string;
+    tomorrowTask: string;
+    aiSummary: string | null;
+    dsa: Array<{id: string, title: string, difficulty: string, pattern: string, insight: string | null, repositoryUrl: string | null}>;
+    builds: Array<{id: string, title: string, area: string, proof: string | null, impact: string | null, repositoryUrl: string | null}>;
+    applications: Array<{id: string, company: string, role: string, status: string, note: string | null, roleUrl: string | null}>;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/dashboard/history?date=${dateKey}`)
+      .then(r => r.json())
+      .then(d => {
+        setDetail(d);
+        setLoading(false);
+      });
+  }, [dateKey]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto glass-card rounded-[32px] p-6 lg:p-8"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-semibold heading-font">
+            {format(parseISO(`${dateKey}T00:00:00`), "EEEE, MMMM do yyyy")}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="py-20 text-center text-[var(--muted)]">Loading timeline...</div>
+        ) : !detail ? (
+          <div className="py-20 text-center text-[var(--muted)]">No logs found for this date.</div>
+        ) : (
+          <div className="space-y-6">
+            {detail.aiSummary && (
+              <div className="p-4 rounded-[20px] bg-gradient-to-r from-[var(--teal-soft)] to-transparent border border-[var(--line)]">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--teal)] mb-2">Automated Coach Summary</div>
+                <div className="text-sm leading-relaxed">{detail.aiSummary}</div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="soft-card">
+                <div className="font-semibold text-sm text-[var(--muted)] mb-3 uppercase tracking-widest">Blocks</div>
+                <ul className="space-y-2 text-sm">
+                  {Object.entries(detail.checkins).map(([key, value]) => value ? (
+                    <li key={key} className="flex items-center gap-2">
+                       <CheckCircle2 className="size-4 text-[var(--teal)]" />
+                       {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </li>
+                  ) : null)}
+                  {Object.values(detail.checkins).every(v => !v) && <li className="text-[var(--muted)]">No blocks completed.</li>}
+                </ul>
+              </div>
+              <div className="soft-card">
+                <div className="font-semibold text-sm text-[var(--muted)] mb-3 uppercase tracking-widest">Notes</div>
+                <div className="text-sm leading-relaxed mb-3">
+                  <span className="font-medium">End of day note:</span> {detail.note || "No note."}
+                </div>
+                <div className="text-sm leading-relaxed">
+                  <span className="font-medium">Next task:</span> {detail.tomorrowTask || "Not planned."}
+                </div>
+              </div>
+            </div>
+
+            <DailyDetailList title="DSA Problems" items={detail.dsa} icon={BrainCircuit} renderItem={(i: {title: string, difficulty: string, pattern: string, insight: string | null, repositoryUrl: string | null}) => (
+               <><div className="font-medium text-[var(--teal)]">{i.title} <span className="text-xs text-[var(--muted)] border border-[var(--line)] rounded px-1.5 py-0.5 ml-2">{i.difficulty}</span> <span className="text-xs text-[var(--muted)] border border-[var(--line)] rounded px-1.5 py-0.5 ml-1">{i.pattern}</span></div><div className="text-sm mt-1">{i.insight || "No insight."}</div>{i.repositoryUrl && <a href={i.repositoryUrl} target="_blank" rel="noreferrer" className="text-xs border border-[var(--line)] rounded-full px-2 py-1 mt-2 inline-flex items-center gap-1 hover:bg-white/10"><Target className="size-3" /> Proof</a>}</>
+            )} />
+
+            <DailyDetailList title="Build Logging" items={detail.builds} icon={Rocket} renderItem={(i: {title: string, area: string, proof: string | null, impact: string | null, repositoryUrl: string | null}) => (
+               <><div className="font-medium text-sky-400">{i.title} <span className="text-xs text-[var(--muted)] border border-[var(--line)] rounded px-1.5 py-0.5 ml-2">{i.area}</span></div><div className="text-sm mt-1">{i.proof || "No proof text."}</div><div className="text-sm mt-1 text-[var(--muted)]">{i.impact}</div>{i.repositoryUrl && <a href={i.repositoryUrl} target="_blank" rel="noreferrer" className="text-xs border border-[var(--line)] rounded-full px-2 py-1 mt-2 inline-flex items-center gap-1 hover:bg-white/10"><Target className="size-3" /> Commit / Deploy</a>}</>
+            )} />
+
+            <DailyDetailList title="Applications" items={detail.applications} icon={Briefcase} renderItem={(i: {role: string, company: string, status: string, note: string | null, roleUrl: string | null}) => (
+               <><div className="font-medium text-rose-400">{i.role} at {i.company} <span className="text-xs text-[var(--muted)] border border-[var(--line)] rounded px-1.5 py-0.5 ml-2">{i.status}</span></div><div className="text-sm mt-1">{i.note || "No note."}</div>{i.roleUrl && <a href={i.roleUrl} target="_blank" rel="noreferrer" className="text-xs border border-[var(--line)] rounded-full px-2 py-1 mt-2 inline-flex items-center gap-1 hover:bg-white/10"><Briefcase className="size-3" /> Job Post</a>}</>
+            )} />
+
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+function DailyDetailList<T>({ title, items, icon: Icon, renderItem }: { title: string, items: T[], icon: React.ElementType, renderItem: (item: T) => React.ReactNode }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-2 font-semibold text-sm uppercase tracking-widest text-[var(--muted)] mb-3">
+        <Icon className="size-4" /> {title} ({items.length})
+      </div>
+      <div className="space-y-3">
+        {items.map((item: T, idx) => (
+          <div key={idx} className="p-4 rounded-2xl border border-[var(--line)] bg-white/5">
+            {renderItem(item)}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }

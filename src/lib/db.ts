@@ -28,6 +28,11 @@ sqlite.exec(`
     openAiModel TEXT NOT NULL DEFAULT 'gpt-4o-mini',
     weekendDsaMinutes INTEGER NOT NULL DEFAULT 150,
     weekendBuildMinutes INTEGER NOT NULL DEFAULT 180,
+    weeklyDsaTarget INTEGER NOT NULL DEFAULT 10,
+    weeklyApplicationTarget INTEGER NOT NULL DEFAULT 5,
+    weeklyBuildTarget INTEGER NOT NULL DEFAULT 4,
+    timerFocusMinutes INTEGER NOT NULL DEFAULT 50,
+    timerBreakMinutes INTEGER NOT NULL DEFAULT 10,
     createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -43,10 +48,12 @@ sqlite.exec(`
     tomorrowTask TEXT,
     aiSummary TEXT,
     aiBiggestRisk TEXT,
+    aiFocusTheme TEXT,
     aiMorningPlan TEXT,
     aiNightPlan TEXT,
     aiApplyPlan TEXT,
     aiOneCut TEXT,
+    aiWeekendMission TEXT,
     createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -98,6 +105,13 @@ sqlite.exec(`
 ensureColumn("app_settings", "leetcodeUrl", "TEXT");
 ensureColumn("app_settings", "primaryGoal", "TEXT");
 ensureColumn("app_settings", "aiProvider", "TEXT");
+ensureColumn("app_settings", "weeklyDsaTarget", "INTEGER NOT NULL DEFAULT 10");
+ensureColumn("app_settings", "weeklyApplicationTarget", "INTEGER NOT NULL DEFAULT 5");
+ensureColumn("app_settings", "weeklyBuildTarget", "INTEGER NOT NULL DEFAULT 4");
+ensureColumn("app_settings", "timerFocusMinutes", "INTEGER NOT NULL DEFAULT 50");
+ensureColumn("app_settings", "timerBreakMinutes", "INTEGER NOT NULL DEFAULT 10");
+ensureColumn("daily_snapshots", "aiFocusTheme", "TEXT");
+ensureColumn("daily_snapshots", "aiWeekendMission", "TEXT");
 
 export { databaseFile, sqlite as db };
 
