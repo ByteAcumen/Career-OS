@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequestSession } from "@/lib/auth-session";
 import { generateInsight } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -13,6 +14,11 @@ const inputSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const session = await getRequestSession(request);
+  if (!session) {
+    return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+  }
+
   const retryAfterSeconds = rateLimit(request, "ai-insight", {
     limit: 20,
     windowMs: 60_000,
@@ -31,7 +37,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const payload = inputSchema.parse(body);
-    const insight = await generateInsight(payload.type, payload.title, payload.context);
+    const insight = await generateInsight(
+      session.user.id,
+      payload.type,
+      payload.title,
+      payload.context,
+    );
     return NextResponse.json({ ok: true, insight });
   } catch (error) {
     return NextResponse.json(

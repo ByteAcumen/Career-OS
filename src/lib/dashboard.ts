@@ -8,6 +8,7 @@ import type { DashboardData } from "@/lib/types";
 import { previousDateKey, toDateKey } from "@/lib/utils";
 
 type SnapshotRow = {
+  userId: string;
   dateKey: string;
   morningRevision: number;
   microRevision: number;
@@ -45,15 +46,104 @@ const defaultSettings = {
   timerBreakMinutes: 10,
 };
 
-export function ensureSettings() {
+export function claimLegacyDataForUser(userId: string) {
+  const hasUserData = db
+    .prepare(
+      `SELECT EXISTS(
+        SELECT 1 FROM daily_snapshots WHERE userId = ?
+      ) as hasData`,
+    )
+    .get(userId) as { hasData: number };
+
+  if (hasUserData.hasData) {
+    ensureSettings(userId);
+    return;
+  }
+
+  const legacySettingsTable = hasTable("legacy_app_settings");
+  const legacySnapshotsTable = hasTable("legacy_daily_snapshots");
+  const legacyDsaTable = hasTable("legacy_dsa_entries");
+  const legacyBuildTable = hasTable("legacy_build_entries");
+  const legacyApplicationsTable = hasTable("legacy_application_entries");
+
+  if (!legacySettingsTable && !legacySnapshotsTable) {
+    ensureSettings(userId);
+    return;
+  }
+
+  const transaction = db.transaction(() => {
+    if (legacySettingsTable) {
+      const legacySettings = db
+        .prepare(
+          `SELECT sheetUrl, resumeUrl, githubUrl, leetcodeUrl, primaryGoal, aiProvider,
+                  googleAppsScriptUrl, openAiModel, weekendDsaMinutes, weekendBuildMinutes,
+                  weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
+                  timerFocusMinutes, timerBreakMinutes
+           FROM legacy_app_settings
+           LIMIT 1`,
+        )
+        .get() as DashboardData["settings"] | undefined;
+
+      if (legacySettings) {
+        saveSettings(userId, normalizeSettings(legacySettings));
+      }
+    }
+
+    if (legacySnapshotsTable) {
+      db.prepare(
+        `INSERT OR IGNORE INTO daily_snapshots
+          (userId, dateKey, morningRevision, microRevision, deepWork, supportBlock, shutdownReview,
+           note, tomorrowTask, aiSummary, aiBiggestRisk, aiFocusTheme, aiMorningPlan, aiNightPlan,
+           aiApplyPlan, aiOneCut, aiWeekendMission, createdAt, updatedAt)
+         SELECT ?, dateKey, morningRevision, microRevision, deepWork, supportBlock, shutdownReview,
+                note, tomorrowTask, aiSummary, aiBiggestRisk, aiFocusTheme, aiMorningPlan, aiNightPlan,
+                aiApplyPlan, aiOneCut, aiWeekendMission, createdAt, updatedAt
+         FROM legacy_daily_snapshots`,
+      ).run(userId);
+    }
+
+    if (legacyDsaTable) {
+      db.prepare(
+        `INSERT OR IGNORE INTO dsa_entries
+          (id, userId, snapshotDateKey, title, difficulty, pattern, insight, repositoryUrl, createdAt)
+         SELECT id, ?, snapshotDateKey, title, difficulty, pattern, insight, repositoryUrl, createdAt
+         FROM legacy_dsa_entries`,
+      ).run(userId);
+    }
+
+    if (legacyBuildTable) {
+      db.prepare(
+        `INSERT OR IGNORE INTO build_entries
+          (id, userId, snapshotDateKey, title, area, proof, impact, repositoryUrl, createdAt)
+         SELECT id, ?, snapshotDateKey, title, area, proof, impact, repositoryUrl, createdAt
+         FROM legacy_build_entries`,
+      ).run(userId);
+    }
+
+    if (legacyApplicationsTable) {
+      db.prepare(
+        `INSERT OR IGNORE INTO application_entries
+          (id, userId, snapshotDateKey, company, role, status, note, roleUrl, syncedToSheet, syncedAt, createdAt)
+         SELECT id, ?, snapshotDateKey, company, role, status, note, roleUrl, syncedToSheet, syncedAt, createdAt
+         FROM legacy_application_entries`,
+      ).run(userId);
+    }
+  });
+
+  transaction();
+  ensureSettings(userId);
+}
+
+export function ensureSettings(userId: string) {
   const existing = db
     .prepare(
       `SELECT sheetUrl, resumeUrl, githubUrl, leetcodeUrl, primaryGoal, aiProvider, googleAppsScriptUrl, openAiModel,
               weekendDsaMinutes, weekendBuildMinutes, weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
               timerFocusMinutes, timerBreakMinutes
-       FROM app_settings WHERE id = 1`,
+       FROM app_settings
+       WHERE userId = ?`,
     )
-    .get() as DashboardData["settings"] | undefined;
+    .get(userId) as DashboardData["settings"] | undefined;
 
   if (existing) {
     return normalizeSettings(existing);
@@ -61,19 +151,23 @@ export function ensureSettings() {
 
   db.prepare(
     `INSERT INTO app_settings
-      (id, sheetUrl, resumeUrl, githubUrl, leetcodeUrl, primaryGoal, aiProvider, googleAppsScriptUrl, openAiModel,
+      (userId, sheetUrl, resumeUrl, githubUrl, leetcodeUrl, primaryGoal, aiProvider, googleAppsScriptUrl, openAiModel,
        weekendDsaMinutes, weekendBuildMinutes, weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
        timerFocusMinutes, timerBreakMinutes)
-     VALUES (1, @sheetUrl, @resumeUrl, @githubUrl, @leetcodeUrl, @primaryGoal, @aiProvider, @googleAppsScriptUrl, @openAiModel,
+     VALUES
+      (@userId, @sheetUrl, @resumeUrl, @githubUrl, @leetcodeUrl, @primaryGoal, @aiProvider, @googleAppsScriptUrl, @openAiModel,
        @weekendDsaMinutes, @weekendBuildMinutes, @weeklyDsaTarget, @weeklyApplicationTarget, @weeklyBuildTarget,
        @timerFocusMinutes, @timerBreakMinutes)`,
-  ).run(defaultSettings);
+  ).run({
+    userId,
+    ...defaultSettings,
+  });
 
   return defaultSettings;
 }
 
-export function saveSettings(settings: DashboardData["settings"]) {
-  ensureSettings();
+export function saveSettings(userId: string, settings: DashboardData["settings"]) {
+  ensureSettings(userId);
   db.prepare(
     `UPDATE app_settings
       SET sheetUrl = @sheetUrl,
@@ -92,61 +186,73 @@ export function saveSettings(settings: DashboardData["settings"]) {
           timerFocusMinutes = @timerFocusMinutes,
           timerBreakMinutes = @timerBreakMinutes,
           updatedAt = CURRENT_TIMESTAMP
-      WHERE id = 1`,
-  ).run(settings);
+      WHERE userId = @userId`,
+  ).run({
+    userId,
+    ...settings,
+  });
 
   return normalizeSettings(settings);
 }
 
-export function ensureSnapshot(dateKey = toDateKey()) {
+export function ensureSnapshot(userId: string, dateKey = toDateKey()) {
   db.prepare(
-    `INSERT INTO daily_snapshots (dateKey)
-     VALUES (?)
-     ON CONFLICT(dateKey) DO NOTHING`,
-  ).run(dateKey);
+    `INSERT INTO daily_snapshots (userId, dateKey)
+     VALUES (?, ?)
+     ON CONFLICT(userId, dateKey) DO NOTHING`,
+  ).run(userId, dateKey);
 
-  return getSnapshotOrThrow(dateKey);
+  return getSnapshotOrThrow(userId, dateKey);
 }
 
-export function updateCheckin(dateKey: string, key: string, value: boolean) {
-  ensureSnapshot(dateKey);
+export function updateCheckin(userId: string, dateKey: string, key: string, value: boolean) {
+  ensureSnapshot(userId, dateKey);
   db.prepare(
     `UPDATE daily_snapshots
       SET ${key} = ?, updatedAt = CURRENT_TIMESTAMP
-      WHERE dateKey = ?`,
-  ).run(value ? 1 : 0, dateKey);
+      WHERE userId = ? AND dateKey = ?`,
+  ).run(value ? 1 : 0, userId, dateKey);
 
-  return getSnapshot(dateKey);
+  return getSnapshot(userId, dateKey);
 }
 
-export function saveReview(dateKey: string, note: string, tomorrowTask: string) {
-  ensureSnapshot(dateKey);
+export function saveReview(
+  userId: string,
+  dateKey: string,
+  note: string,
+  tomorrowTask: string,
+) {
+  ensureSnapshot(userId, dateKey);
   db.prepare(
     `UPDATE daily_snapshots
       SET note = ?, tomorrowTask = ?, updatedAt = CURRENT_TIMESTAMP
-      WHERE dateKey = ?`,
-  ).run(note || null, tomorrowTask || null, dateKey);
+      WHERE userId = ? AND dateKey = ?`,
+  ).run(note || null, tomorrowTask || null, userId, dateKey);
 
-  return getSnapshot(dateKey);
+  return getSnapshot(userId, dateKey);
 }
 
-export function createDsaEntry(input: {
-  dateKey: string;
-  title: string;
-  difficulty: string;
-  pattern: string;
-  insight?: string;
-  repositoryUrl?: string;
-}) {
-  ensureSnapshot(input.dateKey);
+export function createDsaEntry(
+  userId: string,
+  input: {
+    dateKey: string;
+    title: string;
+    difficulty: string;
+    pattern: string;
+    insight?: string;
+    repositoryUrl?: string;
+  },
+) {
+  ensureSnapshot(userId, input.dateKey);
   const id = randomUUID();
 
   db.prepare(
     `INSERT INTO dsa_entries
-      (id, snapshotDateKey, title, difficulty, pattern, insight, repositoryUrl)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      (id, userId, snapshotDateKey, title, difficulty, pattern, insight, repositoryUrl)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
+    userId,
     input.dateKey,
     input.title,
     input.difficulty,
@@ -158,23 +264,27 @@ export function createDsaEntry(input: {
   return { id, ...input };
 }
 
-export function createBuildEntry(input: {
-  dateKey: string;
-  title: string;
-  area: string;
-  proof?: string;
-  impact?: string;
-  repositoryUrl?: string;
-}) {
-  ensureSnapshot(input.dateKey);
+export function createBuildEntry(
+  userId: string,
+  input: {
+    dateKey: string;
+    title: string;
+    area: string;
+    proof?: string;
+    impact?: string;
+    repositoryUrl?: string;
+  },
+) {
+  ensureSnapshot(userId, input.dateKey);
   const id = randomUUID();
 
   db.prepare(
     `INSERT INTO build_entries
-      (id, snapshotDateKey, title, area, proof, impact, repositoryUrl)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      (id, userId, snapshotDateKey, title, area, proof, impact, repositoryUrl)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
+    userId,
     input.dateKey,
     input.title,
     input.area,
@@ -186,23 +296,27 @@ export function createBuildEntry(input: {
   return { id, ...input };
 }
 
-export function createApplicationEntry(input: {
-  dateKey: string;
-  company: string;
-  role: string;
-  status: string;
-  note?: string;
-  roleUrl?: string;
-}) {
-  ensureSnapshot(input.dateKey);
+export function createApplicationEntry(
+  userId: string,
+  input: {
+    dateKey: string;
+    company: string;
+    role: string;
+    status: string;
+    note?: string;
+    roleUrl?: string;
+  },
+) {
+  ensureSnapshot(userId, input.dateKey);
   const id = randomUUID();
 
   db.prepare(
     `INSERT INTO application_entries
-      (id, snapshotDateKey, company, role, status, note, roleUrl)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      (id, userId, snapshotDateKey, company, role, status, note, roleUrl)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
+    userId,
     input.dateKey,
     input.company,
     input.role,
@@ -214,15 +328,15 @@ export function createApplicationEntry(input: {
   return { id, ...input };
 }
 
-export function getPendingApplicationsForSync() {
+export function getPendingApplicationsForSync(userId: string) {
   return db
     .prepare(
       `SELECT id, snapshotDateKey, company, role, status, note, roleUrl, createdAt
        FROM application_entries
-       WHERE syncedToSheet = 0
+       WHERE userId = ? AND syncedToSheet = 0
        ORDER BY createdAt ASC`,
     )
-    .all() as Array<{
+    .all(userId) as Array<{
     id: string;
     snapshotDateKey: string;
     company: string;
@@ -234,15 +348,16 @@ export function getPendingApplicationsForSync() {
   }>;
 }
 
-export function markApplicationSynced(id: string) {
+export function markApplicationSynced(userId: string, id: string) {
   db.prepare(
     `UPDATE application_entries
       SET syncedToSheet = 1, syncedAt = CURRENT_TIMESTAMP
-      WHERE id = ?`,
-  ).run(id);
+      WHERE userId = ? AND id = ?`,
+  ).run(userId, id);
 }
 
 export function saveCoachResponse(
+  userId: string,
   dateKey: string,
   coach: {
     summary: string;
@@ -255,11 +370,11 @@ export function saveCoachResponse(
     weekendMission: string;
   },
 ) {
-  ensureSnapshot(dateKey);
+  ensureSnapshot(userId, dateKey);
   db.prepare(
     `UPDATE daily_snapshots
       SET aiSummary = ?, aiBiggestRisk = ?, aiFocusTheme = ?, aiMorningPlan = ?, aiNightPlan = ?, aiApplyPlan = ?, aiOneCut = ?, aiWeekendMission = ?, updatedAt = CURRENT_TIMESTAMP
-      WHERE dateKey = ?`,
+      WHERE userId = ? AND dateKey = ?`,
   ).run(
     coach.summary,
     coach.biggestRisk,
@@ -269,60 +384,69 @@ export function saveCoachResponse(
     coach.applyPlan,
     coach.oneCut,
     coach.weekendMission,
+    userId,
     dateKey,
   );
 }
 
-export async function getDashboardData(targetDateKey?: string): Promise<DashboardData> {
-  const settings = ensureSettings();
+export async function getDashboardData(
+  userId: string,
+  targetDateKey?: string,
+): Promise<DashboardData> {
+  const settings = ensureSettings(userId);
   const todayKey = targetDateKey ?? toDateKey();
-  const today = ensureSnapshot(todayKey);
-  const previous = getSnapshot(previousDateKey(1, new Date(`${todayKey}T12:00:00`)));
+  const today = ensureSnapshot(userId, todayKey);
+  const previous = getSnapshot(
+    userId,
+    previousDateKey(1, new Date(`${todayKey}T12:00:00`)),
+  );
   const history = db
     .prepare(
       `SELECT *
        FROM daily_snapshots
-       WHERE dateKey >= ?
+       WHERE userId = ? AND dateKey >= ?
        ORDER BY dateKey ASC`,
     )
-    .all(toDateKey(subDays(new Date(), 13))) as SnapshotRow[];
+    .all(userId, toDateKey(subDays(new Date(), 89))) as SnapshotRow[];
 
   const recentDsa = db
     .prepare(
       `SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt
        FROM dsa_entries
+       WHERE userId = ?
        ORDER BY createdAt DESC
        LIMIT 6`,
     )
-    .all() as DashboardData["recentDsa"];
+    .all(userId) as DashboardData["recentDsa"];
 
   const recentBuilds = db
     .prepare(
       `SELECT id, title, area, proof, impact, repositoryUrl, createdAt
        FROM build_entries
+       WHERE userId = ?
        ORDER BY createdAt DESC
        LIMIT 6`,
     )
-    .all() as DashboardData["recentBuilds"];
+    .all(userId) as DashboardData["recentBuilds"];
 
   const rawApplications = db
     .prepare(
       `SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt
        FROM application_entries
+       WHERE userId = ?
        ORDER BY createdAt DESC
        LIMIT 8`,
     )
-    .all() as Array<
+    .all(userId) as Array<
     Omit<DashboardData["recentApplications"][number], "syncedToSheet"> & {
       syncedToSheet: number;
     }
   >;
 
-  const recentApplications = rawApplications
-    .map((item) => ({
-      ...item,
-      syncedToSheet: Boolean((item as { syncedToSheet: number }).syncedToSheet),
-    }));
+  const recentApplications = rawApplications.map((item) => ({
+    ...item,
+    syncedToSheet: Boolean(item.syncedToSheet),
+  }));
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   const currentWeekSnapshots = history.filter(
@@ -331,63 +455,61 @@ export async function getDashboardData(targetDateKey?: string): Promise<Dashboar
 
   let totalXP = 0;
   for (const item of history) {
-    const dsaCount = getCount("dsa_entries", item.dateKey);
-    const buildCount = getCount("build_entries", item.dateKey);
-    const appCount = getCount("application_entries", item.dateKey);
+    const dsaCount = getCount("dsa_entries", userId, item.dateKey);
+    const buildCount = getCount("build_entries", userId, item.dateKey);
+    const appCount = getCount("application_entries", userId, item.dateKey);
     const checks = calculateCompletedCount(item);
-    totalXP += (dsaCount * 15) + (buildCount * 25) + (appCount * 10) + (checks * 5);
+    totalXP += dsaCount * 15 + buildCount * 25 + appCount * 10 + checks * 5;
   }
 
   const currentLevel = Math.floor(totalXP / 250) + 1;
   const xpForCurrentLevel = (currentLevel - 1) * 250;
   const xpForNextLevel = currentLevel * 250;
-  const levelProgress = Math.round(((totalXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100);
+  const levelProgress = Math.round(
+    ((totalXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100,
+  );
 
-  const { currentStreak, maxStreak } = calculateActiveStreaks(history);
+  const { currentStreak, maxStreak } = calculateActiveStreaks(userId, history);
 
-  const metrics = {
-    revisionStreak: calculateRevisionStreak(history),
-    currentStreak,
-    maxStreak,
-    totalXP,
-    level: currentLevel,
-    levelProgress,
-    weekDsa: currentWeekSnapshots.reduce(
-      (sum, item) => sum + getCount("dsa_entries", item.dateKey),
-      0,
-    ),
-    weekApplications: currentWeekSnapshots.reduce(
-      (sum, item) => sum + getCount("application_entries", item.dateKey),
-      0,
-    ),
-    weekBuilds: currentWeekSnapshots.reduce(
-      (sum, item) => sum + getCount("build_entries", item.dateKey),
-      0,
-    ),
-    todayScore: calculateTodayScore(today),
-    syncedApplications: getBooleanCount("application_entries", "syncedToSheet", true),
-    pendingApplications: getBooleanCount("application_entries", "syncedToSheet", false),
-    targetProgress: {
-      dsa: calculateTargetProgress(
-        currentWeekSnapshots.reduce((sum, item) => sum + getCount("dsa_entries", item.dateKey), 0),
-        settings.weeklyDsaTarget,
-      ),
-      applications: calculateTargetProgress(
-        currentWeekSnapshots.reduce((sum, item) => sum + getCount("application_entries", item.dateKey), 0),
-        settings.weeklyApplicationTarget,
-      ),
-      builds: calculateTargetProgress(
-        currentWeekSnapshots.reduce((sum, item) => sum + getCount("build_entries", item.dateKey), 0),
-        settings.weeklyBuildTarget,
-      ),
-    },
-  };
+  const weekDsa = currentWeekSnapshots.reduce(
+    (sum, item) => sum + getCount("dsa_entries", userId, item.dateKey),
+    0,
+  );
+  const weekApplications = currentWeekSnapshots.reduce(
+    (sum, item) => sum + getCount("application_entries", userId, item.dateKey),
+    0,
+  );
+  const weekBuilds = currentWeekSnapshots.reduce(
+    (sum, item) => sum + getCount("build_entries", userId, item.dateKey),
+    0,
+  );
 
   const githubActivity = await fetchGithubActivity(settings.githubUrl);
 
   return {
     settings,
-    metrics,
+    metrics: {
+      revisionStreak: calculateRevisionStreak(history),
+      currentStreak,
+      maxStreak,
+      totalXP,
+      level: currentLevel,
+      levelProgress,
+      weekDsa,
+      weekApplications,
+      weekBuilds,
+      todayScore: calculateTodayScore(today),
+      syncedApplications: getBooleanCount(userId, true),
+      pendingApplications: getBooleanCount(userId, false),
+      targetProgress: {
+        dsa: calculateTargetProgress(weekDsa, settings.weeklyDsaTarget),
+        applications: calculateTargetProgress(
+          weekApplications,
+          settings.weeklyApplicationTarget,
+        ),
+        builds: calculateTargetProgress(weekBuilds, settings.weeklyBuildTarget),
+      },
+    },
     integrations: {
       aiReady: isAiProviderReady(settings.aiProvider),
       googleSheetsReady: Boolean(settings.googleAppsScriptUrl),
@@ -401,9 +523,9 @@ export async function getDashboardData(targetDateKey?: string): Promise<Dashboar
     previousDay: previous
       ? {
           dateKey: previous.dateKey,
-          dsaCount: getCount("dsa_entries", previous.dateKey),
-          buildCount: getCount("build_entries", previous.dateKey),
-          appCount: getCount("application_entries", previous.dateKey),
+          dsaCount: getCount("dsa_entries", userId, previous.dateKey),
+          buildCount: getCount("build_entries", userId, previous.dateKey),
+          appCount: getCount("application_entries", userId, previous.dateKey),
           note: previous.note ?? "",
         }
       : null,
@@ -414,15 +536,15 @@ export async function getDashboardData(targetDateKey?: string): Promise<Dashboar
     history: history.map((item) => ({
       dateKey: item.dateKey,
       completedCount: calculateCompletedCount(item),
-      dsaCount: getCount("dsa_entries", item.dateKey),
-      buildCount: getCount("build_entries", item.dateKey),
-      appCount: getCount("application_entries", item.dateKey),
+      dsaCount: getCount("dsa_entries", userId, item.dateKey),
+      buildCount: getCount("build_entries", userId, item.dateKey),
+      appCount: getCount("application_entries", userId, item.dateKey),
     })),
   };
 }
 
-export function getDailyDetail(dateKey: string) {
-  const snapshot = getSnapshot(dateKey);
+export function getDailyDetail(userId: string, dateKey: string) {
+  const snapshot = getSnapshot(userId, dateKey);
   if (!snapshot) return null;
 
   return {
@@ -437,41 +559,74 @@ export function getDailyDetail(dateKey: string) {
     note: snapshot.note ?? "",
     tomorrowTask: snapshot.tomorrowTask ?? "",
     aiSummary: snapshot.aiSummary ?? null,
-    dsa: db.prepare(`SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt FROM dsa_entries WHERE snapshotDateKey = ? ORDER BY createdAt DESC`).all(dateKey),
-    builds: db.prepare(`SELECT id, title, area, proof, impact, repositoryUrl, createdAt FROM build_entries WHERE snapshotDateKey = ? ORDER BY createdAt DESC`).all(dateKey),
-    applications: db.prepare(`SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt FROM application_entries WHERE snapshotDateKey = ? ORDER BY createdAt DESC`).all(dateKey),
+    dsa: db
+      .prepare(
+        `SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt
+         FROM dsa_entries
+         WHERE userId = ? AND snapshotDateKey = ?
+         ORDER BY createdAt DESC`,
+      )
+      .all(userId, dateKey),
+    builds: db
+      .prepare(
+        `SELECT id, title, area, proof, impact, repositoryUrl, createdAt
+         FROM build_entries
+         WHERE userId = ? AND snapshotDateKey = ?
+         ORDER BY createdAt DESC`,
+      )
+      .all(userId, dateKey),
+    applications: db
+      .prepare(
+        `SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt
+         FROM application_entries
+         WHERE userId = ? AND snapshotDateKey = ?
+         ORDER BY createdAt DESC`,
+      )
+      .all(userId, dateKey),
   };
 }
 
-function getSnapshot(dateKey: string) {
+function getSnapshot(userId: string, dateKey: string) {
   return db
-    .prepare(`SELECT * FROM daily_snapshots WHERE dateKey = ?`)
-    .get(dateKey) as SnapshotRow | undefined;
+    .prepare(
+      `SELECT *
+       FROM daily_snapshots
+       WHERE userId = ? AND dateKey = ?`,
+    )
+    .get(userId, dateKey) as SnapshotRow | undefined;
 }
 
-function getSnapshotOrThrow(dateKey: string) {
-  const snapshot = getSnapshot(dateKey);
+function getSnapshotOrThrow(userId: string, dateKey: string) {
+  const snapshot = getSnapshot(userId, dateKey);
   if (!snapshot) {
     throw new Error(`Snapshot not found for ${dateKey}`);
   }
   return snapshot;
 }
 
-function getCount(table: "dsa_entries" | "build_entries" | "application_entries", dateKey: string) {
+function getCount(
+  table: "dsa_entries" | "build_entries" | "application_entries",
+  userId: string,
+  dateKey: string,
+) {
   const row = db
-    .prepare(`SELECT COUNT(*) as count FROM ${table} WHERE snapshotDateKey = ?`)
-    .get(dateKey) as { count: number };
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM ${table}
+       WHERE userId = ? AND snapshotDateKey = ?`,
+    )
+    .get(userId, dateKey) as { count: number };
   return row.count;
 }
 
-function getBooleanCount(
-  table: "application_entries",
-  column: "syncedToSheet",
-  value: boolean,
-) {
+function getBooleanCount(userId: string, value: boolean) {
   const row = db
-    .prepare(`SELECT COUNT(*) as count FROM ${table} WHERE ${column} = ?`)
-    .get(value ? 1 : 0) as { count: number };
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM application_entries
+       WHERE userId = ? AND syncedToSheet = ?`,
+    )
+    .get(userId, value ? 1 : 0) as { count: number };
   return row.count;
 }
 
@@ -483,17 +638,30 @@ function normalizeSettings(input: Partial<DashboardData["settings"]>) {
     leetcodeUrl: input.leetcodeUrl ?? defaultSettings.leetcodeUrl,
     primaryGoal: input.primaryGoal ?? defaultSettings.primaryGoal,
     aiProvider: input.aiProvider ?? defaultSettings.aiProvider,
-    googleAppsScriptUrl: input.googleAppsScriptUrl ?? defaultSettings.googleAppsScriptUrl,
+    googleAppsScriptUrl:
+      input.googleAppsScriptUrl ?? defaultSettings.googleAppsScriptUrl,
     openAiModel: input.openAiModel ?? defaultSettings.openAiModel,
-    weekendDsaMinutes: Number(input.weekendDsaMinutes ?? defaultSettings.weekendDsaMinutes),
-    weekendBuildMinutes: Number(input.weekendBuildMinutes ?? defaultSettings.weekendBuildMinutes),
-    weeklyDsaTarget: Number(input.weeklyDsaTarget ?? defaultSettings.weeklyDsaTarget),
+    weekendDsaMinutes: Number(
+      input.weekendDsaMinutes ?? defaultSettings.weekendDsaMinutes,
+    ),
+    weekendBuildMinutes: Number(
+      input.weekendBuildMinutes ?? defaultSettings.weekendBuildMinutes,
+    ),
+    weeklyDsaTarget: Number(
+      input.weeklyDsaTarget ?? defaultSettings.weeklyDsaTarget,
+    ),
     weeklyApplicationTarget: Number(
       input.weeklyApplicationTarget ?? defaultSettings.weeklyApplicationTarget,
     ),
-    weeklyBuildTarget: Number(input.weeklyBuildTarget ?? defaultSettings.weeklyBuildTarget),
-    timerFocusMinutes: Number(input.timerFocusMinutes ?? defaultSettings.timerFocusMinutes),
-    timerBreakMinutes: Number(input.timerBreakMinutes ?? defaultSettings.timerBreakMinutes),
+    weeklyBuildTarget: Number(
+      input.weeklyBuildTarget ?? defaultSettings.weeklyBuildTarget,
+    ),
+    timerFocusMinutes: Number(
+      input.timerFocusMinutes ?? defaultSettings.timerFocusMinutes,
+    ),
+    timerBreakMinutes: Number(
+      input.timerBreakMinutes ?? defaultSettings.timerBreakMinutes,
+    ),
   };
 }
 
@@ -571,22 +739,23 @@ function calculateRevisionStreak(snapshots: SnapshotRow[]) {
   return streak;
 }
 
-function calculateActiveStreaks(snapshots: SnapshotRow[]) {
+function calculateActiveStreaks(userId: string, snapshots: SnapshotRow[]) {
   let currentStreak = 0;
   let maxStreak = 0;
   let tempStreak = 0;
 
-  for (let i = 0; i < snapshots.length; i++) {
+  for (let i = 0; i < snapshots.length; i += 1) {
     const item = snapshots[i];
     if (!item) continue;
-    
-    const hasActivity = calculateCompletedCount(item) > 0 || 
-                      getCount("dsa_entries", item.dateKey) > 0 || 
-                      getCount("build_entries", item.dateKey) > 0 ||
-                      getCount("application_entries", item.dateKey) > 0;
+
+    const hasActivity =
+      calculateCompletedCount(item) > 0 ||
+      getCount("dsa_entries", userId, item.dateKey) > 0 ||
+      getCount("build_entries", userId, item.dateKey) > 0 ||
+      getCount("application_entries", userId, item.dateKey) > 0;
 
     if (hasActivity) {
-      tempStreak++;
+      tempStreak += 1;
       if (tempStreak > maxStreak) {
         maxStreak = tempStreak;
       }
@@ -595,22 +764,34 @@ function calculateActiveStreaks(snapshots: SnapshotRow[]) {
     }
   }
 
-  // Count backwards for current streak
   for (let i = snapshots.length - 1; i >= 0; i -= 1) {
     const item = snapshots[i];
     if (!item) break;
-    const hasActivity = calculateCompletedCount(item) > 0 || 
-                      getCount("dsa_entries", item.dateKey) > 0 || 
-                      getCount("build_entries", item.dateKey) > 0 ||
-                      getCount("application_entries", item.dateKey) > 0;
-    
+
+    const hasActivity =
+      calculateCompletedCount(item) > 0 ||
+      getCount("dsa_entries", userId, item.dateKey) > 0 ||
+      getCount("build_entries", userId, item.dateKey) > 0 ||
+      getCount("application_entries", userId, item.dateKey) > 0;
+
     if (hasActivity) {
-      currentStreak++;
+      currentStreak += 1;
     } else if (item.dateKey !== toDateKey()) {
-      // Allow today to be 0 without breaking yesterday's streak yet
       break;
     }
   }
 
   return { currentStreak, maxStreak };
+}
+
+function hasTable(table: string) {
+  const row = db
+    .prepare(
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'table' AND name = ?`,
+    )
+    .get(table) as { name?: string } | undefined;
+
+  return Boolean(row?.name);
 }

@@ -30,6 +30,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
+import { authClient } from "@/lib/auth-client";
 import { getScheduleForDate } from "@/lib/schedule";
 import type { CheckinKey, DashboardData, ScheduleBlock } from "@/lib/types";
 import { cn, toDateKey } from "@/lib/utils";
@@ -76,7 +77,15 @@ const checkinCards: Array<[CheckinKey, string, string]> = [
   ["shutdownReview", "Shutdown review", "Close the day properly"],
 ];
 
-export function TrackerDashboard() {
+export function TrackerDashboard({
+  currentUser,
+}: {
+  currentUser: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}) {
   const [activeTab, setActiveTab] =
     useState<(typeof tabs)[number]["id"]>("overview");
   const [data, setData] = useState<DashboardData | null>(null);
@@ -267,6 +276,31 @@ export function TrackerDashboard() {
             </div>
 
             <div className="grid gap-3">
+              <div className="soft-card">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+                      Signed in as
+                    </div>
+                    <div className="mt-2 text-lg font-semibold text-[var(--ink)]">
+                      {currentUser.name}
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--muted)]">
+                      {currentUser.email}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      void authClient.signOut().then(() => {
+                        window.location.href = "/sign-in";
+                      });
+                    }}
+                    className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--line)]"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
               <StatusCard
                 title="Connected stack"
                 body="Next.js frontend, SQLite-backed storage, API routes, Google Sheet sync, and a switchable AI coach."

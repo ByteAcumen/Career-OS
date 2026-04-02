@@ -1,16 +1,26 @@
 import { NextResponse } from "next/server";
 
-import { createApplicationEntry, ensureSettings, markApplicationSynced } from "@/lib/dashboard";
+import { getRequestSession } from "@/lib/auth-session";
+import {
+  createApplicationEntry,
+  ensureSettings,
+  markApplicationSynced,
+} from "@/lib/dashboard";
 import { pushApplicationToSheet } from "@/lib/google-sheet";
 import { applicationEntrySchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
+  const session = await getRequestSession(request);
+  if (!session) {
+    return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+  }
+
   const payload = applicationEntrySchema.parse(await request.json());
-  const entry = createApplicationEntry(payload);
+  const entry = createApplicationEntry(session.user.id, payload);
 
   // Auto-sync in background
   try {
-    const settings = ensureSettings();
+    const settings = ensureSettings(session.user.id);
     if (settings.googleAppsScriptUrl) {
       pushApplicationToSheet(settings.googleAppsScriptUrl, {
         source: "career-tracker-app",
@@ -22,9 +32,11 @@ export async function POST(request: Request) {
         roleUrl: entry.roleUrl ?? "",
         githubUrl: settings.githubUrl ?? "",
         createdAt: new Date().toISOString(),
-      }).then(() => {
-        markApplicationSynced(entry.id);
-      }).catch((error) => console.error("Auto-sync failed", error));
+      })
+        .then(() => {
+          markApplicationSynced(session.user.id, entry.id);
+        })
+        .catch((error) => console.error("Auto-sync failed", error));
     }
   } catch {
     // ignore

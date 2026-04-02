@@ -34,8 +34,8 @@ const MatchSchema = z.object({
 
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
 
-export async function generateMotivation() {
-  const dashboard = await getDashboardData();
+export async function generateMotivation(userId: string) {
+  const dashboard = await getDashboardData(userId);
   const payload = {
     metrics: dashboard.metrics,
     todayCompleted: dashboard.today.checkins,
@@ -52,8 +52,13 @@ export async function generateMotivation() {
   return response.quote;
 }
 
-export async function generateInsight(type: 'dsa' | 'build', title: string, context: string) {
-  const dashboard = await getDashboardData();
+export async function generateInsight(
+  userId: string,
+  type: "dsa" | "build",
+  title: string,
+  context: string,
+) {
+  const dashboard = await getDashboardData(userId);
   const payload = { type, title, context };
   
   const response = await dispatchAiRequest(
@@ -67,8 +72,8 @@ export async function generateInsight(type: 'dsa' | 'build', title: string, cont
   return response.insight;
 }
 
-export async function generateWeaknessCurriculum() {
-  const dashboard = await getDashboardData();
+export async function generateWeaknessCurriculum(userId: string) {
+  const dashboard = await getDashboardData(userId);
   const recentDsa = dashboard.recentDsa;
   
   const payload = {
@@ -86,8 +91,12 @@ export async function generateWeaknessCurriculum() {
   return response.curriculum;
 }
 
-export async function predictApplicationMatch(company: string, role: string) {
-  const dashboard = await getDashboardData();
+export async function predictApplicationMatch(
+  userId: string,
+  company: string,
+  role: string,
+) {
+  const dashboard = await getDashboardData(userId);
   const payload = {
     company,
     role,
@@ -105,8 +114,8 @@ export async function predictApplicationMatch(company: string, role: string) {
   return response;
 }
 
-export async function generateCoachResponse() {
-  const dashboard = await getDashboardData();
+export async function generateCoachResponse(userId: string) {
+  const dashboard = await getDashboardData(userId);
   const payload = {
     target: dashboard.settings.primaryGoal,
     provider: dashboard.settings.aiProvider,

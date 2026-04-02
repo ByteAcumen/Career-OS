@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequestSession } from "@/lib/auth-session";
 import { ensureSettings } from "@/lib/dashboard";
 import { getScheduleForDate } from "@/lib/schedule";
 import { toDateKey } from "@/lib/utils";
@@ -7,7 +8,12 @@ import { toDateKey } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const settings = ensureSettings();
+  const session = await getRequestSession(request);
+  if (!session) {
+    return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+  }
+
+  const settings = ensureSettings(session.user.id);
   const { searchParams } = new URL(request.url);
   const dateKey = searchParams.get("date") ?? toDateKey();
   const schedule = getScheduleForDate(dateKey, settings);

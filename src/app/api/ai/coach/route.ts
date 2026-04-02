@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { getRequestSession } from "@/lib/auth-session";
 import { generateCoachResponse } from "@/lib/ai";
 import { saveCoachResponse } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";
 import { toDateKey } from "@/lib/utils";
 
 export async function POST(request: Request) {
+  const session = await getRequestSession(request);
+  if (!session) {
+    return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+  }
+
   const retryAfterSeconds = rateLimit(request, "ai-coach", {
     limit: 8,
     windowMs: 60_000,
@@ -22,8 +28,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const coach = await generateCoachResponse();
-    saveCoachResponse(toDateKey(), coach);
+    const coach = await generateCoachResponse(session.user.id);
+    saveCoachResponse(session.user.id, toDateKey(), coach);
 
     return NextResponse.json({ ok: true, coach });
   } catch (error) {

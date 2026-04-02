@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getRequestSession } from "@/lib/auth-session";
 import {
   ensureSettings,
   getPendingApplicationsForSync,
@@ -9,6 +10,11 @@ import { pushApplicationToSheet } from "@/lib/google-sheet";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const session = await getRequestSession(request);
+  if (!session) {
+    return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
+  }
+
   const retryAfterSeconds = rateLimit(request, "sheet-sync", {
     limit: 4,
     windowMs: 60_000,
@@ -24,7 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const settings = await ensureSettings();
+  const settings = ensureSettings(session.user.id);
 
   if (!settings.googleAppsScriptUrl) {
     return NextResponse.json(
@@ -33,7 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const pending = getPendingApplicationsForSync();
+  const pending = getPendingApplicationsForSync(session.user.id);
 
   let syncedCount = 0;
 
@@ -50,7 +56,7 @@ export async function POST(request: Request) {
       createdAt: item.createdAt,
     });
 
-    markApplicationSynced(item.id);
+    markApplicationSynced(session.user.id, item.id);
     syncedCount += 1;
   }
 
