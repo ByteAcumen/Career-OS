@@ -58,6 +58,9 @@ const defaultSettings = {
   weeklyBuildTarget: 4,
   weekdayDeepWorkMinutes: 75,
   weekdaySupportMinutes: 35,
+  weekdayTaskTarget: 3,
+  weekendTaskTarget: 5,
+  weeklyTheme: "",
   timerFocusMinutes: 50,
   timerBreakMinutes: 10,
   onboardingCompleted: false,
@@ -168,7 +171,8 @@ export function ensureSettings(userId: string) {
               university, degree, graduationYear, planStyle, customAiInstructions, aiProvider,
               googleAppsScriptUrl, openAiModel, weekendDsaMinutes, weekendBuildMinutes,
               weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget, weekdayDeepWorkMinutes,
-              weekdaySupportMinutes, timerFocusMinutes, timerBreakMinutes
+              weekdaySupportMinutes, weekdayTaskTarget, weekendTaskTarget, weeklyTheme,
+              timerFocusMinutes, timerBreakMinutes
        FROM app_settings
        WHERE userId = ?`,
     )
@@ -184,13 +188,15 @@ export function ensureSettings(userId: string) {
        codechefUrl, hackerrankUrl, jobTrackerUrl, primaryGoal, targetRole, targetCompanies, university, degree,
        graduationYear, planStyle, customAiInstructions, aiProvider, googleAppsScriptUrl, openAiModel,
        weekendDsaMinutes, weekendBuildMinutes, weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
-       weekdayDeepWorkMinutes, weekdaySupportMinutes, timerFocusMinutes, timerBreakMinutes)
+       weekdayDeepWorkMinutes, weekdaySupportMinutes, weekdayTaskTarget, weekendTaskTarget, weeklyTheme,
+       timerFocusMinutes, timerBreakMinutes)
      VALUES
       (@userId, @sheetUrl, @resumeUrl, @githubUrl, @leetcodeUrl, @linkedinUrl, @portfolioUrl, @codeforcesUrl,
        @codechefUrl, @hackerrankUrl, @jobTrackerUrl, @primaryGoal, @targetRole, @targetCompanies, @university, @degree,
        @graduationYear, @planStyle, @customAiInstructions, @aiProvider, @googleAppsScriptUrl, @openAiModel,
        @weekendDsaMinutes, @weekendBuildMinutes, @weeklyDsaTarget, @weeklyApplicationTarget, @weeklyBuildTarget,
-       @weekdayDeepWorkMinutes, @weekdaySupportMinutes, @timerFocusMinutes, @timerBreakMinutes)`,
+       @weekdayDeepWorkMinutes, @weekdaySupportMinutes, @weekdayTaskTarget, @weekendTaskTarget, @weeklyTheme,
+       @timerFocusMinutes, @timerBreakMinutes)`,
   ).run({
     userId,
     ...defaultSettings,
@@ -235,6 +241,9 @@ export function saveSettings(
           weeklyBuildTarget = @weeklyBuildTarget,
           weekdayDeepWorkMinutes = @weekdayDeepWorkMinutes,
           weekdaySupportMinutes = @weekdaySupportMinutes,
+          weekdayTaskTarget = @weekdayTaskTarget,
+          weekendTaskTarget = @weekendTaskTarget,
+          weeklyTheme = @weeklyTheme,
           timerFocusMinutes = @timerFocusMinutes,
           timerBreakMinutes = @timerBreakMinutes,
           updatedAt = CURRENT_TIMESTAMP
@@ -380,6 +389,62 @@ export function createApplicationEntry(
   return { id, ...input };
 }
 
+export function createPlannerTask(
+  userId: string,
+  input: {
+    title: string;
+    details?: string;
+    scope: DashboardData["planner"]["tasks"][number]["scope"];
+    category: DashboardData["planner"]["tasks"][number]["category"];
+    priority: DashboardData["planner"]["tasks"][number]["priority"];
+    estimateMinutes: number;
+    targetDateKey?: string | null;
+  },
+) {
+  const id = randomUUID();
+
+  db.prepare(
+    `INSERT INTO planner_tasks
+      (id, userId, title, details, scope, category, priority, status, estimateMinutes, targetDateKey)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'todo', ?, ?)`,
+  ).run(
+    id,
+    userId,
+    input.title,
+    input.details || null,
+    input.scope,
+    input.category,
+    input.priority,
+    input.estimateMinutes,
+    input.targetDateKey || null,
+  );
+
+  return getPlannerTaskOrThrow(userId, id);
+}
+
+export function updatePlannerTaskStatus(
+  userId: string,
+  id: string,
+  status: DashboardData["planner"]["tasks"][number]["status"],
+) {
+  db.prepare(
+    `UPDATE planner_tasks
+      SET status = ?, updatedAt = CURRENT_TIMESTAMP
+      WHERE userId = ? AND id = ?`,
+  ).run(status, userId, id);
+
+  return getPlannerTaskOrThrow(userId, id);
+}
+
+export function deletePlannerTask(userId: string, id: string) {
+  db.prepare(
+    `DELETE FROM planner_tasks
+     WHERE userId = ? AND id = ?`,
+  ).run(userId, id);
+
+  return { ok: true };
+}
+
 export function getPendingApplicationsForSync(userId: string) {
   return db
     .prepare(
@@ -500,6 +565,21 @@ export async function getDashboardData(
     syncedToSheet: Boolean(item.syncedToSheet),
   }));
 
+  const plannerTasks = db
+    .prepare(
+      `SELECT id, title, details, scope, category, priority, status, estimateMinutes, targetDateKey, createdAt, updatedAt
+       FROM planner_tasks
+       WHERE userId = ?
+       ORDER BY
+        CASE scope WHEN 'daily' THEN 0 WHEN 'weekly' THEN 1 ELSE 2 END,
+        CASE status WHEN 'todo' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
+        CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+        COALESCE(targetDateKey, '9999-12-31') ASC,
+        updatedAt DESC
+       LIMIT 36`,
+    )
+    .all(userId) as DashboardData["planner"]["tasks"];
+
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   const currentWeekSnapshots = history.filter(
     (item) => new Date(`${item.dateKey}T00:00:00`) >= weekStart,
@@ -538,6 +618,7 @@ export async function getDashboardData(
 
   const githubActivity = await fetchGithubActivity(settings.githubUrl);
   const providerStatus = getAiProviderStatus(userId);
+  const plannerSummary = summarizePlannerTasks(plannerTasks, todayKey);
 
   return {
     settings,
@@ -569,6 +650,14 @@ export async function getDashboardData(
       providers: providerStatus.providers,
       providerSources: providerStatus.providerSources,
       savedApiKeys: providerStatus.savedApiKeys,
+    },
+    planner: {
+      tasks: plannerTasks.map((task) => ({
+        ...task,
+        details: task.details ?? "",
+        targetDateKey: task.targetDateKey ?? null,
+      })),
+      summary: plannerSummary,
     },
     today: mapToday(today),
     previousDay: previous
@@ -681,6 +770,65 @@ function getBooleanCount(userId: string, value: boolean) {
   return row.count;
 }
 
+function getPlannerTaskOrThrow(userId: string, id: string) {
+  const task = db
+    .prepare(
+      `SELECT id, title, details, scope, category, priority, status, estimateMinutes, targetDateKey, createdAt, updatedAt
+       FROM planner_tasks
+       WHERE userId = ? AND id = ?`,
+    )
+    .get(userId, id) as DashboardData["planner"]["tasks"][number] | undefined;
+
+  if (!task) {
+    throw new Error("Planner task not found.");
+  }
+
+  return {
+    ...task,
+    details: task.details ?? "",
+    targetDateKey: task.targetDateKey ?? null,
+  };
+}
+
+function summarizePlannerTasks(
+  tasks: DashboardData["planner"]["tasks"],
+  todayKey: string,
+) {
+  const total = tasks.length;
+  const completed = tasks.filter((task) => task.status === "done").length;
+  const active = tasks.filter((task) => task.status !== "done").length;
+  const todayOpen = tasks.filter((task) => {
+    if (task.status === "done") return false;
+    if (task.scope === "daily") {
+      return !task.targetDateKey || task.targetDateKey === todayKey;
+    }
+    return true;
+  }).length;
+
+  const dailyTasks = tasks.filter((task) => task.scope === "daily");
+  const weeklyTasks = tasks.filter((task) => task.scope === "weekly");
+  const weekendTasks = tasks.filter((task) => task.scope === "weekend");
+
+  return {
+    total,
+    completed,
+    active,
+    todayOpen,
+    daily: {
+      total: dailyTasks.length,
+      completed: dailyTasks.filter((task) => task.status === "done").length,
+    },
+    weekly: {
+      total: weeklyTasks.length,
+      completed: weeklyTasks.filter((task) => task.status === "done").length,
+    },
+    weekend: {
+      total: weekendTasks.length,
+      completed: weekendTasks.filter((task) => task.status === "done").length,
+    },
+  };
+}
+
 function normalizeSettings(input: Partial<DashboardData["settings"]>) {
   const normalized = {
     sheetUrl: input.sheetUrl ?? defaultSettings.sheetUrl,
@@ -727,6 +875,13 @@ function normalizeSettings(input: Partial<DashboardData["settings"]>) {
     weekdaySupportMinutes: Number(
       input.weekdaySupportMinutes ?? defaultSettings.weekdaySupportMinutes,
     ),
+    weekdayTaskTarget: Number(
+      input.weekdayTaskTarget ?? defaultSettings.weekdayTaskTarget,
+    ),
+    weekendTaskTarget: Number(
+      input.weekendTaskTarget ?? defaultSettings.weekendTaskTarget,
+    ),
+    weeklyTheme: input.weeklyTheme ?? defaultSettings.weeklyTheme,
     timerFocusMinutes: Number(
       input.timerFocusMinutes ?? defaultSettings.timerFocusMinutes,
     ),

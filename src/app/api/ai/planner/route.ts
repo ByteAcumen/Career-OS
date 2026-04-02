@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getRequestSession } from "@/lib/auth-session";
-import { generateMotivationQuotes } from "@/lib/ai";
+import { generatePlannerSuggestionPack } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +12,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const retryAfterSeconds = rateLimit(request, "ai-motivate", {
-    limit: 15,
+  const retryAfterSeconds = rateLimit(request, `ai-planner:${session.user.id}`, {
+    limit: 8,
     windowMs: 60_000,
   });
 
@@ -28,13 +28,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const quotes = await generateMotivationQuotes(session.user.id);
-    return NextResponse.json({ ok: true, quote: quotes[0], quotes });
+    const suggestions = await generatePlannerSuggestionPack(session.user.id);
+    return NextResponse.json({ ok: true, suggestions });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        message: error instanceof Error ? error.message : "AI motivation failed",
+        message: error instanceof Error ? error.message : "AI planner failed",
       },
       { status: 500 },
     );

@@ -50,7 +50,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
         }
       }
 
-      router.push("/");
+      router.push("/home");
       router.refresh();
     } catch (submitError) {
       setError(

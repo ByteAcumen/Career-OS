@@ -36,8 +36,8 @@ async function main() {
 
   await ensureAuthTables();
 
-  const name = process.env.APP_SEED_NAME?.trim() || "Hemant";
-  const email = process.env.APP_SEED_EMAIL?.trim() || "owner@career-os.local";
+  const name = process.env.APP_SEED_NAME?.trim() || "Career OS Admin";
+  const email = process.env.APP_SEED_EMAIL?.trim() || "admin@career-os.local";
   const password = process.env.APP_SEED_PASSWORD?.trim() || randomBytes(18).toString("base64url");
 
   const existingUser = db

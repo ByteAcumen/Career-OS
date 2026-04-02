@@ -31,6 +31,9 @@ export const settingsSchema = z.object({
   weeklyBuildTarget: z.number().int().min(1).max(20),
   weekdayDeepWorkMinutes: z.number().int().min(30).max(240),
   weekdaySupportMinutes: z.number().int().min(15).max(180),
+  weekdayTaskTarget: z.number().int().min(1).max(8),
+  weekendTaskTarget: z.number().int().min(1).max(12),
+  weeklyTheme: z.string().max(220),
   timerFocusMinutes: z.number().int().min(15).max(180),
   timerBreakMinutes: z.number().int().min(5).max(60),
 });
@@ -93,4 +96,35 @@ export const applicationEntrySchema = z.object({
   ]),
   note: z.string().max(400).optional().default(""),
   roleUrl: z.string().url().or(z.literal("")).optional().default(""),
+});
+
+export const plannerTaskCreateSchema = z.object({
+  title: z.string().min(2).max(160),
+  details: z.string().max(500).optional().default(""),
+  scope: z.enum(["daily", "weekly", "weekend"]),
+  category: z.enum([
+    "revision",
+    "dsa",
+    "build",
+    "application",
+    "interview",
+    "custom",
+  ]),
+  priority: z.enum(["high", "medium", "low"]),
+  estimateMinutes: z.number().int().min(15).max(480),
+  targetDateKey: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional()
+    .default(null),
+});
+
+export const plannerTaskUpdateSchema = z.object({
+  id: z.string().min(8),
+  status: z.enum(["todo", "in_progress", "done"]),
+});
+
+export const plannerTaskDeleteSchema = z.object({
+  id: z.string().min(8),
 });

@@ -115,11 +115,29 @@ function createMultiUserTables() {
       FOREIGN KEY (userId, snapshotDateKey) REFERENCES daily_snapshots(userId, dateKey) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS planner_tasks (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      details TEXT,
+      scope TEXT NOT NULL,
+      category TEXT NOT NULL,
+      priority TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'todo',
+      estimateMinutes INTEGER NOT NULL DEFAULT 45,
+      targetDateKey TEXT,
+      createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES user(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_dsa_entries_user_created ON dsa_entries(userId, createdAt DESC);
     CREATE INDEX IF NOT EXISTS idx_build_entries_user_created ON build_entries(userId, createdAt DESC);
     CREATE INDEX IF NOT EXISTS idx_application_entries_user_created ON application_entries(userId, createdAt DESC);
     CREATE INDEX IF NOT EXISTS idx_application_entries_user_synced ON application_entries(userId, syncedToSheet);
     CREATE INDEX IF NOT EXISTS idx_daily_snapshots_user_date ON daily_snapshots(userId, dateKey DESC);
+    CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_scope_status ON planner_tasks(userId, scope, status, updatedAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_target_date ON planner_tasks(userId, targetDateKey);
 
     CREATE TABLE IF NOT EXISTS user_ai_credentials (
       userId TEXT NOT NULL,
@@ -158,6 +176,17 @@ function ensureAppSettingsColumns() {
     "weekdaySupportMinutes",
     "INTEGER NOT NULL DEFAULT 35",
   );
+  ensureColumn(
+    "app_settings",
+    "weekdayTaskTarget",
+    "INTEGER NOT NULL DEFAULT 3",
+  );
+  ensureColumn(
+    "app_settings",
+    "weekendTaskTarget",
+    "INTEGER NOT NULL DEFAULT 5",
+  );
+  ensureColumn("app_settings", "weeklyTheme", "TEXT");
 }
 
 function migrateLegacySingleUserTables() {

@@ -2,6 +2,7 @@
 
 import { format, parseISO, subDays } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
   Activity,
   ArrowUpRight,
@@ -26,27 +27,58 @@ import {
   Sparkles,
   X
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
+import { ActivityBarChart } from "@/components/activity-bar-chart";
 import { AiKeyManager } from "@/components/ai-key-manager";
+import { MotivationCarousel } from "@/components/motivation-carousel";
 import { StudentOnboarding } from "@/components/student-onboarding";
 import { StudentStrategyPanel } from "@/components/student-strategy-panel";
+import { TaskBoard } from "@/components/task-board";
 import { authClient } from "@/lib/auth-client";
 import { getScheduleForDate } from "@/lib/schedule";
-import type { AiProvider, CheckinKey, DashboardData, ScheduleBlock, StudentStrategy } from "@/lib/types";
+import type {
+  AiProvider,
+  CheckinKey,
+  DashboardData,
+  PlannerSuggestion,
+  PlannerSuggestionPack,
+  PlannerTaskStatus,
+  ScheduleBlock,
+  StudentStrategy,
+} from "@/lib/types";
 import { cn, toDateKey } from "@/lib/utils";
 
 type SettingsForm = DashboardData["settings"];
 type ScheduleItem = [string, string, string];
+type PlannerTaskForm = {
+  title: string;
+  details: string;
+  scope: "daily" | "weekly" | "weekend";
+  category: "revision" | "dsa" | "build" | "application" | "interview" | "custom";
+  priority: "high" | "medium" | "low";
+  estimateMinutes: number;
+  targetDateKey: string;
+};
 
 const tabs = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "today", label: "Today", icon: Target },
-  { id: "history", label: "History", icon: Activity },
-  { id: "settings", label: "Settings", icon: Database },
+  { id: "overview", label: "Home", href: "/home", icon: LayoutDashboard },
+  { id: "today", label: "Planner", href: "/planner", icon: Target },
+  { id: "history", label: "Progress", href: "/progress", icon: Activity },
+  { id: "settings", label: "Settings", href: "/settings", icon: Database },
 ] as const;
+
+export type DashboardTabId = (typeof tabs)[number]["id"];
+
+const tabByPathname: Record<string, DashboardTabId> = {
+  "/": "overview",
+  "/home": "overview",
+  "/planner": "today",
+  "/progress": "history",
+  "/settings": "settings",
+};
 
 const dsaPatterns = [
   "Arrays and Hashing",
@@ -82,15 +114,17 @@ const checkinCards: Array<[CheckinKey, string, string]> = [
 
 export function TrackerDashboard({
   currentUser,
+  initialTab = "overview",
 }: {
   currentUser: {
     id: string;
     name: string;
     email: string;
   };
+  initialTab?: DashboardTabId;
 }) {
-  const [activeTab, setActiveTab] =
-    useState<(typeof tabs)[number]["id"]>("overview");
+  const pathname = usePathname();
+  const activeTab = tabByPathname[pathname] ?? initialTab;
   const [data, setData] = useState<DashboardData | null>(null);
   const [toast, setToast] = useState("");
   const [isPending, startUiRefresh] = useTransition();
@@ -121,10 +155,29 @@ export function TrackerDashboard({
     note: "",
     tomorrowTask: "",
   });
-  const [motivation, setMotivation] = useState<string | null>(null);
+  const [motivationQuotes, setMotivationQuotes] = useState<string[]>([]);
   const [studentStrategy, setStudentStrategy] = useState<StudentStrategy | null>(null);
   const [strategyLoading, setStrategyLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.sessionStorage.getItem("career-os-onboarding-dismissed") === "true";
+  });
+  const [plannerSuggestions, setPlannerSuggestions] = useState<PlannerSuggestionPack | null>(null);
+  const [plannerSuggestionsLoading, setPlannerSuggestionsLoading] = useState(false);
+  const [taskForm, setTaskForm] = useState<PlannerTaskForm>({
+    title: "",
+    details: "",
+    scope: "daily" as const,
+    category: "revision" as const,
+    priority: "high" as const,
+    estimateMinutes: 45,
+    targetDateKey: toDateKey(),
+  });
+  const lastMotivationSeedRef = useRef("");
 
   const todayKey = data?.today.dateKey ?? toDateKey();
 
@@ -215,6 +268,79 @@ export function TrackerDashboard({
     }
   }
 
+  async function createTask() {
+    if (!taskForm.title.trim()) {
+      setToast("Add a task title first.");
+      return;
+    }
+
+    await runAction(
+      `task-${taskForm.scope}`,
+      async () => {
+        await postJson("/api/tasks", {
+          ...taskForm,
+          targetDateKey: taskForm.scope === "daily" ? taskForm.targetDateKey : null,
+        });
+        setTaskForm((current) => ({
+          ...current,
+          title: "",
+          details: "",
+          estimateMinutes:
+            current.scope === "weekend" ? 90 : current.scope === "weekly" ? 60 : 45,
+          targetDateKey: todayKey,
+        }));
+      },
+      "Planner task saved.",
+    );
+  }
+
+  async function updateTaskStatus(id: string, status: PlannerTaskStatus) {
+    await runAction(
+      `task-${status}`,
+      () => postJson("/api/tasks", { id, status }, { method: "PATCH" }),
+      "Planner task updated.",
+    );
+  }
+
+  async function removeTask(id: string) {
+    await runAction(
+      "delete-task",
+      () => postJson("/api/tasks", { id }, { method: "DELETE" }),
+      "Planner task removed.",
+    );
+  }
+
+  async function generatePlannerSuggestions() {
+    setPlannerSuggestionsLoading(true);
+    try {
+      const response = await postJson<{ ok: boolean; suggestions: PlannerSuggestionPack }>(
+        "/api/ai/planner",
+        undefined,
+        { method: "POST" },
+      );
+      if (response.suggestions) {
+        setPlannerSuggestions(response.suggestions);
+        setToast("AI task pack generated.");
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Could not generate task suggestions");
+    } finally {
+      setPlannerSuggestionsLoading(false);
+    }
+  }
+
+  async function importSuggestion(suggestion: PlannerSuggestion) {
+    await runAction(
+      `import-${suggestion.scope}`,
+      () =>
+        postJson("/api/tasks", {
+          ...suggestion,
+          targetDateKey: suggestion.scope === "daily" ? todayKey : null,
+        }),
+      "Suggestion added to planner.",
+    );
+  }
+
   useEffect(() => {
     void loadDashboard().catch((error: unknown) => {
       setToast(error instanceof Error ? error.message : "Could not load dashboard");
@@ -228,22 +354,49 @@ export function TrackerDashboard({
   }, [toast]);
 
   useEffect(() => {
-    if (data?.integrations.aiReady && !motivation) {
-      postJson<{ quote: string }>("/api/ai/motivate", undefined, { method: "POST" })
+    if (!settings) return;
+
+    const fallbackQuotes = buildFallbackQuotes(settings.targetRole);
+    const motivationSeed = [
+      data?.integrations.aiReady ? "ai" : "fallback",
+      settings.targetRole,
+      settings.primaryGoal,
+      settings.weeklyTheme,
+    ].join("|");
+
+    if (lastMotivationSeedRef.current === motivationSeed) {
+      return;
+    }
+
+    lastMotivationSeedRef.current = motivationSeed;
+
+    if (data?.integrations.aiReady) {
+      postJson<{ quote: string; quotes?: string[] }>("/api/ai/motivate", undefined, { method: "POST" })
         .then((res) => {
-          if (res && res.quote) setMotivation(res.quote);
+          const quotes = res.quotes?.filter(Boolean) ?? [];
+          setMotivationQuotes(quotes.length ? quotes : fallbackQuotes);
         })
         .catch(() => {
-          // ignore motivation failure
+          setMotivationQuotes(fallbackQuotes);
         });
+      return;
     }
-  }, [data, motivation]);
+
+    setMotivationQuotes(fallbackQuotes);
+  }, [data?.integrations.aiReady, settings]);
 
   useEffect(() => {
-    if (settings && !settings.onboardingCompleted) {
+    if (settings && !settings.onboardingCompleted && !onboardingDismissed) {
       setShowOnboarding(true);
     }
-  }, [settings]);
+  }, [onboardingDismissed, settings]);
+
+  useEffect(() => {
+    setTaskForm((current) => ({
+      ...current,
+      targetDateKey: todayKey,
+    }));
+  }, [todayKey]);
 
   if (!data || !settings) {
     return (
@@ -264,16 +417,16 @@ export function TrackerDashboard({
       tone: "bg-[var(--gold-soft)] text-amber-500",
     },
     {
-      label: "Weekly Target",
-      value: `${data.metrics.targetProgress.dsa}%`,
-      icon: BrainCircuit,
-      tone: "bg-[var(--teal-soft)] text-teal-400",
-    },
-    {
       label: "Applications",
       value: data.metrics.weekApplications,
       icon: Briefcase,
       tone: "bg-[var(--rose-soft)] text-rose-400",
+    },
+    {
+      label: "Tasks Open",
+      value: data.planner.summary.todayOpen,
+      icon: BrainCircuit,
+      tone: "bg-[var(--teal-soft)] text-teal-400",
     },
     {
       label: "Max Streak",
@@ -305,27 +458,38 @@ export function TrackerDashboard({
               <h1 className="heading-font max-w-3xl text-4xl leading-[0.95] sm:text-5xl lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-white to-neutral-400">
                 Proper tracker. Proper storage. Proper momentum.
               </h1>
-              {motivation && (
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-4 italic text-[var(--teal)] font-medium text-lg leading-relaxed">
-                  &quot;{motivation}&quot;
-                </motion.div>
-              )}
               <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-base">
                 This app stores your study data in a real database, keeps your
                 links and application systems separate per user, and runs AI on the
                 backend so credentials stay out of the browser. It is designed for
                 interview preparation that needs structure, momentum, and clarity.
               </p>
-              <div className="mt-4 inline-flex max-w-2xl text-wrap rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--ink)]">
-                {settings.primaryGoal}
+              <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[24px] border border-[var(--line)] bg-[var(--card)] px-4 py-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+                    Primary Goal
+                  </div>
+                  <div className="mt-3 text-sm leading-7 text-[var(--ink)]">
+                    {settings.primaryGoal}
+                  </div>
+                  {settings.weeklyTheme ? (
+                    <div className="mt-4 inline-flex rounded-full bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                      Weekly theme: {settings.weeklyTheme}
+                    </div>
+                  ) : null}
+                </div>
+                <MotivationCarousel quotes={motivationQuotes} />
               </div>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <QuickLink href={settings.githubUrl} icon={GitBranch} label="GitHub" />
-                <QuickLink href={settings.jobTrackerUrl || settings.sheetUrl} icon={Briefcase} label="Job tracker" />
-                <QuickLink href={settings.resumeUrl} icon={Link2} label="Resume" />
-                <QuickLink href={settings.leetcodeUrl} icon={Target} label="LeetCode" />
-                <QuickLink href={settings.linkedinUrl} icon={Link2} label="LinkedIn" />
-              </div>
+              {hasAnyProfileLink(settings) ? (
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <QuickLink href={settings.githubUrl} icon={GitBranch} label="GitHub" />
+                  <QuickLink href={settings.jobTrackerUrl} icon={Briefcase} label="Job tracker" />
+                  <QuickLink href={settings.sheetUrl} icon={CalendarRange} label="Application sheet" />
+                  <QuickLink href={settings.resumeUrl} icon={Link2} label="Resume" />
+                  <QuickLink href={settings.leetcodeUrl} icon={Target} label="LeetCode" />
+                  <QuickLink href={settings.linkedinUrl} icon={Link2} label="LinkedIn" />
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-3">
@@ -361,12 +525,12 @@ export function TrackerDashboard({
               />
               <StatusCard
                 title="Weekend loadout"
-                body={`${settings.weekendDsaMinutes} minutes for DSA and ${settings.weekendBuildMinutes} minutes for build work are reserved for your heavier weekend sessions.`}
+                body={`${settings.weekendDsaMinutes} minutes for DSA, ${settings.weekendBuildMinutes} minutes for build work, and room for ${settings.weekendTaskTarget} heavier weekend tasks.`}
                 icon={Clock3}
               />
               <StatusCard
-                title="Pending sheet sync"
-                body={`${data.metrics.pendingApplications} application entries still need to be pushed to your Google Sheet.`}
+                title="Planner pressure"
+                body={`${data.planner.summary.todayOpen} active tasks are still open across your daily, weekly, and weekend lanes.`}
                 icon={RefreshCcw}
               />
             </div>
@@ -377,9 +541,10 @@ export function TrackerDashboard({
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button
+              <Link
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                href={tab.href}
+                aria-current={activeTab === tab.id ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition",
                   activeTab === tab.id
@@ -389,7 +554,7 @@ export function TrackerDashboard({
               >
                 <Icon className="size-4" />
                 {tab.label}
-              </button>
+              </Link>
             );
           })}
         </div>
@@ -439,19 +604,28 @@ export function TrackerDashboard({
             )}
             {activeTab === "today" && (
               <motion.div key="today" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-                <TodayTab
+                <PlannerTab
                   data={data}
                   settings={settings}
                   todayKey={todayKey}
                   scheduleBlocks={scheduleBlocks}
                   reviewForm={reviewForm}
                   setReviewForm={setReviewForm}
+                  taskForm={taskForm}
+                  setTaskForm={setTaskForm}
                   dsaForm={dsaForm}
                   setDsaForm={setDsaForm}
                   buildForm={buildForm}
                   setBuildForm={setBuildForm}
                   applicationForm={applicationForm}
                   setApplicationForm={setApplicationForm}
+                  plannerSuggestions={plannerSuggestions}
+                  plannerSuggestionsLoading={plannerSuggestionsLoading}
+                  onGeneratePlannerSuggestions={generatePlannerSuggestions}
+                  onImportSuggestion={importSuggestion}
+                  onCreateTask={createTask}
+                  onUpdateTaskStatus={updateTaskStatus}
+                  onDeleteTask={removeTask}
                   setToast={setToast}
                   runAction={runAction}
                 />
@@ -497,11 +671,17 @@ export function TrackerDashboard({
                 async () => {
                   await postJson("/api/settings", settings);
                   setShowOnboarding(false);
+                  setOnboardingDismissed(false);
+                  window.sessionStorage.removeItem("career-os-onboarding-dismissed");
                 },
                 "Workspace setup saved.",
               )
             }
-            onDismiss={() => setShowOnboarding(false)}
+            onDismiss={() => {
+              setShowOnboarding(false);
+              setOnboardingDismissed(true);
+              window.sessionStorage.setItem("career-os-onboarding-dismissed", "true");
+            }}
           />
         ) : null}
       </div>
@@ -645,38 +825,61 @@ function OverviewTab({
           />
         </Panel>
 
-        <Panel title="14-day momentum" subtitle="Progress looks better when the data survives each day.">
-          <div className="h-[240px] w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-              <BarChart data={data.history.slice(-14)} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
-                <XAxis 
-                  dataKey="dateKey" 
-                  tickFormatter={(v) => format(parseISO(`${v}T00:00:00`), "dd MMM")} 
-                  stroke="var(--muted)" 
-                  fontSize={11} 
-                  tickLine={false} 
-                  axisLine={false} 
-                />
-                <YAxis 
-                  stroke="var(--muted)" 
-                  fontSize={11} 
-                  tickLine={false} 
-                  axisLine={false} 
-                  allowDecimals={false}
-                />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                  contentStyle={{ backgroundColor: 'var(--paper-strong)', borderColor: 'var(--line)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(255,255,255,0.1)' }}
-                  itemStyle={{ color: 'var(--ink)' }}
-                  labelFormatter={(v) => format(parseISO(`${v}T00:00:00`), "EEEE, dd MMM")}
-                />
-                <Bar dataKey="dsaCount" name="DSA" stackId="a" fill="#2dd4bf" radius={[0, 0, 4, 4]} maxBarSize={40} />
-                <Bar dataKey="buildCount" name="Builds" stackId="a" fill="#0ea5e9" maxBarSize={40} />
-                <Bar dataKey="appCount" name="Apps" stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+        <Panel
+          title="Planner snapshot"
+          subtitle="Daily, weekly, and weekend commitments in one place."
+        >
+          <div className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
+            <div className="grid gap-3">
+              <TargetProgressRow
+                label="Daily tasks"
+                current={data.planner.summary.daily.completed}
+                target={Math.max(data.planner.summary.daily.total, settings.weekdayTaskTarget)}
+                progress={toProgressPercent(
+                  data.planner.summary.daily.completed,
+                  Math.max(data.planner.summary.daily.total, settings.weekdayTaskTarget),
+                )}
+              />
+              <TargetProgressRow
+                label="Weekend tasks"
+                current={data.planner.summary.weekend.completed}
+                target={Math.max(
+                  data.planner.summary.weekend.total,
+                  settings.weekendTaskTarget,
+                )}
+                progress={toProgressPercent(
+                  data.planner.summary.weekend.completed,
+                  Math.max(
+                    data.planner.summary.weekend.total,
+                    settings.weekendTaskTarget,
+                  ),
+                )}
+              />
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {data.planner.tasks.slice(0, 4).map((task) => (
+                <div key={task.id} className="soft-card">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--ink)]">{task.title}</div>
+                    <span className="rounded-full bg-white/6 px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+                      {task.scope}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                    {task.details || `${task.estimateMinutes} min ${task.category} block`}
+                  </div>
+                </div>
+              ))}
+              {!data.planner.tasks.length ? (
+                <EmptyState text="Your planner is empty. Add daily, weekly, and weekend tasks from the Planner tab." />
+              ) : null}
+            </div>
           </div>
+        </Panel>
+
+        <Panel title="14-day momentum" subtitle="Progress looks better when the data survives each day.">
+          <ActivityBarChart data={data.history.slice(-14)} />
         </Panel>
 
         <Panel title="Recent proof of work" subtitle="The output recruiters can actually believe.">
@@ -837,7 +1040,8 @@ function OverviewTab({
                   ["LinkedIn", settings.linkedinUrl],
                   ["Portfolio", settings.portfolioUrl],
                   ["Codeforces", settings.codeforcesUrl],
-                  ["Job tracker", settings.jobTrackerUrl || settings.sheetUrl],
+                  ["Job tracker", settings.jobTrackerUrl],
+                  ["Application sheet", settings.sheetUrl],
                 ].map(([label, href]) =>
                   href ? (
                     <a
@@ -876,19 +1080,28 @@ function OverviewTab({
   );
 }
 
-function TodayTab({
+function PlannerTab({
   data,
   settings,
   todayKey,
   scheduleBlocks,
   reviewForm,
   setReviewForm,
+  taskForm,
+  setTaskForm,
   dsaForm,
   setDsaForm,
   buildForm,
   setBuildForm,
   applicationForm,
   setApplicationForm,
+  plannerSuggestions,
+  plannerSuggestionsLoading,
+  onGeneratePlannerSuggestions,
+  onImportSuggestion,
+  onCreateTask,
+  onUpdateTaskStatus,
+  onDeleteTask,
   setToast,
   runAction,
 }: {
@@ -898,6 +1111,8 @@ function TodayTab({
   scheduleBlocks: ScheduleBlock[];
   reviewForm: { note: string; tomorrowTask: string };
   setReviewForm: React.Dispatch<React.SetStateAction<{ note: string; tomorrowTask: string }>>;
+  taskForm: PlannerTaskForm;
+  setTaskForm: React.Dispatch<React.SetStateAction<PlannerTaskForm>>;
   dsaForm: { title: string; difficulty: string; pattern: string; insight: string; repositoryUrl: string };
   setDsaForm: React.Dispatch<
     React.SetStateAction<{
@@ -928,12 +1143,40 @@ function TodayTab({
       roleUrl: string;
     }>
   >;
+  plannerSuggestions: PlannerSuggestionPack | null;
+  plannerSuggestionsLoading: boolean;
+  onGeneratePlannerSuggestions: () => void;
+  onImportSuggestion: (suggestion: PlannerSuggestion) => void;
+  onCreateTask: () => void;
+  onUpdateTaskStatus: (id: string, status: PlannerTaskStatus) => void;
+  onDeleteTask: (id: string) => void;
   setToast: React.Dispatch<React.SetStateAction<string>>;
   runAction: <T>(label: string, request: () => Promise<T>, successMessage: string) => Promise<void>;
 }) {
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="grid gap-5">
+        <Panel
+          title="Task planner"
+          subtitle="Organize daily, weekly, and weekend work with manual or AI-generated task packs."
+        >
+          <TaskBoard
+            tasks={data.planner.tasks}
+            summary={data.planner.summary}
+            todayKey={todayKey}
+            form={taskForm}
+            setForm={setTaskForm}
+            onCreateTask={() => void onCreateTask()}
+            onAdvanceTask={(task, nextStatus) => void onUpdateTaskStatus(task.id, nextStatus)}
+            onDeleteTask={(id) => void onDeleteTask(id)}
+            aiReady={data.integrations.aiReady}
+            suggestions={plannerSuggestions}
+            suggestionsLoading={plannerSuggestionsLoading}
+            onGenerateSuggestions={onGeneratePlannerSuggestions}
+            onImportSuggestion={(suggestion) => void onImportSuggestion(suggestion)}
+          />
+        </Panel>
+
         <FocusToolsPanel
           dateKey={todayKey}
           settings={settings}
@@ -1413,7 +1656,7 @@ function SettingsTab({
 }) {
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-      <Panel title="App settings" subtitle="Customize the app without touching code.">
+      <Panel title="Settings studio" subtitle="Own your workflow, links, AI behavior, and weekly operating model.">
         <div className="grid gap-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-[var(--ink)] block">Primary Goal</label>
@@ -1505,6 +1748,20 @@ function SettingsTab({
           </div>
 
           <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[var(--ink)] block">Weekly Theme</label>
+            <input
+              value={settings.weeklyTheme}
+              onChange={(event) =>
+                setSettings((current) =>
+                  current ? { ...current, weeklyTheme: event.target.value } : current,
+                )
+              }
+              className="field"
+              placeholder="Example: Graphs and backend systems, OA sprint, resume polish week"
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <label className="text-sm font-medium text-[var(--ink)] block">Custom AI Instructions</label>
             <textarea
               value={settings.customAiInstructions}
@@ -1522,14 +1779,14 @@ function SettingsTab({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Job Tracker / Sheet URL</label>
+              <label className="text-sm font-medium text-[var(--ink)] block">Application Sheet URL</label>
               <input
                 value={settings.sheetUrl}
                 onChange={(event) =>
                   setSettings((current) => (current ? { ...current, sheetUrl: event.target.value } : current))
                 }
                 className="field"
-                placeholder="Job tracker URL"
+                placeholder="Google Sheet / Airtable used to log applications"
               />
             </div>
             
@@ -1608,14 +1865,14 @@ function SettingsTab({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Dedicated Job Tracker URL</label>
+              <label className="text-sm font-medium text-[var(--ink)] block">Job Tracker Board URL</label>
               <input
                 value={settings.jobTrackerUrl}
                 onChange={(event) =>
                   setSettings((current) => (current ? { ...current, jobTrackerUrl: event.target.value } : current))
                 }
                 className="field"
-                placeholder="Notion / Airtable / sheet"
+                placeholder="Notion / dashboard / primary tracker board"
               />
             </div>
           </div>
@@ -1764,6 +2021,35 @@ function SettingsTab({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekday Task Target</label>
+              <input
+                type="number"
+                value={settings.weekdayTaskTarget}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weekdayTaskTarget: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekend Task Target</label>
+              <input
+                type="number"
+                value={settings.weekendTaskTarget}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weekendTaskTarget: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
               <label className="text-sm font-medium text-[var(--ink)] block">Weekend DSA Minutes</label>
               <input
                 type="number"
@@ -1868,35 +2154,37 @@ function SettingsTab({
         </div>
       </Panel>
 
-      <Panel title="Operating model" subtitle="How this workspace now behaves like a real multi-user product.">
+      <Panel title="Workspace health" subtitle="Live feedback on personalization, planning, and security posture.">
         <div className="space-y-4 text-sm leading-7 text-[var(--muted)]">
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Per-user personalization</strong>
+            <strong className="text-[var(--ink)]">Personalization coverage</strong>
             <p className="mt-2">
-              Your profile, targets, planning style, and platform links are now user-specific.
-              That means different students can use the same app without inheriting someone else&apos;s
-              GitHub, LeetCode, or job tracker defaults.
+              {settings.onboardingCompleted
+                ? "Your main profile inputs are complete, so the planner and AI can use your role, targets, and links."
+                : "Finish onboarding details to unlock more specific AI suggestions and cleaner planner defaults."}
             </p>
           </div>
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Protected AI usage</strong>
+            <strong className="text-[var(--ink)]">Learning progress</strong>
             <p className="mt-2">
-              AI calls stay on the server. Users can save provider keys into their account and the
-              app uses those securely without sending the raw key back to the browser.
+              You have {data.metrics.weekDsa} DSA logs, {data.metrics.weekBuilds} build logs, and{" "}
+              {data.metrics.weekApplications} applications this week. The planner currently tracks{" "}
+              {data.planner.summary.active} active tasks.
             </p>
           </div>
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Student-specific coaching</strong>
+            <strong className="text-[var(--ink)]">Planner defaults</strong>
             <p className="mt-2">
-              The AI suggestions now have richer profile context: role target, companies,
-              university, plan style, recent output, and application momentum.
+              Weekdays aim for {settings.weekdayTaskTarget} key tasks, while weekends expect{" "}
+              {settings.weekendTaskTarget}. Weekend blocks stay heavier with{" "}
+              {settings.weekendDsaMinutes + settings.weekendBuildMinutes} focused minutes reserved.
             </p>
           </div>
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Next production step</strong>
+            <strong className="text-[var(--ink)]">Security posture</strong>
             <p className="mt-2">
-              For full hosted scale, keep this product design but move the database from SQLite to a
-              managed PostgreSQL instance. The app logic is already structured so that migration is practical.
+              Auth stays server-side, AI keys are encrypted at rest, and profile links are blank by
+              default so new users do not inherit someone else&apos;s GitHub, LeetCode, or tracker setup.
             </p>
           </div>
         </div>
@@ -2205,6 +2493,33 @@ function Panel({
       {children}
     </section>
   );
+}
+
+function hasAnyProfileLink(settings: SettingsForm) {
+  return Boolean(
+    settings.githubUrl ||
+      settings.jobTrackerUrl ||
+      settings.sheetUrl ||
+      settings.resumeUrl ||
+      settings.leetcodeUrl ||
+      settings.linkedinUrl,
+  );
+}
+
+function buildFallbackQuotes(targetRole: string) {
+  const role = (targetRole || "software engineer").trim();
+
+  return [
+    `Protect one serious block of work today and let it compound into the ${role} role you want.`,
+    `Interviews reward the quiet reps, so keep showing up for the work that makes you a sharper ${role}.`,
+    `If you move one part of your ${role} prep forward today, the week still counts.`,
+    `Finish the next task cleanly, then let consistency do the recruiting for you.`,
+  ];
+}
+
+function toProgressPercent(value: number, target: number) {
+  if (!target) return 0;
+  return Math.min(100, Math.round((value / target) * 100));
 }
 
 function QuickLink({

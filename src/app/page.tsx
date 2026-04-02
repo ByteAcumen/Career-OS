@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { TrackerDashboard } from "@/components/tracker-dashboard";
 import { getServerSession } from "@/lib/auth-session";
 
 export default async function Home() {
@@ -10,13 +9,5 @@ export default async function Home() {
     redirect("/sign-in");
   }
 
-  return (
-    <TrackerDashboard
-      currentUser={{
-        id: session.user.id,
-        name: session.user.name,
-        email: session.user.email,
-      }}
-    />
-  );
+  redirect("/home");
 }

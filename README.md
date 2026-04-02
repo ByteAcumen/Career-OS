@@ -1,21 +1,17 @@
 # Career OS
 
-A full-stack personal operating system for structured interview prep, project execution, and job application tracking.
-
-Built for a final-year engineering student actively applying for software roles and balancing:
-
-- Java DSA practice
-- React, TypeScript, and NestJS project work
-- AI project proof
-- daily execution tracking
-- recruiter and application follow-up
+A full-stack student workspace for interview prep, project execution, planner management, and job application tracking.
 
 ## Features
 
+- Multi-user auth with isolated student data
 - Daily study tracker with revision, deep-work, and shutdown review blocks
+- Daily, weekly, and weekend task planner with customizable targets
 - DSA logging with difficulty, pattern, insight, and proof link
 - Build logging for frontend, backend, TypeScript, AI, and system design work
 - Application tracking with Google Sheets sync support
+- Personalized settings for profile links, target role, planning style, and weekly theme
+- AI task-pack suggestions, coaching, and motivational header quotes
 - AI coach panel with switchable providers:
   - OpenAI
   - Gemini
@@ -26,6 +22,7 @@ Built for a final-year engineering student actively applying for software roles 
 - One-click calendar export for your daily schedule
 - GitHub and LeetCode profile linking
 - Local persistent storage with SQLite
+- Encrypted per-user AI key storage on the server
 - API hardening with rate limiting and security headers
 
 ## Tech Stack
@@ -62,6 +59,8 @@ Create a local `.env` file:
 
 ```bash
 DATABASE_FILE=./data/career-tracker.db
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:3000
 OPENAI_API_KEY=
 GEMINI_API_KEY=
 OPENROUTER_API_KEY=
@@ -77,7 +76,7 @@ The app lets you choose the active AI provider from the Settings page.
 - `gemini` uses the Gemini REST API
 - `openrouter` uses OpenRouter's OpenAI-compatible chat completions endpoint
 
-If the selected provider key is missing, the AI coach button stays disabled instead of failing noisily.
+If the selected provider key is missing, the AI features stay disabled instead of failing noisily.
 
 Recommended default:
 
@@ -97,7 +96,7 @@ To enable application sync:
 ## Project Structure
 
 - `src/app` - routes and API handlers
-- `src/components` - dashboard UI
+- `src/components` - dashboard UI, planner, analytics, and settings surfaces
 - `src/lib` - storage, AI, and shared server logic
 - `data` - local SQLite database file
 

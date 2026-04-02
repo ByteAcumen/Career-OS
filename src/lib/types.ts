@@ -16,6 +16,20 @@ export type AiProvider = "openai" | "gemini" | "openrouter";
 
 export type AiProviderSource = "user" | "server" | "none";
 
+export type PlannerTaskScope = "daily" | "weekly" | "weekend";
+
+export type PlannerTaskStatus = "todo" | "in_progress" | "done";
+
+export type PlannerTaskPriority = "high" | "medium" | "low";
+
+export type PlannerTaskCategory =
+  | "revision"
+  | "dsa"
+  | "build"
+  | "application"
+  | "interview"
+  | "custom";
+
 export type ScheduleBlock = {
   key: string;
   label: string;
@@ -55,6 +69,9 @@ export type DashboardData = {
     weeklyBuildTarget: number;
     weekdayDeepWorkMinutes: number;
     weekdaySupportMinutes: number;
+    weekdayTaskTarget: number;
+    weekendTaskTarget: number;
+    weeklyTheme: string;
     timerFocusMinutes: number;
     timerBreakMinutes: number;
     onboardingCompleted: boolean;
@@ -95,6 +112,39 @@ export type DashboardData = {
       openai: boolean;
       gemini: boolean;
       openrouter: boolean;
+    };
+  };
+  planner: {
+    tasks: Array<{
+      id: string;
+      title: string;
+      details: string;
+      scope: PlannerTaskScope;
+      category: PlannerTaskCategory;
+      priority: PlannerTaskPriority;
+      status: PlannerTaskStatus;
+      estimateMinutes: number;
+      targetDateKey: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    summary: {
+      total: number;
+      completed: number;
+      active: number;
+      todayOpen: number;
+      daily: {
+        total: number;
+        completed: number;
+      };
+      weekly: {
+        total: number;
+        completed: number;
+      };
+      weekend: {
+        total: number;
+        completed: number;
+      };
     };
   };
   today: {
@@ -166,4 +216,20 @@ export type StudentStrategy = {
   applicationPriority: string;
   mockInterviewTask: string;
   realityCheck: string;
+};
+
+export type PlannerSuggestion = {
+  title: string;
+  details: string;
+  scope: PlannerTaskScope;
+  category: PlannerTaskCategory;
+  priority: PlannerTaskPriority;
+  estimateMinutes: number;
+};
+
+export type PlannerSuggestionPack = {
+  headline: string;
+  daily: PlannerSuggestion[];
+  weekly: PlannerSuggestion[];
+  weekend: PlannerSuggestion[];
 };

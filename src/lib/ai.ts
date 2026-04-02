@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { resolveAiProviderKey } from "@/lib/ai-credentials";
 import { getDashboardData } from "@/lib/dashboard";
-import type { StudentStrategy } from "@/lib/types";
+import type { PlannerSuggestionPack, StudentStrategy } from "@/lib/types";
 
 const CoachResponseSchema = z.object({
   summary: z.string(),
@@ -18,7 +18,7 @@ const CoachResponseSchema = z.object({
 });
 
 const MotivationSchema = z.object({
-  quote: z.string(),
+  quotes: z.array(z.string()).min(3).max(6),
 });
 
 const InsightSchema = z.object({
@@ -44,9 +44,32 @@ const StudentStrategySchema = z.object({
   realityCheck: z.string(),
 });
 
+const PlannerSuggestionItemSchema = z.object({
+  title: z.string(),
+  details: z.string(),
+  scope: z.enum(["daily", "weekly", "weekend"]),
+  category: z.enum([
+    "revision",
+    "dsa",
+    "build",
+    "application",
+    "interview",
+    "custom",
+  ]),
+  priority: z.enum(["high", "medium", "low"]),
+  estimateMinutes: z.number().int().min(15).max(480),
+});
+
+const PlannerSuggestionPackSchema = z.object({
+  headline: z.string(),
+  daily: z.array(PlannerSuggestionItemSchema).min(1).max(6),
+  weekly: z.array(PlannerSuggestionItemSchema).min(1).max(8),
+  weekend: z.array(PlannerSuggestionItemSchema).min(1).max(8),
+});
+
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
 
-export async function generateMotivation(userId: string) {
+export async function generateMotivationQuotes(userId: string) {
   const dashboard = await getDashboardData(userId);
   const payload = {
     profile: {
@@ -54,21 +77,23 @@ export async function generateMotivation(userId: string) {
       planStyle: dashboard.settings.planStyle,
       university: dashboard.settings.university,
       graduationYear: dashboard.settings.graduationYear,
+      weeklyTheme: dashboard.settings.weeklyTheme,
     },
     metrics: dashboard.metrics,
     todayCompleted: dashboard.today.checkins,
+    planner: dashboard.planner.summary,
   };
 
   const response = await dispatchAiRequest(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
-    "You are an intense elite engineering coach. Generate a single highly motivating 1-sentence quote based on today's progress to get the user to execute deep work. Be sharp and slightly aggressive.",
-    "Return only a JSON object with a single string field 'quote'.",
+    "You are an intense but constructive engineering career coach. Generate 4 short, sharp motivational quotes that feel specific to the student's current progress and targets. Each quote must be one sentence and should push the user toward immediate action.",
+    "Return only a JSON object with a single array field 'quotes'.",
     MotivationSchema,
     userId,
   );
-  return response.quote;
+  return response.quotes;
 }
 
 export async function generateInsight(
@@ -223,6 +248,48 @@ export async function generateStudentStrategy(userId: string): Promise<StudentSt
     "You are an elite placement strategist for engineering students. Produce a practical, student-specific interview preparation strategy using the stored profile, history, and current momentum. Be concrete, realistic, and prioritize the highest ROI actions.",
     "Return only a JSON object with these exact string fields: headline, todayMission, dsaPriority, buildPriority, applicationPriority, mockInterviewTask, realityCheck.",
     StudentStrategySchema,
+    userId,
+  );
+}
+
+export async function generatePlannerSuggestionPack(
+  userId: string,
+): Promise<PlannerSuggestionPack> {
+  const dashboard = await getDashboardData(userId);
+  const payload = {
+    studentProfile: {
+      targetRole: dashboard.settings.targetRole,
+      primaryGoal: dashboard.settings.primaryGoal,
+      targetCompanies: dashboard.settings.targetCompanies,
+      university: dashboard.settings.university,
+      degree: dashboard.settings.degree,
+      graduationYear: dashboard.settings.graduationYear,
+      planStyle: dashboard.settings.planStyle,
+      weeklyTheme: dashboard.settings.weeklyTheme,
+      customAiInstructions: dashboard.settings.customAiInstructions,
+    },
+    targets: {
+      dailyTaskTarget: dashboard.settings.weekdayTaskTarget,
+      weekendTaskTarget: dashboard.settings.weekendTaskTarget,
+      weeklyDsaTarget: dashboard.settings.weeklyDsaTarget,
+      weeklyApplicationTarget: dashboard.settings.weeklyApplicationTarget,
+      weeklyBuildTarget: dashboard.settings.weeklyBuildTarget,
+    },
+    planner: dashboard.planner,
+    metrics: dashboard.metrics,
+    today: dashboard.today,
+    recentDsa: dashboard.recentDsa.slice(0, 5),
+    recentBuilds: dashboard.recentBuilds.slice(0, 4),
+    recentApplications: dashboard.recentApplications.slice(0, 5),
+  };
+
+  return dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    "You are an elite interview-preparation planner for students. Generate a practical task pack with daily, weekly, and weekend tasks based on the student's stored progress, weak spots, targets, and current workload. Weekend tasks should be heavier and more ambitious than weekday tasks. Keep tasks specific, realistic, and action-oriented.",
+    "Return only a JSON object with these exact fields: headline, daily, weekly, weekend. Each task item must include title, details, scope, category, priority, and estimateMinutes.",
+    PlannerSuggestionPackSchema,
     userId,
   );
 }

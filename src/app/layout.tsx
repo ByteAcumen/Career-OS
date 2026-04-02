@@ -27,6 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${bodyFont.variable} ${headingFont.variable} h-full`}
     >
       <body className="min-h-full bg-[var(--paper)] font-[var(--font-body)] text-[var(--ink)] antialiased">
