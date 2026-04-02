@@ -1,16 +1,23 @@
 import type { GithubActivity } from "@/lib/types";
 
 function parseGithubUsername(url: string) {
+  if (!url.trim()) {
+    return null;
+  }
+
   try {
     const pathname = new URL(url).pathname.replace(/^\/|\/$/g, "");
-    return pathname.split("/")[0] || "ByteAcumen";
+    return pathname.split("/")[0] || null;
   } catch {
-    return "ByteAcumen";
+    return null;
   }
 }
 
 export async function fetchGithubActivity(githubUrl: string) {
   const username = parseGithubUsername(githubUrl);
+  if (!username) {
+    return [] satisfies GithubActivity[];
+  }
 
   try {
     const response = await fetch(

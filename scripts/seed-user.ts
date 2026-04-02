@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -37,8 +38,7 @@ async function main() {
 
   const name = process.env.APP_SEED_NAME?.trim() || "Hemant";
   const email = process.env.APP_SEED_EMAIL?.trim() || "owner@career-os.local";
-  const password =
-    process.env.APP_SEED_PASSWORD?.trim() || "ChangeThisPassword123!";
+  const password = process.env.APP_SEED_PASSWORD?.trim() || randomBytes(18).toString("base64url");
 
   const existingUser = db
     .prepare(`SELECT id, email, name FROM user WHERE email = ?`)
@@ -64,6 +64,9 @@ async function main() {
 
   claimLegacyDataForUser(response.user.id);
   console.log(`Created seed user: ${email}`);
+  if (!process.env.APP_SEED_PASSWORD?.trim()) {
+    console.log(`Generated temporary password: ${password}`);
+  }
 }
 
 void main().catch((error) => {

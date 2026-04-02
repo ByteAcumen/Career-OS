@@ -32,12 +32,40 @@ export function getScheduleForDate(dateKey: string, settings: Settings): Schedul
     ];
   }
 
+  const deepWorkStart = "20:45";
+  const supportStart = shiftTime(deepWorkStart, settings.weekdayDeepWorkMinutes + 5);
+  const shutdownStart = shiftTime(
+    supportStart,
+    settings.weekdaySupportMinutes + 5,
+  );
+
   return [
     createBlock(dateKey, "morning-revision", "Morning revision", "Non-negotiable daily recall before office.", "05:50", 45),
     createBlock(dateKey, "micro-revision", "Micro revision", "Flashcards or pattern replay only.", "13:15", 15),
-    createBlock(dateKey, "deep-work", "Deep work", "DSA or product work depending on the day.", "20:45", 75),
-    createBlock(dateKey, "support-block", "Support block", "Applications or DSA reinforcement.", "22:05", 35),
-    createBlock(dateKey, "shutdown-review", "Shutdown review", "Save note and lock tomorrow's first task.", "22:40", 15),
+    createBlock(
+      dateKey,
+      "deep-work",
+      `Deep work (${settings.weekdayDeepWorkMinutes} min)`,
+      "DSA or product work depending on the day.",
+      deepWorkStart,
+      settings.weekdayDeepWorkMinutes,
+    ),
+    createBlock(
+      dateKey,
+      "support-block",
+      `Support block (${settings.weekdaySupportMinutes} min)`,
+      "Applications or DSA reinforcement.",
+      supportStart,
+      settings.weekdaySupportMinutes,
+    ),
+    createBlock(
+      dateKey,
+      "shutdown-review",
+      "Shutdown review",
+      "Save note and lock tomorrow's first task.",
+      shutdownStart,
+      15,
+    ),
   ];
 }
 
@@ -66,4 +94,13 @@ function buildLocalDate(dateKey: string, time: string) {
   const [year, month, day] = dateKey.split("-").map(Number);
   const [hours, minutes] = time.split(":").map(Number);
   return new Date(year, (month ?? 1) - 1, day ?? 1, hours ?? 0, minutes ?? 0, 0, 0);
+}
+
+function shiftTime(time: string, minutesToAdd: number) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const current = new Date(2000, 0, 1, hours ?? 0, minutes ?? 0, 0, 0);
+  current.setMinutes(current.getMinutes() + minutesToAdd);
+  return `${String(current.getHours()).padStart(2, "0")}:${String(
+    current.getMinutes(),
+  ).padStart(2, "0")}`;
 }

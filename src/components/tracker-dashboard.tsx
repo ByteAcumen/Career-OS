@@ -30,9 +30,12 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
+import { AiKeyManager } from "@/components/ai-key-manager";
+import { StudentOnboarding } from "@/components/student-onboarding";
+import { StudentStrategyPanel } from "@/components/student-strategy-panel";
 import { authClient } from "@/lib/auth-client";
 import { getScheduleForDate } from "@/lib/schedule";
-import type { CheckinKey, DashboardData, ScheduleBlock } from "@/lib/types";
+import type { AiProvider, CheckinKey, DashboardData, ScheduleBlock, StudentStrategy } from "@/lib/types";
 import { cn, toDateKey } from "@/lib/utils";
 
 type SettingsForm = DashboardData["settings"];
@@ -119,6 +122,9 @@ export function TrackerDashboard({
     tomorrowTask: "",
   });
   const [motivation, setMotivation] = useState<string | null>(null);
+  const [studentStrategy, setStudentStrategy] = useState<StudentStrategy | null>(null);
+  const [strategyLoading, setStrategyLoading] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const todayKey = data?.today.dateKey ?? toDateKey();
 
@@ -169,6 +175,46 @@ export function TrackerDashboard({
     }
   }
 
+  async function saveAiKey(provider: AiProvider, apiKey: string) {
+    return runAction(
+      `save-${provider}-key`,
+      () =>
+        postJson("/api/settings/ai-keys", {
+          provider,
+          apiKey,
+        }),
+      `${provider} API key saved securely.`,
+    );
+  }
+
+  async function deleteAiKey(provider: AiProvider) {
+    return runAction(
+      `remove-${provider}-key`,
+      () =>
+        postJson("/api/settings/ai-keys", { provider }, { method: "DELETE" }),
+      `${provider} API key removed.`,
+    );
+  }
+
+  async function generateStrategy() {
+    setStrategyLoading(true);
+    try {
+      const response = await postJson<{ ok: boolean; strategy: StudentStrategy }>(
+        "/api/ai/strategy",
+        undefined,
+        { method: "POST" },
+      );
+      if (response.strategy) {
+        setStudentStrategy(response.strategy);
+        setToast("Student strategy generated.");
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Could not generate strategy");
+    } finally {
+      setStrategyLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadDashboard().catch((error: unknown) => {
       setToast(error instanceof Error ? error.message : "Could not load dashboard");
@@ -192,6 +238,12 @@ export function TrackerDashboard({
         });
     }
   }, [data, motivation]);
+
+  useEffect(() => {
+    if (settings && !settings.onboardingCompleted) {
+      setShowOnboarding(true);
+    }
+  }, [settings]);
 
   if (!data || !settings) {
     return (
@@ -248,7 +300,7 @@ export function TrackerDashboard({
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--gold-soft)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
-                Career OS for ByteAcumen
+                Career OS Student Workspace
               </div>
               <h1 className="heading-font max-w-3xl text-4xl leading-[0.95] sm:text-5xl lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-white to-neutral-400">
                 Proper tracker. Proper storage. Proper momentum.
@@ -259,19 +311,20 @@ export function TrackerDashboard({
                 </motion.div>
               )}
               <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-base">
-                This app stores your study data in a real database, keeps GitHub and
-                Google Sheets connected, and adds an AI coach layer from the backend
-                so secrets stay safe. It is built around your weekday office reality
-                and your stronger weekend study windows.
+                This app stores your study data in a real database, keeps your
+                links and application systems separate per user, and runs AI on the
+                backend so credentials stay out of the browser. It is designed for
+                interview preparation that needs structure, momentum, and clarity.
               </p>
               <div className="mt-4 inline-flex max-w-2xl text-wrap rounded-xl border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--ink)]">
                 {settings.primaryGoal}
               </div>
               <div className="mt-6 flex flex-wrap gap-3">
                 <QuickLink href={settings.githubUrl} icon={GitBranch} label="GitHub" />
-                <QuickLink href={settings.sheetUrl} icon={Briefcase} label="Job sheet" />
+                <QuickLink href={settings.jobTrackerUrl || settings.sheetUrl} icon={Briefcase} label="Job tracker" />
                 <QuickLink href={settings.resumeUrl} icon={Link2} label="Resume" />
                 <QuickLink href={settings.leetcodeUrl} icon={Target} label="LeetCode" />
+                <QuickLink href={settings.linkedinUrl} icon={Link2} label="LinkedIn" />
               </div>
             </div>
 
@@ -377,6 +430,10 @@ export function TrackerDashboard({
                   settings={settings}
                   schedule={schedule}
                   runAction={runAction}
+                  strategy={studentStrategy}
+                  strategyLoading={strategyLoading}
+                  onGenerateStrategy={generateStrategy}
+                  onOpenOnboarding={() => setShowOnboarding(true)}
                 />
               </motion.div>
             )}
@@ -408,9 +465,12 @@ export function TrackerDashboard({
             {activeTab === "settings" && (
               <motion.div key="settings" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
                 <SettingsTab
+                  data={data}
                   settings={settings}
                   setSettings={setSettings}
                   runAction={runAction}
+                  onSaveAiKey={saveAiKey}
+                  onDeleteAiKey={deleteAiKey}
                 />
               </motion.div>
             )}
@@ -427,6 +487,23 @@ export function TrackerDashboard({
             {action ? `Working on ${action}...` : "Refreshing..."}
           </div>
         ) : null}
+        {showOnboarding ? (
+          <StudentOnboarding
+            settings={settings}
+            setSettings={setSettings}
+            onSave={() =>
+              void runAction(
+                "onboarding",
+                async () => {
+                  await postJson("/api/settings", settings);
+                  setShowOnboarding(false);
+                },
+                "Workspace setup saved.",
+              )
+            }
+            onDismiss={() => setShowOnboarding(false)}
+          />
+        ) : null}
       </div>
     </main>
   );
@@ -437,17 +514,42 @@ function OverviewTab({
   settings,
   schedule,
   runAction,
+  strategy,
+  strategyLoading,
+  onGenerateStrategy,
+  onOpenOnboarding,
 }: {
   data: DashboardData;
   settings: SettingsForm;
   schedule: ScheduleItem[];
   runAction: <T>(label: string, request: () => Promise<T>, successMessage: string) => Promise<void>;
+  strategy: StudentStrategy | null;
+  strategyLoading: boolean;
+  onGenerateStrategy: () => void;
+  onOpenOnboarding: () => void;
 }) {
   const [curriculum, setCurriculum] = useState<string | null>(null);
 
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
       <div className="grid gap-5">
+        {!settings.onboardingCompleted ? (
+          <Panel title="Finish setup" subtitle="Complete your student profile so the app can personalize recommendations.">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--gold-soft)] px-4 py-4 text-sm text-[var(--ink)]">
+              <div className="max-w-2xl leading-7">
+                Add your target role, LinkedIn, job tracker, university, and planning style.
+                That unlocks more relevant AI suggestions and removes generic defaults.
+              </div>
+              <button
+                onClick={onOpenOnboarding}
+                className="rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper-strong)]"
+              >
+                Open onboarding
+              </button>
+            </div>
+          </Panel>
+        ) : null}
+
         <Panel
           title="AI coach"
           subtitle="Server-side guidance based on today's real activity."
@@ -514,7 +616,7 @@ function OverviewTab({
               text={
                 data.integrations.aiReady
                   ? "No AI reflection saved yet. Generate your coach update once today's data is logged."
-                  : `AI is not connected yet. Add the ${settings.aiProvider.toUpperCase()} key in the server .env file to enable coaching.`
+                  : `AI is not connected yet. Save a ${settings.aiProvider.toUpperCase()} key in Settings or configure a secure server fallback.`
               }
             />
           )}
@@ -529,6 +631,18 @@ function OverviewTab({
               </motion.div>
             )}
           </AnimatePresence>
+        </Panel>
+
+        <Panel
+          title="Student strategy"
+          subtitle="A personalized recommendation engine using your stored study, build, and application data."
+        >
+          <StudentStrategyPanel
+            aiReady={data.integrations.aiReady}
+            strategy={strategy}
+            isLoading={strategyLoading}
+            onGenerate={onGenerateStrategy}
+          />
         </Panel>
 
         <Panel title="14-day momentum" subtitle="Progress looks better when the data survives each day.">
@@ -666,7 +780,7 @@ function OverviewTab({
             <div className="soft-card">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <GitBranch className="size-4" />
-                ByteAcumen public activity
+                GitHub public activity
               </div>
               <div className="mt-3 space-y-2 text-sm text-[var(--muted)]">
                 {data.githubActivity.length ? (
@@ -707,7 +821,7 @@ function OverviewTab({
                         : "bg-slate-200 text-slate-600",
                     )}
                   >
-                    {provider}
+                    {provider} {data.integrations.providerSources[provider]}
                     {settings.aiProvider === provider ? " active" : ""}
                   </span>
                 ))}
@@ -717,14 +831,27 @@ function OverviewTab({
             <div className="soft-card text-sm text-[var(--muted)]">
               <div className="font-medium text-[var(--ink)]">Profiles linked</div>
               <div className="mt-2 flex flex-wrap gap-3">
-                <a href={settings.githubUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--teal)]">
-                  GitHub
-                  <ArrowUpRight className="size-4" />
-                </a>
-                <a href={settings.leetcodeUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--teal)]">
-                  LeetCode
-                  <ArrowUpRight className="size-4" />
-                </a>
+                {[
+                  ["GitHub", settings.githubUrl],
+                  ["LeetCode", settings.leetcodeUrl],
+                  ["LinkedIn", settings.linkedinUrl],
+                  ["Portfolio", settings.portfolioUrl],
+                  ["Codeforces", settings.codeforcesUrl],
+                  ["Job tracker", settings.jobTrackerUrl || settings.sheetUrl],
+                ].map(([label, href]) =>
+                  href ? (
+                    <a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[var(--teal)]"
+                    >
+                      {label}
+                      <ArrowUpRight className="size-4" />
+                    </a>
+                  ) : null,
+                )}
               </div>
             </div>
           </div>
@@ -1270,13 +1397,19 @@ function HistoryTab({ data }: { data: DashboardData }) {
 }
 
 function SettingsTab({
+  data,
   settings,
   setSettings,
   runAction,
+  onSaveAiKey,
+  onDeleteAiKey,
 }: {
+  data: DashboardData;
   settings: SettingsForm;
   setSettings: React.Dispatch<React.SetStateAction<SettingsForm | null>>;
   runAction: <T>(label: string, request: () => Promise<T>, successMessage: string) => Promise<void>;
+  onSaveAiKey: (provider: AiProvider, apiKey: string) => Promise<void>;
+  onDeleteAiKey: (provider: AiProvider) => Promise<void>;
 }) {
   return (
     <section className="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
@@ -1295,18 +1428,108 @@ function SettingsTab({
             />
           </div>
 
-          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Integrations & Profiles</div>
-          
+          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Student Profile</div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Google Sheet Webhook URL</label>
+              <label className="text-sm font-medium text-[var(--ink)] block">Target Role</label>
+              <input
+                value={settings.targetRole}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, targetRole: event.target.value } : current))
+                }
+                className="field"
+                placeholder="Frontend Engineer, SDE 1, Full-stack Engineer..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Graduation Year</label>
+              <input
+                value={settings.graduationYear}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, graduationYear: event.target.value } : current))
+                }
+                className="field"
+                placeholder="2026"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">University</label>
+              <input
+                value={settings.university}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, university: event.target.value } : current))
+                }
+                className="field"
+                placeholder="University / college"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Degree / Program</label>
+              <input
+                value={settings.degree}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, degree: event.target.value } : current))
+                }
+                className="field"
+                placeholder="B.Tech CSE"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[var(--ink)] block">Target Companies / Tracks</label>
+            <textarea
+              value={settings.targetCompanies}
+              onChange={(event) =>
+                setSettings((current) => (current ? { ...current, targetCompanies: event.target.value } : current))
+              }
+              className="field-area"
+              placeholder="Product startups, high-growth SaaS, MAANG-style roles, backend-heavy teams..."
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[var(--ink)] block">Planning Style</label>
+            <textarea
+              value={settings.planStyle}
+              onChange={(event) =>
+                setSettings((current) => (current ? { ...current, planStyle: event.target.value } : current))
+              }
+              className="field-area"
+              placeholder="Strict weekday routine, balanced weekends, prioritize DSA first, push applications in batches..."
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[var(--ink)] block">Custom AI Instructions</label>
+            <textarea
+              value={settings.customAiInstructions}
+              onChange={(event) =>
+                setSettings((current) =>
+                  current ? { ...current, customAiInstructions: event.target.value } : current,
+                )
+              }
+              className="field-area"
+              placeholder="Tell the coach about weak topics, office constraints, preferred learning style, or the kind of feedback you want."
+            />
+          </div>
+
+          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Links & Trackers</div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Job Tracker / Sheet URL</label>
               <input
                 value={settings.sheetUrl}
                 onChange={(event) =>
                   setSettings((current) => (current ? { ...current, sheetUrl: event.target.value } : current))
                 }
                 className="field"
-                placeholder="Google Sheet URL"
+                placeholder="Job tracker URL"
               />
             </div>
             
@@ -1361,6 +1584,78 @@ function SettingsTab({
             </div>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">LinkedIn URL</label>
+              <input
+                value={settings.linkedinUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, linkedinUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="LinkedIn profile"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Portfolio URL</label>
+              <input
+                value={settings.portfolioUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, portfolioUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="Portfolio / personal site"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Dedicated Job Tracker URL</label>
+              <input
+                value={settings.jobTrackerUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, jobTrackerUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="Notion / Airtable / sheet"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Codeforces URL</label>
+              <input
+                value={settings.codeforcesUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, codeforcesUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="Codeforces profile"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">CodeChef URL</label>
+              <input
+                value={settings.codechefUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, codechefUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="CodeChef profile"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">HackerRank URL</label>
+              <input
+                value={settings.hackerrankUrl}
+                onChange={(event) =>
+                  setSettings((current) => (current ? { ...current, hackerrankUrl: event.target.value } : current))
+                }
+                className="field"
+                placeholder="HackerRank profile"
+              />
+            </div>
+          </div>
+
           <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">AI Configuration</div>
           
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1403,6 +1698,22 @@ function SettingsTab({
                 placeholder="e.g. gpt-4o-mini"
               />
             </div>
+          </div>
+
+          <div className="rounded-[20px] border border-[var(--line)] bg-[var(--paper-strong)] px-4 py-4">
+            <div className="mb-3 text-sm font-semibold text-[var(--ink)]">
+              Per-user API keys
+            </div>
+            <p className="mb-4 text-sm leading-7 text-[var(--muted)]">
+              Save your own provider keys here. They stay on the server, are encrypted
+              before storage, and are never returned to the browser after saving.
+              If you do not save one, the app can still use a secure server fallback when available.
+            </p>
+            <AiKeyManager
+              integrations={data.integrations}
+              onSaveKey={onSaveAiKey}
+              onDeleteKey={onDeleteAiKey}
+            />
           </div>
 
           <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Targets & Timeboxing</div>
@@ -1479,6 +1790,35 @@ function SettingsTab({
               />
             </div>
           </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekday Deep Work Minutes</label>
+              <input
+                type="number"
+                value={settings.weekdayDeepWorkMinutes}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weekdayDeepWorkMinutes: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[var(--ink)] block">Weekday Support Block Minutes</label>
+              <input
+                type="number"
+                value={settings.weekdaySupportMinutes}
+                onChange={(event) =>
+                  setSettings((current) =>
+                    current ? { ...current, weekdaySupportMinutes: Number(event.target.value) } : current,
+                  )
+                }
+                className="field"
+              />
+            </div>
+          </div>
           
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -1528,38 +1868,35 @@ function SettingsTab({
         </div>
       </Panel>
 
-      <Panel title="Recommended architecture" subtitle="The stack I would actually recommend for you.">
+      <Panel title="Operating model" subtitle="How this workspace now behaves like a real multi-user product.">
         <div className="space-y-4 text-sm leading-7 text-[var(--muted)]">
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">AI API</strong>
+            <strong className="text-[var(--ink)]">Per-user personalization</strong>
             <p className="mt-2">
-              Keep the AI calls on the backend and use provider switching based on cost and reliability.
-              OpenRouter is the best day-to-day default, Gemini is a strong backup, and OpenAI is the
-              premium structured-output option when you want it.
-            </p>
-            <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              Switch providers from Settings without exposing secrets in the browser.
+              Your profile, targets, planning style, and platform links are now user-specific.
+              That means different students can use the same app without inheriting someone else&apos;s
+              GitHub, LeetCode, or job tracker defaults.
             </p>
           </div>
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Frontend</strong>
+            <strong className="text-[var(--ink)]">Protected AI usage</strong>
             <p className="mt-2">
-              Next.js is already set up so the tracker can stay fast, customizable, and easy to
-              deploy on Vercel when you are ready to move online.
+              AI calls stay on the server. Users can save provider keys into their account and the
+              app uses those securely without sending the raw key back to the browser.
             </p>
           </div>
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Database</strong>
+            <strong className="text-[var(--ink)]">Student-specific coaching</strong>
             <p className="mt-2">
-              The app is already storing data in SQLite. For proper online storage later, move this
-              data layer to PostgreSQL on Neon, Supabase, or Vercel Postgres.
+              The AI suggestions now have richer profile context: role target, companies,
+              university, plan style, recent output, and application momentum.
             </p>
           </div>
           <div className="soft-card">
-            <strong className="text-[var(--ink)]">Google Sheet bridge</strong>
+            <strong className="text-[var(--ink)]">Next production step</strong>
             <p className="mt-2">
-              Google Apps Script is still the simplest reliable way to push application rows into your
-              existing Sheet while keeping the database as the true source of record.
+              For full hosted scale, keep this product design but move the database from SQLite to a
+              managed PostgreSQL instance. The app logic is already structured so that migration is practical.
             </p>
           </div>
         </div>
@@ -1879,6 +2216,8 @@ function QuickLink({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
 }) {
+  if (!href) return null;
+
   return (
     <a
       href={href}
@@ -2025,6 +2364,11 @@ async function postJson<T>(
     | null;
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/sign-in";
+      throw new Error("Session expired. Redirecting to sign in.");
+    }
+
     const message =
       payload && typeof payload === "object" && "message" in payload
         ? payload.message

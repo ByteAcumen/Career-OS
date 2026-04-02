@@ -14,6 +14,8 @@ export type GithubActivity = {
 
 export type AiProvider = "openai" | "gemini" | "openrouter";
 
+export type AiProviderSource = "user" | "server" | "none";
+
 export type ScheduleBlock = {
   key: string;
   label: string;
@@ -29,7 +31,20 @@ export type DashboardData = {
     resumeUrl: string;
     githubUrl: string;
     leetcodeUrl: string;
+    linkedinUrl: string;
+    portfolioUrl: string;
+    codeforcesUrl: string;
+    codechefUrl: string;
+    hackerrankUrl: string;
+    jobTrackerUrl: string;
     primaryGoal: string;
+    targetRole: string;
+    targetCompanies: string;
+    university: string;
+    degree: string;
+    graduationYear: string;
+    planStyle: string;
+    customAiInstructions: string;
     aiProvider: AiProvider;
     googleAppsScriptUrl: string;
     openAiModel: string;
@@ -38,8 +53,11 @@ export type DashboardData = {
     weeklyDsaTarget: number;
     weeklyApplicationTarget: number;
     weeklyBuildTarget: number;
+    weekdayDeepWorkMinutes: number;
+    weekdaySupportMinutes: number;
     timerFocusMinutes: number;
     timerBreakMinutes: number;
+    onboardingCompleted: boolean;
   };
   metrics: {
     revisionStreak: number;
@@ -64,6 +82,16 @@ export type DashboardData = {
     aiReady: boolean;
     googleSheetsReady: boolean;
     providers: {
+      openai: boolean;
+      gemini: boolean;
+      openrouter: boolean;
+    };
+    providerSources: {
+      openai: AiProviderSource;
+      gemini: AiProviderSource;
+      openrouter: AiProviderSource;
+    };
+    savedApiKeys: {
       openai: boolean;
       gemini: boolean;
       openrouter: boolean;
@@ -128,4 +156,14 @@ export type DashboardData = {
     buildCount: number;
     appCount: number;
   }>;
+};
+
+export type StudentStrategy = {
+  headline: string;
+  todayMission: string;
+  dsaPriority: string;
+  buildPriority: string;
+  applicationPriority: string;
+  mockInterviewTask: string;
+  realityCheck: string;
 };

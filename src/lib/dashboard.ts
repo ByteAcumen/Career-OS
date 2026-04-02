@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { startOfWeek, subDays } from "date-fns";
 
+import { getAiProviderStatus } from "@/lib/ai-credentials";
 import { db } from "@/lib/db";
 import { fetchGithubActivity } from "@/lib/github";
 import type { DashboardData } from "@/lib/types";
@@ -28,12 +29,25 @@ type SnapshotRow = {
 };
 
 const defaultSettings = {
-  sheetUrl:
-    "https://docs.google.com/spreadsheets/d/1AtdZ8s5U5VgGOH4O7IIBVnc_Gdq3tef1rp4dJfPgNFA/edit?gid=0#gid=0",
-  resumeUrl: "https://www.overleaf.com/project/69c93e4ef81662db852a5d8f",
-  githubUrl: "https://github.com/ByteAcumen",
-  leetcodeUrl: "https://leetcode.com/u/hemant_hk/",
-  primaryGoal: "MAANG-ready Java DSA + React + NestJS + AI portfolio",
+  sheetUrl: "",
+  resumeUrl: "",
+  githubUrl: "",
+  leetcodeUrl: "",
+  linkedinUrl: "",
+  portfolioUrl: "",
+  codeforcesUrl: "",
+  codechefUrl: "",
+  hackerrankUrl: "",
+  jobTrackerUrl: "",
+  primaryGoal:
+    "Land a strong software engineering role through consistent DSA, project shipping, and deliberate applications.",
+  targetRole: "Software Engineer",
+  targetCompanies: "",
+  university: "",
+  degree: "",
+  graduationYear: "",
+  planStyle: "Structured, realistic, and student-focused.",
+  customAiInstructions: "",
   aiProvider: "openai" as const,
   googleAppsScriptUrl: "",
   openAiModel: "gpt-4o-mini",
@@ -42,11 +56,23 @@ const defaultSettings = {
   weeklyDsaTarget: 10,
   weeklyApplicationTarget: 5,
   weeklyBuildTarget: 4,
+  weekdayDeepWorkMinutes: 75,
+  weekdaySupportMinutes: 35,
   timerFocusMinutes: 50,
   timerBreakMinutes: 10,
+  onboardingCompleted: false,
 };
 
 export function claimLegacyDataForUser(userId: string) {
+  const userCount = db
+    .prepare(`SELECT COUNT(*) as count FROM user`)
+    .get() as { count: number };
+
+  if (userCount.count > 1) {
+    ensureSettings(userId);
+    return;
+  }
+
   const hasUserData = db
     .prepare(
       `SELECT EXISTS(
@@ -137,9 +163,12 @@ export function claimLegacyDataForUser(userId: string) {
 export function ensureSettings(userId: string) {
   const existing = db
     .prepare(
-      `SELECT sheetUrl, resumeUrl, githubUrl, leetcodeUrl, primaryGoal, aiProvider, googleAppsScriptUrl, openAiModel,
-              weekendDsaMinutes, weekendBuildMinutes, weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
-              timerFocusMinutes, timerBreakMinutes
+      `SELECT sheetUrl, resumeUrl, githubUrl, leetcodeUrl, linkedinUrl, portfolioUrl, codeforcesUrl,
+              codechefUrl, hackerrankUrl, jobTrackerUrl, primaryGoal, targetRole, targetCompanies,
+              university, degree, graduationYear, planStyle, customAiInstructions, aiProvider,
+              googleAppsScriptUrl, openAiModel, weekendDsaMinutes, weekendBuildMinutes,
+              weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget, weekdayDeepWorkMinutes,
+              weekdaySupportMinutes, timerFocusMinutes, timerBreakMinutes
        FROM app_settings
        WHERE userId = ?`,
     )
@@ -151,13 +180,17 @@ export function ensureSettings(userId: string) {
 
   db.prepare(
     `INSERT INTO app_settings
-      (userId, sheetUrl, resumeUrl, githubUrl, leetcodeUrl, primaryGoal, aiProvider, googleAppsScriptUrl, openAiModel,
+      (userId, sheetUrl, resumeUrl, githubUrl, leetcodeUrl, linkedinUrl, portfolioUrl, codeforcesUrl,
+       codechefUrl, hackerrankUrl, jobTrackerUrl, primaryGoal, targetRole, targetCompanies, university, degree,
+       graduationYear, planStyle, customAiInstructions, aiProvider, googleAppsScriptUrl, openAiModel,
        weekendDsaMinutes, weekendBuildMinutes, weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
-       timerFocusMinutes, timerBreakMinutes)
+       weekdayDeepWorkMinutes, weekdaySupportMinutes, timerFocusMinutes, timerBreakMinutes)
      VALUES
-      (@userId, @sheetUrl, @resumeUrl, @githubUrl, @leetcodeUrl, @primaryGoal, @aiProvider, @googleAppsScriptUrl, @openAiModel,
+      (@userId, @sheetUrl, @resumeUrl, @githubUrl, @leetcodeUrl, @linkedinUrl, @portfolioUrl, @codeforcesUrl,
+       @codechefUrl, @hackerrankUrl, @jobTrackerUrl, @primaryGoal, @targetRole, @targetCompanies, @university, @degree,
+       @graduationYear, @planStyle, @customAiInstructions, @aiProvider, @googleAppsScriptUrl, @openAiModel,
        @weekendDsaMinutes, @weekendBuildMinutes, @weeklyDsaTarget, @weeklyApplicationTarget, @weeklyBuildTarget,
-       @timerFocusMinutes, @timerBreakMinutes)`,
+       @weekdayDeepWorkMinutes, @weekdaySupportMinutes, @timerFocusMinutes, @timerBreakMinutes)`,
   ).run({
     userId,
     ...defaultSettings,
@@ -166,15 +199,32 @@ export function ensureSettings(userId: string) {
   return defaultSettings;
 }
 
-export function saveSettings(userId: string, settings: DashboardData["settings"]) {
+export function saveSettings(
+  userId: string,
+  settings: Partial<DashboardData["settings"]>,
+) {
   ensureSettings(userId);
+  const normalized = normalizeSettings(settings);
   db.prepare(
     `UPDATE app_settings
       SET sheetUrl = @sheetUrl,
           resumeUrl = @resumeUrl,
           githubUrl = @githubUrl,
           leetcodeUrl = @leetcodeUrl,
+          linkedinUrl = @linkedinUrl,
+          portfolioUrl = @portfolioUrl,
+          codeforcesUrl = @codeforcesUrl,
+          codechefUrl = @codechefUrl,
+          hackerrankUrl = @hackerrankUrl,
+          jobTrackerUrl = @jobTrackerUrl,
           primaryGoal = @primaryGoal,
+          targetRole = @targetRole,
+          targetCompanies = @targetCompanies,
+          university = @university,
+          degree = @degree,
+          graduationYear = @graduationYear,
+          planStyle = @planStyle,
+          customAiInstructions = @customAiInstructions,
           aiProvider = @aiProvider,
           googleAppsScriptUrl = @googleAppsScriptUrl,
           openAiModel = @openAiModel,
@@ -183,16 +233,18 @@ export function saveSettings(userId: string, settings: DashboardData["settings"]
           weeklyDsaTarget = @weeklyDsaTarget,
           weeklyApplicationTarget = @weeklyApplicationTarget,
           weeklyBuildTarget = @weeklyBuildTarget,
+          weekdayDeepWorkMinutes = @weekdayDeepWorkMinutes,
+          weekdaySupportMinutes = @weekdaySupportMinutes,
           timerFocusMinutes = @timerFocusMinutes,
           timerBreakMinutes = @timerBreakMinutes,
           updatedAt = CURRENT_TIMESTAMP
       WHERE userId = @userId`,
   ).run({
     userId,
-    ...settings,
+    ...normalized,
   });
 
-  return normalizeSettings(settings);
+  return normalized;
 }
 
 export function ensureSnapshot(userId: string, dateKey = toDateKey()) {
@@ -485,6 +537,7 @@ export async function getDashboardData(
   );
 
   const githubActivity = await fetchGithubActivity(settings.githubUrl);
+  const providerStatus = getAiProviderStatus(userId);
 
   return {
     settings,
@@ -511,13 +564,11 @@ export async function getDashboardData(
       },
     },
     integrations: {
-      aiReady: isAiProviderReady(settings.aiProvider),
+      aiReady: providerStatus.providers[settings.aiProvider],
       googleSheetsReady: Boolean(settings.googleAppsScriptUrl),
-      providers: {
-        openai: Boolean(process.env.OPENAI_API_KEY),
-        gemini: Boolean(process.env.GEMINI_API_KEY),
-        openrouter: Boolean(process.env.OPENROUTER_API_KEY),
-      },
+      providers: providerStatus.providers,
+      providerSources: providerStatus.providerSources,
+      savedApiKeys: providerStatus.savedApiKeys,
     },
     today: mapToday(today),
     previousDay: previous
@@ -631,12 +682,26 @@ function getBooleanCount(userId: string, value: boolean) {
 }
 
 function normalizeSettings(input: Partial<DashboardData["settings"]>) {
-  return {
+  const normalized = {
     sheetUrl: input.sheetUrl ?? defaultSettings.sheetUrl,
     resumeUrl: input.resumeUrl ?? defaultSettings.resumeUrl,
     githubUrl: input.githubUrl ?? defaultSettings.githubUrl,
     leetcodeUrl: input.leetcodeUrl ?? defaultSettings.leetcodeUrl,
+    linkedinUrl: input.linkedinUrl ?? defaultSettings.linkedinUrl,
+    portfolioUrl: input.portfolioUrl ?? defaultSettings.portfolioUrl,
+    codeforcesUrl: input.codeforcesUrl ?? defaultSettings.codeforcesUrl,
+    codechefUrl: input.codechefUrl ?? defaultSettings.codechefUrl,
+    hackerrankUrl: input.hackerrankUrl ?? defaultSettings.hackerrankUrl,
+    jobTrackerUrl: input.jobTrackerUrl ?? defaultSettings.jobTrackerUrl,
     primaryGoal: input.primaryGoal ?? defaultSettings.primaryGoal,
+    targetRole: input.targetRole ?? defaultSettings.targetRole,
+    targetCompanies: input.targetCompanies ?? defaultSettings.targetCompanies,
+    university: input.university ?? defaultSettings.university,
+    degree: input.degree ?? defaultSettings.degree,
+    graduationYear: input.graduationYear ?? defaultSettings.graduationYear,
+    planStyle: input.planStyle ?? defaultSettings.planStyle,
+    customAiInstructions:
+      input.customAiInstructions ?? defaultSettings.customAiInstructions,
     aiProvider: input.aiProvider ?? defaultSettings.aiProvider,
     googleAppsScriptUrl:
       input.googleAppsScriptUrl ?? defaultSettings.googleAppsScriptUrl,
@@ -656,19 +721,25 @@ function normalizeSettings(input: Partial<DashboardData["settings"]>) {
     weeklyBuildTarget: Number(
       input.weeklyBuildTarget ?? defaultSettings.weeklyBuildTarget,
     ),
+    weekdayDeepWorkMinutes: Number(
+      input.weekdayDeepWorkMinutes ?? defaultSettings.weekdayDeepWorkMinutes,
+    ),
+    weekdaySupportMinutes: Number(
+      input.weekdaySupportMinutes ?? defaultSettings.weekdaySupportMinutes,
+    ),
     timerFocusMinutes: Number(
       input.timerFocusMinutes ?? defaultSettings.timerFocusMinutes,
     ),
     timerBreakMinutes: Number(
       input.timerBreakMinutes ?? defaultSettings.timerBreakMinutes,
     ),
+    onboardingCompleted: Boolean(input.onboardingCompleted),
   };
-}
 
-function isAiProviderReady(provider: DashboardData["settings"]["aiProvider"]) {
-  if (provider === "openai") return Boolean(process.env.OPENAI_API_KEY);
-  if (provider === "gemini") return Boolean(process.env.GEMINI_API_KEY);
-  return Boolean(process.env.OPENROUTER_API_KEY);
+  return {
+    ...normalized,
+    onboardingCompleted: hasCompletedOnboarding(normalized),
+  };
 }
 
 function mapToday(snapshot: SnapshotRow): DashboardData["today"] {
@@ -794,4 +865,15 @@ function hasTable(table: string) {
     .get(table) as { name?: string } | undefined;
 
   return Boolean(row?.name);
+}
+
+function hasCompletedOnboarding(settings: Partial<DashboardData["settings"]>) {
+  return Boolean(
+    settings.primaryGoal &&
+      settings.targetRole &&
+      settings.linkedinUrl &&
+      settings.jobTrackerUrl &&
+      settings.university &&
+      settings.planStyle,
+  );
 }

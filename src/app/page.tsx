@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { TrackerDashboard } from "@/components/tracker-dashboard";
 import { getServerSession } from "@/lib/auth-session";
-import { claimLegacyDataForUser } from "@/lib/dashboard";
 
 export default async function Home() {
   const session = await getServerSession();
@@ -10,8 +9,6 @@ export default async function Home() {
   if (!session) {
     redirect("/sign-in");
   }
-
-  claimLegacyDataForUser(session.user.id);
 
   return (
     <TrackerDashboard

@@ -14,9 +14,9 @@ const headingFont = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Hemanth Career OS",
+  title: "Career OS",
   description:
-    "A full-stack study, DSA, build, and job application tracker with AI coaching and Google Sheet sync.",
+    "A full-stack interview preparation workspace with student planning, AI coaching, and job tracking.",
 };
 
 export default function RootLayout({

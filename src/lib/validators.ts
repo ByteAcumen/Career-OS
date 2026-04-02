@@ -1,21 +1,47 @@
 import { z } from "zod";
 
+const optionalUrl = z.string().url().or(z.literal(""));
+
 export const settingsSchema = z.object({
-  sheetUrl: z.string().url(),
-  resumeUrl: z.string().url(),
-  githubUrl: z.string().url(),
-  leetcodeUrl: z.string().url(),
+  sheetUrl: optionalUrl,
+  resumeUrl: optionalUrl,
+  githubUrl: optionalUrl,
+  leetcodeUrl: optionalUrl,
+  linkedinUrl: optionalUrl,
+  portfolioUrl: optionalUrl,
+  codeforcesUrl: optionalUrl,
+  codechefUrl: optionalUrl,
+  hackerrankUrl: optionalUrl,
+  jobTrackerUrl: optionalUrl,
   primaryGoal: z.string().min(5).max(220),
+  targetRole: z.string().min(2).max(140),
+  targetCompanies: z.string().max(300),
+  university: z.string().max(140),
+  degree: z.string().max(140),
+  graduationYear: z.string().max(20),
+  planStyle: z.string().max(220),
+  customAiInstructions: z.string().max(1500),
   aiProvider: z.enum(["openai", "gemini", "openrouter"]),
-  googleAppsScriptUrl: z.string().url().or(z.literal("")),
+  googleAppsScriptUrl: optionalUrl,
   openAiModel: z.string().min(1),
   weekendDsaMinutes: z.number().int().min(60).max(480),
   weekendBuildMinutes: z.number().int().min(60).max(480),
   weeklyDsaTarget: z.number().int().min(1).max(50),
   weeklyApplicationTarget: z.number().int().min(1).max(30),
   weeklyBuildTarget: z.number().int().min(1).max(20),
+  weekdayDeepWorkMinutes: z.number().int().min(30).max(240),
+  weekdaySupportMinutes: z.number().int().min(15).max(180),
   timerFocusMinutes: z.number().int().min(15).max(180),
   timerBreakMinutes: z.number().int().min(5).max(60),
+});
+
+export const aiKeySchema = z.object({
+  provider: z.enum(["openai", "gemini", "openrouter"]),
+  apiKey: z.string().min(10).max(500),
+});
+
+export const aiKeyDeleteSchema = z.object({
+  provider: z.enum(["openai", "gemini", "openrouter"]),
 });
 
 export const checkinSchema = z.object({

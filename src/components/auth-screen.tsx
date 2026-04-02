@@ -146,7 +146,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                   onChange={(event) =>
                     setForm((current) => ({ ...current, name: event.target.value }))
                   }
-                  placeholder="Hemant Kumar"
+                  placeholder="Aarav Sharma"
                 />
               </label>
             ) : null}

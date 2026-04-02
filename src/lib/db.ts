@@ -21,6 +21,7 @@ sqlite.pragma("foreign_keys = ON");
 
 migrateLegacySingleUserTables();
 createMultiUserTables();
+ensureAppSettingsColumns();
 
 export { databaseFile, sqlite as db };
 export { normalizeBetterAuthSqliteTables };
@@ -119,7 +120,44 @@ function createMultiUserTables() {
     CREATE INDEX IF NOT EXISTS idx_application_entries_user_created ON application_entries(userId, createdAt DESC);
     CREATE INDEX IF NOT EXISTS idx_application_entries_user_synced ON application_entries(userId, syncedToSheet);
     CREATE INDEX IF NOT EXISTS idx_daily_snapshots_user_date ON daily_snapshots(userId, dateKey DESC);
+
+    CREATE TABLE IF NOT EXISTS user_ai_credentials (
+      userId TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      encryptedApiKey TEXT NOT NULL,
+      keyHint TEXT,
+      createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (userId, provider),
+      FOREIGN KEY (userId) REFERENCES user(id) ON DELETE CASCADE
+    );
   `);
+}
+
+function ensureAppSettingsColumns() {
+  ensureColumn("app_settings", "linkedinUrl", "TEXT");
+  ensureColumn("app_settings", "portfolioUrl", "TEXT");
+  ensureColumn("app_settings", "codeforcesUrl", "TEXT");
+  ensureColumn("app_settings", "codechefUrl", "TEXT");
+  ensureColumn("app_settings", "hackerrankUrl", "TEXT");
+  ensureColumn("app_settings", "jobTrackerUrl", "TEXT");
+  ensureColumn("app_settings", "targetRole", "TEXT");
+  ensureColumn("app_settings", "targetCompanies", "TEXT");
+  ensureColumn("app_settings", "university", "TEXT");
+  ensureColumn("app_settings", "degree", "TEXT");
+  ensureColumn("app_settings", "graduationYear", "TEXT");
+  ensureColumn("app_settings", "planStyle", "TEXT");
+  ensureColumn("app_settings", "customAiInstructions", "TEXT");
+  ensureColumn(
+    "app_settings",
+    "weekdayDeepWorkMinutes",
+    "INTEGER NOT NULL DEFAULT 75",
+  );
+  ensureColumn(
+    "app_settings",
+    "weekdaySupportMinutes",
+    "INTEGER NOT NULL DEFAULT 35",
+  );
 }
 
 function migrateLegacySingleUserTables() {
@@ -167,6 +205,13 @@ function getColumns(table: string) {
     .all() as Array<{ name: string }>;
 
   return rows.map((row) => row.name);
+}
+
+function ensureColumn(table: string, column: string, definition: string) {
+  const columns = getColumns(table);
+  if (!columns.includes(column)) {
+    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 function normalizeBetterAuthSqliteTables() {

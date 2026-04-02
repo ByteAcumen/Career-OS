@@ -2,7 +2,9 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
+import { resolveAiProviderKey } from "@/lib/ai-credentials";
 import { getDashboardData } from "@/lib/dashboard";
+import type { StudentStrategy } from "@/lib/types";
 
 const CoachResponseSchema = z.object({
   summary: z.string(),
@@ -32,11 +34,27 @@ const MatchSchema = z.object({
   analysis: z.string(),
 });
 
+const StudentStrategySchema = z.object({
+  headline: z.string(),
+  todayMission: z.string(),
+  dsaPriority: z.string(),
+  buildPriority: z.string(),
+  applicationPriority: z.string(),
+  mockInterviewTask: z.string(),
+  realityCheck: z.string(),
+});
+
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
 
 export async function generateMotivation(userId: string) {
   const dashboard = await getDashboardData(userId);
   const payload = {
+    profile: {
+      targetRole: dashboard.settings.targetRole,
+      planStyle: dashboard.settings.planStyle,
+      university: dashboard.settings.university,
+      graduationYear: dashboard.settings.graduationYear,
+    },
     metrics: dashboard.metrics,
     todayCompleted: dashboard.today.checkins,
   };
@@ -47,7 +65,8 @@ export async function generateMotivation(userId: string) {
     dashboard.settings.openAiModel,
     "You are an intense elite engineering coach. Generate a single highly motivating 1-sentence quote based on today's progress to get the user to execute deep work. Be sharp and slightly aggressive.",
     "Return only a JSON object with a single string field 'quote'.",
-    MotivationSchema
+    MotivationSchema,
+    userId,
   );
   return response.quote;
 }
@@ -59,7 +78,14 @@ export async function generateInsight(
   context: string,
 ) {
   const dashboard = await getDashboardData(userId);
-  const payload = { type, title, context };
+  const payload = {
+    type,
+    title,
+    context,
+    targetRole: dashboard.settings.targetRole,
+    primaryGoal: dashboard.settings.primaryGoal,
+    customAiInstructions: dashboard.settings.customAiInstructions,
+  };
   
   const response = await dispatchAiRequest(
     payload,
@@ -67,7 +93,8 @@ export async function generateInsight(
     dashboard.settings.openAiModel,
     "You are a principal engineer mentoring a mid-level dev. Generate a 1-2 sentence core technical insight/takeaway based on the problem title and minimal context.",
     "Return only a JSON object with a single string field 'insight'.",
-    InsightSchema
+    InsightSchema,
+    userId,
   );
   return response.insight;
 }
@@ -77,6 +104,8 @@ export async function generateWeaknessCurriculum(userId: string) {
   const recentDsa = dashboard.recentDsa;
   
   const payload = {
+    targetRole: dashboard.settings.targetRole,
+    targetCompanies: dashboard.settings.targetCompanies,
     recentProblemsAndInsights: recentDsa.map(d => ({ title: d.title, pattern: d.pattern, insight: d.insight }))
   };
 
@@ -86,7 +115,8 @@ export async function generateWeaknessCurriculum(userId: string) {
     dashboard.settings.openAiModel,
     "You are an expert technical interviewer. Analyze these recent data structure problems and the user's insights to cluster their WEAKNESSES. Generate a 2-3 sentence strict weekend curriculum focusing on their most frequent blind spots.",
     "Return only a JSON object with a single string field 'curriculum'.",
-    WeaknessSchema
+    WeaknessSchema,
+    userId,
   );
   return response.curriculum;
 }
@@ -101,6 +131,8 @@ export async function predictApplicationMatch(
     company,
     role,
     primaryGoal: dashboard.settings.primaryGoal,
+    targetRole: dashboard.settings.targetRole,
+    strengths: dashboard.settings.customAiInstructions,
   };
 
   const response = await dispatchAiRequest(
@@ -109,7 +141,8 @@ export async function predictApplicationMatch(
     dashboard.settings.openAiModel,
     "You are an elite career matching algorithm. Score the match (0-100) between the user's primary goal and this specific job application. Provide a 1-sentence harsh analysis.",
     "Return only a JSON object with 'score' (number) and 'analysis' (string).",
-    MatchSchema
+    MatchSchema,
+    userId,
   );
   return response;
 }
@@ -118,11 +151,23 @@ export async function generateCoachResponse(userId: string) {
   const dashboard = await getDashboardData(userId);
   const payload = {
     target: dashboard.settings.primaryGoal,
+    targetRole: dashboard.settings.targetRole,
+    targetCompanies: dashboard.settings.targetCompanies,
+    university: dashboard.settings.university,
+    degree: dashboard.settings.degree,
+    graduationYear: dashboard.settings.graduationYear,
+    planStyle: dashboard.settings.planStyle,
+    customAiInstructions: dashboard.settings.customAiInstructions,
     provider: dashboard.settings.aiProvider,
     metrics: dashboard.metrics,
     profileLinks: {
       github: dashboard.settings.githubUrl,
       leetcode: dashboard.settings.leetcodeUrl,
+      linkedin: dashboard.settings.linkedinUrl,
+      codeforces: dashboard.settings.codeforcesUrl,
+      codechef: dashboard.settings.codechefUrl,
+      hackerrank: dashboard.settings.hackerrankUrl,
+      jobTracker: dashboard.settings.jobTrackerUrl,
     },
     previousDay: dashboard.previousDay,
     recentDsa: dashboard.recentDsa.slice(0, 4),
@@ -137,7 +182,48 @@ export async function generateCoachResponse(userId: string) {
     dashboard.settings.openAiModel,
     systemPrompt,
     jsonPromptPrefix,
-    CoachResponseSchema
+    CoachResponseSchema,
+    userId,
+  );
+}
+
+export async function generateStudentStrategy(userId: string): Promise<StudentStrategy> {
+  const dashboard = await getDashboardData(userId);
+  const payload = {
+    studentProfile: {
+      targetRole: dashboard.settings.targetRole,
+      primaryGoal: dashboard.settings.primaryGoal,
+      targetCompanies: dashboard.settings.targetCompanies,
+      university: dashboard.settings.university,
+      degree: dashboard.settings.degree,
+      graduationYear: dashboard.settings.graduationYear,
+      planStyle: dashboard.settings.planStyle,
+      customAiInstructions: dashboard.settings.customAiInstructions,
+      links: {
+        github: dashboard.settings.githubUrl,
+        leetcode: dashboard.settings.leetcodeUrl,
+        codeforces: dashboard.settings.codeforcesUrl,
+        codechef: dashboard.settings.codechefUrl,
+        hackerrank: dashboard.settings.hackerrankUrl,
+        jobTracker: dashboard.settings.jobTrackerUrl,
+      },
+    },
+    metrics: dashboard.metrics,
+    today: dashboard.today,
+    recentDsa: dashboard.recentDsa.slice(0, 6),
+    recentBuilds: dashboard.recentBuilds.slice(0, 4),
+    recentApplications: dashboard.recentApplications.slice(0, 6),
+    history: dashboard.history.slice(-21),
+  };
+
+  return dispatchAiRequest(
+    payload,
+    dashboard.settings.aiProvider,
+    dashboard.settings.openAiModel,
+    "You are an elite placement strategist for engineering students. Produce a practical, student-specific interview preparation strategy using the stored profile, history, and current momentum. Be concrete, realistic, and prioritize the highest ROI actions.",
+    "Return only a JSON object with these exact string fields: headline, todayMission, dsaPriority, buildPriority, applicationPriority, mockInterviewTask, realityCheck.",
+    StudentStrategySchema,
+    userId,
   );
 }
 
@@ -147,29 +233,32 @@ async function dispatchAiRequest<T extends z.ZodTypeAny>(
   model: string,
   sysPrompt: string,
   jsonPrefix: string,
-  schema: T
+  schema: T,
+  userId: string,
 ): Promise<z.infer<T>> {
   if (provider === "openai") {
-    return generateWithOpenAI(payload, model, sysPrompt, schema);
+    return generateWithOpenAI(payload, model, sysPrompt, schema, userId);
   }
   if (provider === "gemini") {
-    return generateWithGemini(payload, model, sysPrompt, jsonPrefix, schema);
+    return generateWithGemini(payload, model, sysPrompt, jsonPrefix, schema, userId);
   }
-  return generateWithOpenRouter(payload, model, sysPrompt, jsonPrefix, schema);
+  return generateWithOpenRouter(payload, model, sysPrompt, jsonPrefix, schema, userId);
 }
 
 async function generateWithOpenAI<T extends z.ZodTypeAny>(
   payload: unknown, 
   model: string, 
   sysPrompt: string,
-  schema: T
+  schema: T,
+  userId: string,
 ) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  const apiKey = resolveAiProviderKey(userId, "openai");
+  if (!apiKey) {
+    throw new Error("OpenAI is not configured for this account or the server.");
   }
 
   const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey,
   });
 
   const response = await client.responses.parse({
@@ -205,14 +294,16 @@ async function generateWithGemini<T extends z.ZodTypeAny>(
   model: string, 
   sysPrompt: string, 
   jsonPrefix: string,
-  schema: T
+  schema: T,
+  userId: string,
 ) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured");
+  const apiKey = resolveAiProviderKey(userId, "gemini");
+  if (!apiKey) {
+    throw new Error("Gemini is not configured for this account or the server.");
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.5-flash"}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: {
@@ -259,18 +350,20 @@ async function generateWithOpenRouter<T extends z.ZodTypeAny>(
   model: string, 
   sysPrompt: string, 
   jsonPrefix: string,
-  schema: T
+  schema: T,
+  userId: string,
 ) {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error("OPENROUTER_API_KEY is not configured");
+  const apiKey = resolveAiProviderKey(userId, "openrouter");
+  if (!apiKey) {
+    throw new Error("OpenRouter is not configured for this account or the server.");
   }
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      "HTTP-Referer": "https://github.com/ByteAcumen/Career-OS",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": getApplicationOrigin(),
       "X-OpenRouter-Title": "Career OS",
     },
     body: JSON.stringify({
@@ -313,6 +406,19 @@ function parseJsonWithSchema<T extends z.ZodTypeAny>(text: string, schema: T): z
   }
 
   return schema.parse(JSON.parse(raw.slice(start, end + 1)));
+}
+
+function getApplicationOrigin() {
+  const configured =
+    process.env.BETTER_AUTH_URL?.trim() ||
+    process.env.APP_BASE_URL?.trim() ||
+    "http://localhost:3000";
+
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return "http://localhost:3000";
+  }
 }
 
 const systemPrompt =
