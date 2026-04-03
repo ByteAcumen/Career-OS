@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 
 import { db, normalizeBetterAuthSqliteTables } from "@/lib/db";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 const authBaseUrl = process.env.BETTER_AUTH_URL?.trim() || "http://localhost:3000";
 const configuredOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
@@ -43,6 +44,16 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 12,
     maxPasswordLength: 128,
+    sendResetPassword: async ({ user, url }) => {
+      // Fire-and-forget to avoid timing attacks
+      void sendPasswordResetEmail(user.email, url);
+    },
+  },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7,

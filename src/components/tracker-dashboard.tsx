@@ -31,12 +31,14 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
+import { AccountSecurityPanel } from "@/components/account-security-panel";
 import { ActivityBarChart } from "@/components/activity-bar-chart";
 import { AiKeyManager } from "@/components/ai-key-manager";
 import { MotivationCarousel } from "@/components/motivation-carousel";
 import { StudentOnboarding } from "@/components/student-onboarding";
 import { StudentStrategyPanel } from "@/components/student-strategy-panel";
 import { TaskBoard } from "@/components/task-board";
+import { SettingsPanel } from "@/components/settings-panel";
 import { authClient } from "@/lib/auth-client";
 import { getScheduleForDate } from "@/lib/schedule";
 import type {
@@ -159,13 +161,14 @@ export function TrackerDashboard({
   const [studentStrategy, setStudentStrategy] = useState<StudentStrategy | null>(null);
   const [strategyLoading, setStrategyLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOnboardingDismissed(
+        window.sessionStorage.getItem("career-os-onboarding-dismissed") === "true"
+      );
     }
-
-    return window.sessionStorage.getItem("career-os-onboarding-dismissed") === "true";
-  });
+  }, []);
   const [plannerSuggestions, setPlannerSuggestions] = useState<PlannerSuggestionPack | null>(null);
   const [plannerSuggestionsLoading, setPlannerSuggestionsLoading] = useState(false);
   const [taskForm, setTaskForm] = useState<PlannerTaskForm>({
@@ -444,7 +447,7 @@ export function TrackerDashboard({
 
   return (
     <main className="relative overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto w-full max-w-[1600px]">
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -710,19 +713,34 @@ function OverviewTab({
 }) {
   const [curriculum, setCurriculum] = useState<string | null>(null);
 
+  const containerVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.1 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+  };
+
   return (
-    <section className="mt-5 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-      <div className="grid gap-5">
+    <motion.section 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr] items-start"
+    >
+      <div className="grid gap-6">
         {!settings.onboardingCompleted ? (
-          <Panel title="Finish setup" subtitle="Complete your student profile so the app can personalize recommendations.">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--gold-soft)] px-4 py-4 text-sm text-[var(--ink)]">
-              <div className="max-w-2xl leading-7">
+          <Panel variants={itemVariants} title="Finish setup" subtitle="Complete your student profile so the app can personalize recommendations.">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--gold-soft)] px-5 py-4 text-sm text-[var(--ink)] shadow-sm">
+              <div className="max-w-xl leading-relaxed">
                 Add your target role, LinkedIn, job tracker, university, and planning style.
                 That unlocks more relevant AI suggestions and removes generic defaults.
               </div>
               <button
                 onClick={onOpenOnboarding}
-                className="rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper-strong)]"
+                className="whitespace-nowrap rounded-full bg-[var(--ink)] px-5 py-2.5 text-sm font-medium text-[var(--paper-strong)] transition-all hover:scale-105 hover:bg-black/80"
               >
                 Open onboarding
               </button>
@@ -731,6 +749,7 @@ function OverviewTab({
         ) : null}
 
         <Panel
+          variants={itemVariants}
           title="AI coach"
           subtitle="Server-side guidance based on today's real activity."
           action={
@@ -814,6 +833,7 @@ function OverviewTab({
         </Panel>
 
         <Panel
+          variants={itemVariants}
           title="Student strategy"
           subtitle="A personalized recommendation engine using your stored study, build, and application data."
         >
@@ -826,6 +846,7 @@ function OverviewTab({
         </Panel>
 
         <Panel
+          variants={itemVariants}
           title="Planner snapshot"
           subtitle="Daily, weekly, and weekend commitments in one place."
         >
@@ -878,11 +899,11 @@ function OverviewTab({
           </div>
         </Panel>
 
-        <Panel title="14-day momentum" subtitle="Progress looks better when the data survives each day.">
+        <Panel variants={itemVariants} title="14-day momentum" subtitle="Progress looks better when the data survives each day.">
           <ActivityBarChart data={data.history.slice(-14)} />
         </Panel>
 
-        <Panel title="Recent proof of work" subtitle="The output recruiters can actually believe.">
+        <Panel variants={itemVariants} title="Recent proof of work" subtitle="The output recruiters can actually believe.">
           <div className="grid gap-4 lg:grid-cols-3">
             <LogColumn
               title="DSA"
@@ -915,8 +936,8 @@ function OverviewTab({
         </Panel>
       </div>
 
-      <div className="grid gap-5">
-        <Panel title="Weekly targets" subtitle="Track the numbers that actually move your job search forward.">
+      <div className="grid gap-6">
+        <Panel variants={itemVariants} title="Weekly targets" subtitle="Track the numbers that actually move your job search forward.">
           <div className="space-y-3">
             <TargetProgressRow
               label="DSA problems"
@@ -939,7 +960,7 @@ function OverviewTab({
           </div>
         </Panel>
 
-        <Panel title="Yesterday snapshot" subtitle="Carry context forward instead of resetting daily.">
+        <Panel variants={itemVariants} title="Yesterday snapshot" subtitle="Carry context forward instead of resetting daily.">
           {data.previousDay ? (
             <div className="space-y-3 text-sm text-[var(--muted)]">
               <StatLine label="Date" value={data.previousDay.dateKey} />
@@ -956,6 +977,7 @@ function OverviewTab({
         </Panel>
 
         <Panel
+          variants={itemVariants}
           title="Connected apps"
           subtitle="GitHub proof and Google Sheet reporting in one place."
           action={
@@ -1061,7 +1083,7 @@ function OverviewTab({
           </div>
         </Panel>
 
-        <Panel title="Today's schedule" subtitle="Compact on weekdays. Heavier on weekends.">
+        <Panel variants={itemVariants} title="Today's schedule" subtitle="Compact on weekdays. Heavier on weekends.">
           <div className="space-y-3">
             {schedule.map(([time, title, copy]) => (
               <div key={`${time}-${title}`} className="soft-card">
@@ -1076,7 +1098,7 @@ function OverviewTab({
           </div>
         </Panel>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -1153,10 +1175,26 @@ function PlannerTab({
   setToast: React.Dispatch<React.SetStateAction<string>>;
   runAction: <T>(label: string, request: () => Promise<T>, successMessage: string) => Promise<void>;
 }) {
+  const containerVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.1 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+  };
+
   return (
-    <section className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-      <div className="grid gap-5">
+    <motion.section 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr] items-start"
+    >
+      <div className="grid gap-6">
         <Panel
+          variants={itemVariants}
           title="Task planner"
           subtitle="Organize daily, weekly, and weekend work with manual or AI-generated task packs."
         >
@@ -1561,7 +1599,7 @@ function PlannerTab({
           />
         </Panel>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -1574,9 +1612,24 @@ function HistoryTab({ data }: { data: DashboardData }) {
     totalApps: data.history.reduce((acc, h) => acc + h.appCount, 0),
   };
 
+  const containerVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.1 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+  };
+
   return (
-    <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr]">
-      <Panel title="Execution graph" subtitle="A 90-day view of your output. Click a day for full logs.">
+    <motion.section 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start"
+    >
+      <Panel variants={itemVariants} title="Execution graph" subtitle="A 90-day view of your output. Click a day for full logs.">
         <div className="flex flex-col gap-6">
           <CalendarHeatmap history={data.history} onSelect={setSelectedDate} />
           
@@ -1600,7 +1653,7 @@ function HistoryTab({ data }: { data: DashboardData }) {
         </div>
       </Panel>
 
-      <Panel title="Recent logging" subtitle="You need momentum more than motivation.">
+      <Panel variants={itemVariants} title="Recent logging" subtitle="You need momentum more than motivation.">
         <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
           {data.history
             .slice(-14)
@@ -1635,7 +1688,7 @@ function HistoryTab({ data }: { data: DashboardData }) {
       <AnimatePresence>
         {selectedDate && <DailyDetailModal dateKey={selectedDate} onClose={() => setSelectedDate(null)} />}
       </AnimatePresence>
-    </section>
+    </motion.section>
   );
 }
 
@@ -1654,542 +1707,87 @@ function SettingsTab({
   onSaveAiKey: (provider: AiProvider, apiKey: string) => Promise<void>;
   onDeleteAiKey: (provider: AiProvider) => Promise<void>;
 }) {
+  const containerVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.1 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+  };
+
   return (
-    <section className="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-      <Panel title="Settings studio" subtitle="Own your workflow, links, AI behavior, and weekly operating model.">
-        <div className="grid gap-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[var(--ink)] block">Primary Goal</label>
-            <p className="text-xs text-[var(--muted)]">The overarching mission that dictates your application matching and AI coaching.</p>
-            <textarea
-              value={settings.primaryGoal}
-              onChange={(event) =>
-                setSettings((current) => (current ? { ...current, primaryGoal: event.target.value } : current))
-              }
-              className="field-area"
-              placeholder="e.g., Actively applying for Senior Frontend roles with React/Next.js"
-            />
-          </div>
-
-          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Student Profile</div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Target Role</label>
-              <input
-                value={settings.targetRole}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, targetRole: event.target.value } : current))
-                }
-                className="field"
-                placeholder="Frontend Engineer, SDE 1, Full-stack Engineer..."
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Graduation Year</label>
-              <input
-                value={settings.graduationYear}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, graduationYear: event.target.value } : current))
-                }
-                className="field"
-                placeholder="2026"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">University</label>
-              <input
-                value={settings.university}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, university: event.target.value } : current))
-                }
-                className="field"
-                placeholder="University / college"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Degree / Program</label>
-              <input
-                value={settings.degree}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, degree: event.target.value } : current))
-                }
-                className="field"
-                placeholder="B.Tech CSE"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[var(--ink)] block">Target Companies / Tracks</label>
-            <textarea
-              value={settings.targetCompanies}
-              onChange={(event) =>
-                setSettings((current) => (current ? { ...current, targetCompanies: event.target.value } : current))
-              }
-              className="field-area"
-              placeholder="Product startups, high-growth SaaS, MAANG-style roles, backend-heavy teams..."
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[var(--ink)] block">Planning Style</label>
-            <textarea
-              value={settings.planStyle}
-              onChange={(event) =>
-                setSettings((current) => (current ? { ...current, planStyle: event.target.value } : current))
-              }
-              className="field-area"
-              placeholder="Strict weekday routine, balanced weekends, prioritize DSA first, push applications in batches..."
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[var(--ink)] block">Weekly Theme</label>
-            <input
-              value={settings.weeklyTheme}
-              onChange={(event) =>
-                setSettings((current) =>
-                  current ? { ...current, weeklyTheme: event.target.value } : current,
-                )
-              }
-              className="field"
-              placeholder="Example: Graphs and backend systems, OA sprint, resume polish week"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-[var(--ink)] block">Custom AI Instructions</label>
-            <textarea
-              value={settings.customAiInstructions}
-              onChange={(event) =>
-                setSettings((current) =>
-                  current ? { ...current, customAiInstructions: event.target.value } : current,
-                )
-              }
-              className="field-area"
-              placeholder="Tell the coach about weak topics, office constraints, preferred learning style, or the kind of feedback you want."
-            />
-          </div>
-
-          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Links & Trackers</div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Application Sheet URL</label>
-              <input
-                value={settings.sheetUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, sheetUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="Google Sheet / Airtable used to log applications"
-              />
-            </div>
-            
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Google Apps Script URL</label>
-              <input
-                value={settings.googleAppsScriptUrl}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, googleAppsScriptUrl: event.target.value } : current,
-                  )
-                }
-                className="field"
-                placeholder="Apps Script Endpoint"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Resume URL</label>
-              <input
-                value={settings.resumeUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, resumeUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="Resume link (Drive, PDF)"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">GitHub URL</label>
-              <input
-                value={settings.githubUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, githubUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="GitHub Profile"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">LeetCode URL</label>
-              <input
-                value={settings.leetcodeUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, leetcodeUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="LeetCode Profile"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">LinkedIn URL</label>
-              <input
-                value={settings.linkedinUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, linkedinUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="LinkedIn profile"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Portfolio URL</label>
-              <input
-                value={settings.portfolioUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, portfolioUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="Portfolio / personal site"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Job Tracker Board URL</label>
-              <input
-                value={settings.jobTrackerUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, jobTrackerUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="Notion / dashboard / primary tracker board"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Codeforces URL</label>
-              <input
-                value={settings.codeforcesUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, codeforcesUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="Codeforces profile"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">CodeChef URL</label>
-              <input
-                value={settings.codechefUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, codechefUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="CodeChef profile"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">HackerRank URL</label>
-              <input
-                value={settings.hackerrankUrl}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, hackerrankUrl: event.target.value } : current))
-                }
-                className="field"
-                placeholder="HackerRank profile"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">AI Configuration</div>
-          
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">AI Provider</label>
-              <select
-                value={settings.aiProvider}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current
-                      ? {
-                          ...current,
-                          aiProvider: event.target.value as SettingsForm["aiProvider"],
-                          openAiModel:
-                            event.target.value === "gemini"
-                              ? "gemini-2.5-flash"
-                              : event.target.value === "openrouter"
-                                ? "openai/gpt-4o-mini"
-                                : "gpt-4o-mini",
-                        }
-                      : current,
-                  )
-                }
-                className="field"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Gemini</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
-            </div>
-            
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">AI Model String</label>
-              <input
-                value={settings.openAiModel}
-                onChange={(event) =>
-                  setSettings((current) => (current ? { ...current, openAiModel: event.target.value } : current))
-                }
-                className="field"
-                placeholder="e.g. gpt-4o-mini"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[20px] border border-[var(--line)] bg-[var(--paper-strong)] px-4 py-4">
-            <div className="mb-3 text-sm font-semibold text-[var(--ink)]">
-              Per-user API keys
-            </div>
-            <p className="mb-4 text-sm leading-7 text-[var(--muted)]">
-              Save your own provider keys here. They stay on the server, are encrypted
-              before storage, and are never returned to the browser after saving.
-              If you do not save one, the app can still use a secure server fallback when available.
-            </p>
+    <motion.section 
+      initial="hidden"
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.1 } },
+      }}
+      className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start"
+    >
+      <motion.div variants={itemVariants} className="grid gap-6">
+        <SettingsPanel
+          settings={settings}
+          setSettings={setSettings}
+          onSave={() =>
+            runAction(
+              "settings",
+              () => postJson("/api/settings", settings),
+              "Settings saved.",
+            )
+          }
+          aiKeyManager={
             <AiKeyManager
               integrations={data.integrations}
               onSaveKey={onSaveAiKey}
               onDeleteKey={onDeleteAiKey}
             />
-          </div>
+          }
+        />
+      </motion.div>
 
-          <div className="mt-4 mb-2 text-sm font-semibold uppercase tracking-[0.15em] text-[var(--teal)] border-b border-[var(--line)] pb-2">Targets & Timeboxing</div>
+      <motion.div variants={itemVariants} className="grid gap-6">
+        <AccountSecurityPanel />
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekly DSA Target</label>
-              <input
-                type="number"
-                value={settings.weeklyDsaTarget}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weeklyDsaTarget: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
+        <Panel title="Workspace health" subtitle="Live feedback on personalization, planning, and security posture.">
+          <div className="space-y-4 text-sm leading-7 text-[var(--muted)]">
+            <div className="soft-card">
+              <strong className="text-[var(--ink)]">Personalization coverage</strong>
+              <p className="mt-2">
+                {settings.onboardingCompleted
+                  ? "Your main profile inputs are complete, so the planner and AI can use your role, targets, and links."
+                  : "Finish onboarding details to unlock more specific AI suggestions and cleaner planner defaults."}
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekly Apps Target</label>
-              <input
-                type="number"
-                value={settings.weeklyApplicationTarget}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current
-                      ? { ...current, weeklyApplicationTarget: Number(event.target.value) }
-                      : current,
-                  )
-                }
-                className="field"
-              />
+            <div className="soft-card">
+              <strong className="text-[var(--ink)]">Learning progress</strong>
+              <p className="mt-2">
+                You have {data.metrics.weekDsa} DSA logs, {data.metrics.weekBuilds} build logs, and{" "}
+                {data.metrics.weekApplications} applications this week. The planner currently tracks{" "}
+                {data.planner.summary.active} active tasks.
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekly Build Target</label>
-              <input
-                type="number"
-                value={settings.weeklyBuildTarget}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weeklyBuildTarget: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
+            <div className="soft-card">
+              <strong className="text-[var(--ink)]">Planner defaults</strong>
+              <p className="mt-2">
+                Weekdays aim for {settings.weekdayTaskTarget} key tasks, while weekends expect{" "}
+                {settings.weekendTaskTarget}. Weekend blocks stay heavier with{" "}
+                {settings.weekendDsaMinutes + settings.weekendBuildMinutes} focused minutes reserved.
+              </p>
+            </div>
+            <div className="soft-card">
+              <strong className="text-[var(--ink)]">Security posture</strong>
+              <p className="mt-2">
+                Auth stays server-side, AI keys are encrypted at rest, and profile links are blank by
+                default so new users do not inherit someone else&apos;s GitHub, LeetCode, or tracker setup.
+              </p>
             </div>
           </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekday Task Target</label>
-              <input
-                type="number"
-                value={settings.weekdayTaskTarget}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weekdayTaskTarget: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekend Task Target</label>
-              <input
-                type="number"
-                value={settings.weekendTaskTarget}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weekendTaskTarget: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekend DSA Minutes</label>
-              <input
-                type="number"
-                value={settings.weekendDsaMinutes}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weekendDsaMinutes: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekend Build Minutes</label>
-              <input
-                type="number"
-                value={settings.weekendBuildMinutes}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weekendBuildMinutes: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekday Deep Work Minutes</label>
-              <input
-                type="number"
-                value={settings.weekdayDeepWorkMinutes}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weekdayDeepWorkMinutes: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Weekday Support Block Minutes</label>
-              <input
-                type="number"
-                value={settings.weekdaySupportMinutes}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, weekdaySupportMinutes: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-          </div>
-          
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Focus Timer Length (min)</label>
-              <input
-                type="number"
-                value={settings.timerFocusMinutes}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, timerFocusMinutes: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--ink)] block">Break Timer Length (min)</label>
-              <input
-                type="number"
-                value={settings.timerBreakMinutes}
-                onChange={(event) =>
-                  setSettings((current) =>
-                    current ? { ...current, timerBreakMinutes: Number(event.target.value) } : current,
-                  )
-                }
-                className="field"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[20px] border border-[var(--line)] bg-[var(--gold-soft)] px-4 py-3 text-sm text-[var(--gold)]">
-            Weekend template reserves {settings.weekendDsaMinutes + settings.weekendBuildMinutes} focused
-            minutes across DSA and project work.
-          </div>
-          <button
-            onClick={() =>
-              runAction(
-                "settings",
-                () => postJson("/api/settings", settings),
-                "Settings saved.",
-              )
-            }
-            className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper-strong)]"
-          >
-            Save settings
-          </button>
-        </div>
-      </Panel>
-
-      <Panel title="Workspace health" subtitle="Live feedback on personalization, planning, and security posture.">
-        <div className="space-y-4 text-sm leading-7 text-[var(--muted)]">
-          <div className="soft-card">
-            <strong className="text-[var(--ink)]">Personalization coverage</strong>
-            <p className="mt-2">
-              {settings.onboardingCompleted
-                ? "Your main profile inputs are complete, so the planner and AI can use your role, targets, and links."
-                : "Finish onboarding details to unlock more specific AI suggestions and cleaner planner defaults."}
-            </p>
-          </div>
-          <div className="soft-card">
-            <strong className="text-[var(--ink)]">Learning progress</strong>
-            <p className="mt-2">
-              You have {data.metrics.weekDsa} DSA logs, {data.metrics.weekBuilds} build logs, and{" "}
-              {data.metrics.weekApplications} applications this week. The planner currently tracks{" "}
-              {data.planner.summary.active} active tasks.
-            </p>
-          </div>
-          <div className="soft-card">
-            <strong className="text-[var(--ink)]">Planner defaults</strong>
-            <p className="mt-2">
-              Weekdays aim for {settings.weekdayTaskTarget} key tasks, while weekends expect{" "}
-              {settings.weekendTaskTarget}. Weekend blocks stay heavier with{" "}
-              {settings.weekendDsaMinutes + settings.weekendBuildMinutes} focused minutes reserved.
-            </p>
-          </div>
-          <div className="soft-card">
-            <strong className="text-[var(--ink)]">Security posture</strong>
-            <p className="mt-2">
-              Auth stays server-side, AI keys are encrypted at rest, and profile links are blank by
-              default so new users do not inherit someone else&apos;s GitHub, LeetCode, or tracker setup.
-            </p>
-          </div>
-        </div>
-      </Panel>
-    </section>
+        </Panel>
+      </motion.div>
+    </motion.section>
   );
 }
 
@@ -2207,14 +1805,17 @@ function FocusToolsPanel({
   const [timerMode, setTimerMode] = useState<"focus" | "break">("focus");
   const [isRunning, setIsRunning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(settings.timerFocusMinutes * 60);
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [currentTime, setCurrentTime] = useState(0); // Server-safe mock
   const [notificationPermission, setNotificationPermission] = useState<
     NotificationPermission | "unsupported"
-  >(() =>
-    typeof window !== "undefined" && "Notification" in window
-      ? Notification.permission
-      : "unsupported",
-  );
+  >("unsupported"); // Server-safe mock
+  
+  useEffect(() => {
+    setCurrentTime(Date.now());
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
   const reminderTimeoutsRef = useRef<number[]>([]);
 
   const targetSeconds =
@@ -2475,23 +2076,31 @@ function Panel({
   subtitle,
   action,
   children,
+  variants,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  variants?: import("framer-motion").Variants;
 }) {
+  const Component = variants ? motion.section : "section";
   return (
-    <section className="glass-card rounded-[28px] p-5 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">{title}</h2>
-          {subtitle ? <p className="mt-1 text-sm text-[var(--muted)]">{subtitle}</p> : null}
+    <Component
+      variants={variants}
+      className="glass-card flex flex-col overflow-hidden rounded-[28px] p-6 lg:p-8 transition-shadow duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/5"
+    >
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <h2 className="text-xl font-semibold tracking-tight text-[var(--ink)] heading-font">{title}</h2>
+          {subtitle ? <p className="text-sm text-[var(--muted)]">{subtitle}</p> : null}
         </div>
         {action}
       </div>
-      {children}
-    </section>
+      <div className="flex-1 flex flex-col">
+        {children}
+      </div>
+    </Component>
   );
 }
 

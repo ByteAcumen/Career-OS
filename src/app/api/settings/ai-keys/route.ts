@@ -13,7 +13,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const retryAfterSeconds = rateLimit(request, `ai-keys:${session.user.id}`, {
+  // Security Check: Enforce user-level isolation.
+  // The rate limit key and database writes are strictly bound to this session's user ID.
+  const userId = session.user.id;
+
+  const retryAfterSeconds = rateLimit(request, `ai-keys:${userId}`, {
     limit: 12,
     windowMs: 60_000,
   });
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const payload = aiKeySchema.parse(await request.json());
-  saveAiCredential(session.user.id, payload.provider, payload.apiKey);
+  saveAiCredential(userId, payload.provider, payload.apiKey);
 
   return NextResponse.json({ ok: true });
 }

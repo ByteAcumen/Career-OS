@@ -23,6 +23,13 @@ migrateLegacySingleUserTables();
 createMultiUserTables();
 ensureAppSettingsColumns();
 
+// Ensure user table has email_verified and email_verification_token columns
+ensureColumn("user", "email_verified", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("user", "email_verification_token", "TEXT");
+// Add unique indexes for email and name
+sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email ON user(email);`);
+sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_name ON user(name);`);
+
 export { databaseFile, sqlite as db };
 export { normalizeBetterAuthSqliteTables };
 
