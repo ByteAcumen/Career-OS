@@ -28,7 +28,7 @@ import {
   X
 } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
 import { AccountSecurityPanel } from "@/components/account-security-panel";
@@ -178,8 +178,12 @@ export function TrackerDashboard({
     category: "revision" as const,
     priority: "high" as const,
     estimateMinutes: 45,
-    targetDateKey: toDateKey(),
+    targetDateKey: "", // Start empty for hydration safety
   });
+
+  useEffect(() => {
+    setTaskForm(prev => ({ ...prev, targetDateKey: toDateKey() }));
+  }, []);
   const lastMotivationSeedRef = useRef("");
 
   const todayKey = data?.today.dateKey ?? toDateKey();
@@ -1707,11 +1711,6 @@ function SettingsTab({
   onSaveAiKey: (provider: AiProvider, apiKey: string) => Promise<void>;
   onDeleteAiKey: (provider: AiProvider) => Promise<void>;
 }) {
-  const containerVariants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.1 } },
-  };
-
   const itemVariants = {
     hidden: { opacity: 0, y: 15, scale: 0.98 },
     visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
@@ -1810,7 +1809,9 @@ function FocusToolsPanel({
     NotificationPermission | "unsupported"
   >("unsupported"); // Server-safe mock
   
-  useEffect(() => {
+  
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentTime(Date.now());
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotificationPermission(Notification.permission);

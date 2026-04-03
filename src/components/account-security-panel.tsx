@@ -64,25 +64,22 @@ export function AccountSecurityPanel() {
   }
 
   return (
-    <div className="glass-card rounded-[32px] p-6 sm:p-8">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
-          <KeyRound className="size-3.5" />
-          Account Security
+    <div className="group rounded-[24px] border border-[var(--line)] bg-[var(--card)] overflow-hidden transition-all duration-300 hover:border-teal-500/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+      <div className="flex w-full items-center gap-4 px-6 py-5 border-b border-[var(--line)] bg-black/10">
+        <div className="flex size-10 items-center justify-center rounded-2xl bg-teal-500/10 shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110">
+          <KeyRound className="size-5 text-teal-400" />
         </div>
-        <h3 className="mt-2 text-lg font-semibold text-[var(--ink)]">
-          Password management
-        </h3>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Set or change your password. OAuth users can add a password to enable email sign-in.
-        </p>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-semibold text-[var(--ink)] tracking-tight">Account Security</div>
+          <div className="mt-0.5 text-xs text-[var(--muted)]">Password management & secure sign-in</div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid gap-4">
-        <div className="rounded-[20px] border border-[var(--line)] bg-[var(--paper-strong)] px-4 py-4">
+      <div className="px-6 py-6 space-y-6">
+        <div className="rounded-2xl border border-[var(--line)] bg-white/5 p-4">
           <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[var(--teal)]" />
-            <p className="text-sm leading-7 text-[var(--muted)]">
+            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber-400" />
+            <p className="text-[13px] leading-relaxed text-[var(--muted)]">
               If you signed in with{" "}
               <strong className="text-[var(--ink)]">Google</strong>, leave the
               &ldquo;Current password&rdquo; field empty and set a new password below.
@@ -91,24 +88,26 @@ export function AccountSecurityPanel() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-[var(--ink)]">
+        <form onSubmit={handleSubmit} className="grid gap-5">
+
+        <div className="group/field space-y-2">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
             Current password{" "}
-            <span className="text-[var(--muted)]">(leave empty for OAuth accounts)</span>
+            <span className="text-[10px] lowercase italic opacity-60">(leave empty for OAuth)</span>
           </label>
           <div className="relative">
             <input
               type={showPasswords ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="field pr-10"
-              placeholder="Leave blank if signed in via Google"
+              className="field h-11 w-full bg-black/20 pr-10 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
+              placeholder="••••••••••••"
               autoComplete="current-password"
             />
             <button
               type="button"
               onClick={() => setShowPasswords((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)] transition"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-white transition"
               aria-label={showPasswords ? "Hide passwords" : "Show passwords"}
             >
               {showPasswords ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -116,15 +115,15 @@ export function AccountSecurityPanel() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-[var(--ink)]">
+        <div className="group/field space-y-2">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
             New password
           </label>
           <input
             type={showPasswords ? "text" : "password"}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="field"
+            className="field h-11 w-full bg-black/20 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
             placeholder="At least 12 characters"
             autoComplete="new-password"
             minLength={12}
@@ -156,22 +155,22 @@ export function AccountSecurityPanel() {
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-[var(--ink)]">
+        <div className="group/field space-y-2">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
             Confirm new password
           </label>
           <input
             type={showPasswords ? "text" : "password"}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="field"
+            className="field h-11 w-full bg-black/20 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
             placeholder="Re-enter your new password"
             autoComplete="new-password"
             minLength={12}
             required
           />
           {confirmPassword && newPassword !== confirmPassword && (
-            <p className="mt-1 text-xs text-rose-400">Passwords do not match.</p>
+            <p className="mt-1 text-[11px] font-medium text-rose-400">Passwords do not match.</p>
           )}
         </div>
 
@@ -192,15 +191,16 @@ export function AccountSecurityPanel() {
           type="submit"
           disabled={saving || !newPassword || !confirmPassword}
           className={cn(
-            "rounded-full px-4 py-3 text-sm font-medium transition",
+            "mt-2 w-full rounded-2xl px-5 py-3.5 text-sm font-semibold transition-all shadow-lg",
             saving || !newPassword || !confirmPassword
-              ? "cursor-not-allowed bg-slate-700 text-slate-400"
-              : "bg-[var(--ink)] text-[var(--paper-strong)] hover:opacity-90",
+              ? "cursor-not-allowed bg-white/5 text-white/20"
+              : "bg-white text-black hover:bg-neutral-200 active:scale-[0.99]",
           )}
         >
           {saving ? "Updating..." : "Update password"}
         </button>
       </form>
     </div>
-  );
+  </div>
+);
 }

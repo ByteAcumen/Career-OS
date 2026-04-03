@@ -4,12 +4,10 @@ import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown,
-  Globe,
-  GraduationCap,
   Link2,
+  ShieldCheck,
   Sparkles,
   Target,
-  Timer,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,26 +76,28 @@ function AccordionSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper-strong)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.1)]">
+    <div className="group rounded-[24px] border border-[var(--line)] bg-[var(--card)] overflow-hidden transition-all duration-300 hover:border-teal-500/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
+        className="flex w-full items-center gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.02]"
       >
         <div
-          className="flex size-8 shrink-0 items-center justify-center rounded-xl"
-          style={{ background: `color-mix(in srgb, ${accentColor} 15%, transparent)` }}
+          className="flex size-10 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110"
+          style={{ 
+            background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} 20%, transparent), color-mix(in srgb, ${accentColor} 5%, transparent))`,
+          }}
         >
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-[var(--ink)]">{title}</div>
-          <div className="text-xs text-[var(--muted)] truncate">{subtitle}</div>
+          <div className="text-[15px] font-semibold text-[var(--ink)] tracking-tight">{title}</div>
+          <div className="mt-0.5 text-xs text-[var(--muted)] line-clamp-1">{subtitle}</div>
         </div>
         <motion.div
           animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="shrink-0 text-[var(--muted)]"
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="shrink-0 rounded-full bg-white/5 p-1.5 text-[var(--muted)]"
         >
           <ChevronDown className="size-4" />
         </motion.div>
@@ -109,10 +109,10 @@ function AccordionSection({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 35 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-[var(--line)] px-5 pb-5 pt-4">
+            <div className="border-t border-[var(--line)] bg-black/10 px-6 pb-6 pt-5">
               {children}
             </div>
           </motion.div>
@@ -139,13 +139,15 @@ function FieldInput({
   type?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="block text-xs font-medium text-[var(--ink)]">{label}</label>
+    <div className="group/field space-y-2">
+      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
+        {label}
+      </label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="field text-sm"
+        className="field h-11 w-full bg-[var(--card)] text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
         placeholder={placeholder}
       />
     </div>
@@ -166,15 +168,19 @@ function FieldTextarea({
   placeholder?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="block text-xs font-medium text-[var(--ink)]">{label}</label>
-      {description && (
-        <p className="text-[11px] text-[var(--muted)]">{description}</p>
-      )}
+    <div className="group/field space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
+          {label}
+        </label>
+        {description && (
+          <span className="text-[10px] text-[var(--muted)]/60 italic">{description}</span>
+        )}
+      </div>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="field-area text-sm"
+        className="field-area min-h-[90px] w-full bg-[var(--card)] text-[14px] leading-relaxed transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
         placeholder={placeholder}
         rows={3}
       />
@@ -203,15 +209,23 @@ export function SettingsPanel({
   }
 
   return (
-    <div className="space-y-3">
-      {/* ─── Section 1: Profile ─── */}
-      <AccordionSection
-        icon={<User className="size-4" style={{ color: "var(--teal)" }} />}
-        title="Profile & Identity"
-        subtitle="Role, education, and career targets"
-        defaultOpen={true}
-        accentColor="var(--teal)"
-      >
+    <div className="grid gap-5">
+      <div className="flex items-center justify-between px-2">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-white">Account Settings</h2>
+          <p className="text-xs text-[var(--muted)]">Manage your workspace configuration and preferences</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        {/* ─── Section 1: Profile ─── */}
+        <AccordionSection
+          icon={<User className="size-5" style={{ color: "var(--teal)" }} />}
+          title="Profile & Identity"
+          subtitle="Role, education, and career targets"
+          defaultOpen={true}
+          accentColor="var(--teal)"
+        >
         <div className="grid gap-4">
           <FieldTextarea
             label="Primary Goal"
@@ -320,10 +334,13 @@ export function SettingsPanel({
           />
 
           {/* API keys card */}
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
-            <div className="mb-2 text-xs font-semibold text-[var(--ink)]">Per-user API keys</div>
-            <p className="mb-3 text-[11px] leading-5 text-[var(--muted)]">
-              Keys are encrypted before storage and never returned to the browser.
+          <div className="mt-2 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-inner">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="size-4 text-emerald-400" />
+              <div className="text-xs font-bold uppercase tracking-widest text-[var(--ink)]">Per-user API keys</div>
+            </div>
+            <p className="mb-4 text-[11px] leading-5 text-[var(--muted)]">
+              Keys are encrypted before storage and never returned to the browser. Only your workspace uses them.
             </p>
             {aiKeyManager}
           </div>
@@ -528,5 +545,6 @@ export function SettingsPanel({
         Save all settings
       </button>
     </div>
-  );
+  </div>
+);
 }

@@ -219,22 +219,17 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     setForgotPending(true);
     setForgotError("");
     try {
-      const res = await fetch("/api/auth/forget-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: forgotEmail.trim(),
-          redirectTo: window.location.origin + "/reset-password",
-        }),
+      const { error } = await authClient.requestPasswordReset({
+        email: forgotEmail.trim(),
+        redirectTo: window.location.origin + "/reset-password",
       });
-      
-      const result = await res.json().catch(() => ({}));
-      
-      if (!res.ok || result.error) {
-        throw new Error(result.error?.message || result.message || "Request failed.");
+
+      if (error) {
+        throw new Error(error.message || "Failed to send reset link.");
       }
-      
+
       setForgotSuccess(true);
+      setForgotEmail("");
     } catch (err) {
       setForgotError(
         err instanceof Error ? err.message : "Could not send reset email.",
