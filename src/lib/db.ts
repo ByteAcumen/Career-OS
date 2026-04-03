@@ -9,6 +9,11 @@ function resolveDatabaseFile() {
       : path.join(/*turbopackIgnore: true*/ process.cwd(), process.env.DATABASE_FILE);
   }
 
+  // Detect Vercel environment and use /tmp (the only writable directory)
+  if (process.env.VERCEL === "1") {
+    return path.join("/tmp", "career-tracker.db");
+  }
+
   return path.join(/*turbopackIgnore: true*/ process.cwd(), "data", "career-tracker.db");
 }
 
