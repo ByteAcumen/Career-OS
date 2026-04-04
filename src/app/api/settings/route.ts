@@ -27,5 +27,5 @@ export async function POST(request: Request) {
   }
 
   const payload = settingsSchema.parse(await request.json());
-  return NextResponse.json(saveSettings(session.user.id, payload));
+  return NextResponse.json(await saveSettings(session.user.id, payload));
 }

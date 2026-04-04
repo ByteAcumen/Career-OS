@@ -11,5 +11,5 @@ export async function POST(request: Request) {
   }
 
   const payload = buildEntrySchema.parse(await request.json());
-  return NextResponse.json(createBuildEntry(session.user.id, payload));
+  return NextResponse.json(await createBuildEntry(session.user.id, payload));
 }

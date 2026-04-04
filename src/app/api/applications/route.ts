@@ -16,11 +16,11 @@ export async function POST(request: Request) {
   }
 
   const payload = applicationEntrySchema.parse(await request.json());
-  const entry = createApplicationEntry(session.user.id, payload);
+  const entry = await createApplicationEntry(session.user.id, payload);
 
   // Auto-sync in background
   try {
-    const settings = ensureSettings(session.user.id);
+    const settings = await ensureSettings(session.user.id);
     if (settings.googleAppsScriptUrl) {
       pushApplicationToSheet(settings.googleAppsScriptUrl, {
         source: "career-tracker-app",
@@ -33,8 +33,8 @@ export async function POST(request: Request) {
         githubUrl: settings.githubUrl ?? "",
         createdAt: new Date().toISOString(),
       })
-        .then(() => {
-          markApplicationSynced(session.user.id, entry.id);
+        .then(async () => {
+          await markApplicationSynced(session.user.id, entry.id);
         })
         .catch((error) => console.error("Auto-sync failed", error));
     }

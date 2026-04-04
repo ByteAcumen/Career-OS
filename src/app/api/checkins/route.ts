@@ -15,12 +15,12 @@ export async function POST(request: Request) {
   if ("key" in body) {
     const payload = checkinSchema.parse(body);
     return NextResponse.json(
-      updateCheckin(session.user.id, payload.dateKey, payload.key, payload.value),
+      await updateCheckin(session.user.id, payload.dateKey, payload.key, payload.value),
     );
   }
 
   const review = reviewSchema.parse(body);
   return NextResponse.json(
-    saveReview(session.user.id, review.dateKey, review.note, review.tomorrowTask),
+    await saveReview(session.user.id, review.dateKey, review.note, review.tomorrowTask),
   );
 }

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const settings = ensureSettings(session.user.id);
+  const settings = await ensureSettings(session.user.id);
 
   if (!settings.googleAppsScriptUrl) {
     return NextResponse.json(
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const pending = getPendingApplicationsForSync(session.user.id);
+  const pending = await getPendingApplicationsForSync(session.user.id);
 
   let syncedCount = 0;
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       createdAt: item.createdAt,
     });
 
-    markApplicationSynced(session.user.id, item.id);
+    await markApplicationSynced(session.user.id, item.id);
     syncedCount += 1;
   }
 

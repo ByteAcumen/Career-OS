@@ -34,6 +34,7 @@ import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
 import { AccountSecurityPanel } from "@/components/account-security-panel";
 import { ActivityBarChart } from "@/components/activity-bar-chart";
 import { AiKeyManager } from "@/components/ai-key-manager";
+import { CareerAssistant } from "@/components/career-assistant";
 import { MotivationCarousel } from "@/components/motivation-carousel";
 import { StudentOnboarding } from "@/components/student-onboarding";
 import { StudentStrategyPanel } from "@/components/student-strategy-panel";
@@ -578,8 +579,9 @@ export function TrackerDashboard({
                 key={card.label}
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
                 transition={{ delay: index * 0.05 }}
-                className="glass-card rounded-[24px] p-5"
+                className="glass-card rounded-[24px] p-5 cursor-default"
               >
                 <div className="mb-4 flex items-center justify-between">
                   <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", card.tone)}>
@@ -692,6 +694,7 @@ export function TrackerDashboard({
           />
         ) : null}
       </div>
+      <CareerAssistant />
     </main>
   );
 }

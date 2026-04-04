@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const settings = ensureSettings(session.user.id);
+  const settings = await ensureSettings(session.user.id);
   const { searchParams } = new URL(request.url);
   const dateKey = searchParams.get("date") ?? toDateKey();
   const schedule = getScheduleForDate(dateKey, settings);

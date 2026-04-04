@@ -328,24 +328,40 @@ export function TaskBoard({
             <div className="space-y-3">
               <AnimatePresence initial={false}>
                 {scopedTasks.length ? (
-                  scopedTasks.map((task) => (
+                  <motion.div
+                    initial="hidden"
+                    animate="show"
+                    exit="hidden"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      show: {
+                        opacity: 1,
+                        transition: { staggerChildren: 0.08 }
+                      }
+                    }}
+                    className="space-y-3"
+                  >
+                  {scopedTasks.map((task) => (
                     <motion.div
+                      layout
                       key={task.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
+                      variants={{
+                        hidden: { opacity: 0, scale: 0.95, y: 10 },
+                        show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+                      }}
+                      exit={{ opacity: 0, scale: 0.95, x: -20, transition: { duration: 0.2 } }}
                       className={cn(
-                        "rounded-[18px] border p-4 transition",
+                        "rounded-[18px] border p-4 transition-all duration-300 hover:shadow-lg",
                         task.status === "done"
-                          ? "border-emerald-500/20 bg-emerald-500/8"
-                          : "border-[var(--line)] bg-black/20",
+                          ? "border-emerald-500/20 bg-emerald-500/8 hover:border-emerald-500/40"
+                          : "border-[var(--line)] bg-[var(--card)] hover:border-white/15 hover:bg-white-[0.02]"
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-[var(--ink)]">{task.title}</div>
+                          <div className="font-semibold text-[var(--ink)] leading-snug">{task.title}</div>
                           {task.details ? (
-                            <div className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                            <div className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
                               {task.details}
                             </div>
                           ) : null}
@@ -354,63 +370,77 @@ export function TaskBoard({
                         <button
                           type="button"
                           onClick={() => onDeleteTask(task.id)}
-                          className="rounded-full border border-[var(--line)] p-2 text-[var(--muted)] hover:bg-white/6 hover:text-[var(--ink)]"
+                          className="shrink-0 rounded-full border border-[var(--line)] p-2 text-[var(--muted)] hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition"
                           aria-label={`Delete ${task.title}`}
                         >
                           <Trash2 className="size-4" />
                         </button>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em]">
-                        <span className="rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)]">
+                      <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] font-medium">
+                        <span className={cn(
+                          "rounded-full px-2.5 py-1",
+                          task.category === "dsa" ? "bg-[var(--teal-soft)] text-[var(--teal)]" :
+                          task.category === "build" ? "bg-[var(--navy-soft)] text-sky-400" :
+                          task.category === "application" ? "bg-[var(--rose-soft)] text-rose-400" :
+                          task.category === "interview" ? "bg-[var(--gold-soft)] text-amber-400" :
+                          "bg-white/6 text-[var(--muted)]"
+                        )}>
                           {task.category}
                         </span>
-                        <span className="rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)]">
+                        <span className={cn(
+                          "rounded-full px-2.5 py-1",
+                          task.priority === "high" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
+                          task.priority === "medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                          "bg-white/6 text-[var(--muted)] border border-[var(--line)]"
+                        )}>
                           {task.priority}
                         </span>
-                        <span className="rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)]">
+                        <span className="rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)] border border-[var(--line)]">
                           {task.estimateMinutes} min
                         </span>
                         {task.targetDateKey ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)]">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)] border border-[var(--line)]">
                             <CalendarRange className="size-3.5" />
                             {task.targetDateKey}
                           </span>
                         ) : null}
                       </div>
 
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                        <div className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
+                        <div className="inline-flex items-center gap-2 text-sm text-[var(--muted)] font-medium">
                           <Clock3 className="size-4" />
-                          {task.status.replace("_", " ")}
+                          <span className="capitalize">{task.status.replace("_", " ")}</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => onAdvanceTask(task, nextTaskStatus(task.status))}
                           className={cn(
-                            "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition",
+                            "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 shadow-sm active:scale-95",
                             task.status === "done"
-                              ? "bg-[var(--ink)] text-[var(--paper-strong)]"
-                              : "bg-[var(--teal)] text-white",
+                              ? "bg-[var(--ink)] text-[var(--paper-strong)] hover:shadow-md hover:-translate-y-0.5"
+                              : "bg-[var(--teal)] text-[var(--paper-strong)] hover:shadow-[0_4px_12px_rgba(20,184,166,0.3)] hover:-translate-y-0.5"
                           )}
                         >
                           <CheckCircle2 className="size-4" />
                           {task.status === "todo"
-                            ? "Start"
+                            ? "Start Task"
                             : task.status === "in_progress"
-                              ? "Mark done"
+                              ? "Complete"
                               : "Reopen"}
                         </button>
                       </div>
                     </motion.div>
-                  ))
+                  ))}
+                  </motion.div>
                 ) : (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="rounded-[18px] border border-dashed border-[var(--line)] px-4 py-6 text-sm leading-7 text-[var(--muted)]"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="rounded-[18px] border border-dashed border-[var(--line)] px-4 py-8 text-center text-sm leading-7 text-[var(--muted)] bg-black/10"
                   >
-                    No {scope} tasks yet. Add one manually or import the AI suggestions.
+                    No {scope} tasks yet. <br/> Add one manually or import the AI suggestions.
                   </motion.div>
                 )}
               </AnimatePresence>

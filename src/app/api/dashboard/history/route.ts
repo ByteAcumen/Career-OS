@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, message: "Invalid date parameter." }, { status: 400 });
   }
 
-  const detail = getDailyDetail(session.user.id, dateStr);
+  const detail = await getDailyDetail(session.user.id, dateStr);
   if (!detail) {
     return NextResponse.json({ ok: false, message: "Date not found in history." }, { status: 404 });
   }

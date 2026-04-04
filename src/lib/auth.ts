@@ -1,8 +1,10 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
-import { db, normalizeBetterAuthSqliteTables } from "@/lib/db";
+import { db, initializeSchema } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/email";
+import * as schema from "@/lib/schema";
 
 const authBaseUrl = process.env.BETTER_AUTH_URL?.trim() || "http://localhost:3000";
 const configuredOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
@@ -39,7 +41,10 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   trustedOrigins,
   secret: process.env.BETTER_AUTH_SECRET,
-  database: db,
+  database: drizzleAdapter(db, {
+    provider: "sqlite",
+    schema,
+  }),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 12,
@@ -65,7 +70,7 @@ export const auth = betterAuth({
   },
   rateLimit: {
     enabled: true,
-    storage: "database",
+    storage: "memory",
   },
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
@@ -85,13 +90,14 @@ let authMigrationPromise: Promise<void> | null = null;
 
 export function ensureAuthTables() {
   if (!authMigrationPromise) {
-    authMigrationPromise = auth.$context.then(async (ctx) => {
-      await ctx.runMigrations();
-      normalizeBetterAuthSqliteTables();
+    authMigrationPromise = Promise.resolve().then(async () => {
+      // Ensure app tables are created in Turso
+      await initializeSchema();
+      
+      // Note: Better Auth tables are managed via the drizzleAdapter during usage,
+      // but we ensure the app schema is ready here.
     });
   }
 
   return authMigrationPromise;
 }
-
-void ensureAuthTables();

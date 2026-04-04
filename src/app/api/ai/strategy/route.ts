@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getRequestSession } from "@/lib/auth-session";
-import { generateStudentStrategy } from "@/lib/ai";
+import { generateStudentStrategy, AiError } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
+        code: "RATE_LIMITED",
         message: `Too many AI requests. Try again in ${retryAfterSeconds} seconds.`,
       },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
@@ -31,9 +32,22 @@ export async function POST(request: Request) {
     const strategy = await generateStudentStrategy(session.user.id);
     return NextResponse.json({ ok: true, strategy });
   } catch (error) {
+    if (error instanceof AiError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: error.code,
+          provider: error.provider,
+          message: error.userMessage,
+          retryable: error.retryable,
+        },
+        { status: error.code === "NO_KEY" ? 400 : 502 },
+      );
+    }
     return NextResponse.json(
       {
         ok: false,
+        code: "PROVIDER_ERROR",
         message: error instanceof Error ? error.message : "AI strategy failed",
       },
       { status: 500 },

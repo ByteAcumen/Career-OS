@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   const payload = plannerTaskCreateSchema.parse(await request.json());
-  return NextResponse.json(createPlannerTask(session.user.id, payload));
+  return NextResponse.json(await createPlannerTask(session.user.id, payload));
 }
 
 export async function PATCH(request: Request) {
@@ -63,7 +63,7 @@ export async function PATCH(request: Request) {
 
   const payload = plannerTaskUpdateSchema.parse(await request.json());
   return NextResponse.json(
-    updatePlannerTaskStatus(session.user.id, payload.id, payload.status),
+    await updatePlannerTaskStatus(session.user.id, payload.id, payload.status),
   );
 }
 
@@ -89,5 +89,5 @@ export async function DELETE(request: Request) {
   }
 
   const payload = plannerTaskDeleteSchema.parse(await request.json());
-  return NextResponse.json(deletePlannerTask(session.user.id, payload.id));
+  return NextResponse.json(await deletePlannerTask(session.user.id, payload.id));
 }

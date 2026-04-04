@@ -27,7 +27,7 @@ function loadEnvFile() {
 async function main() {
   loadEnvFile();
 
-  const [{ auth, ensureAuthTables }, { db }, { claimLegacyDataForUser }] =
+  const [{ auth, ensureAuthTables }, { db, client }, { claimLegacyDataForUser }] =
     await Promise.all([
       import("../src/lib/auth"),
       import("../src/lib/db"),
@@ -40,12 +40,14 @@ async function main() {
   const email = process.env.APP_SEED_EMAIL?.trim() || "admin@career-os.local";
   const password = process.env.APP_SEED_PASSWORD?.trim() || randomBytes(18).toString("base64url");
 
-  const existingUser = db
-    .prepare(`SELECT id, email, name FROM user WHERE email = ?`)
-    .get(email) as { id: string; email: string; name: string } | undefined;
+  const rs = await client.execute({
+    sql: `SELECT id, email, name FROM user WHERE email = ?`,
+    args: [email],
+  });
+  const existingUser = rs.rows[0] as unknown as { id: string; email: string; name: string } | undefined;
 
   if (existingUser) {
-    claimLegacyDataForUser(existingUser.id);
+    await claimLegacyDataForUser(existingUser.id);
     console.log(`User already exists: ${existingUser.email}`);
     return;
   }
@@ -62,7 +64,7 @@ async function main() {
     throw new Error("Seed user creation did not return a user id.");
   }
 
-  claimLegacyDataForUser(response.user.id);
+  await claimLegacyDataForUser(response.user.id);
   console.log(`Created seed user: ${email}`);
   if (!process.env.APP_SEED_PASSWORD?.trim()) {
     console.log(`Generated temporary password: ${password}`);

@@ -2,9 +2,80 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
-import { resolveAiProviderKey } from "@/lib/ai-credentials";
+import { resolveAiProviderKey, getFirstAvailableProvider } from "@/lib/ai-credentials";
 import { getDashboardData } from "@/lib/dashboard";
-import type { PlannerSuggestionPack, StudentStrategy } from "@/lib/types";
+import type { AiProvider, PlannerSuggestionPack, StudentStrategy } from "@/lib/types";
+
+// ── Error Classification ──────────────────────────────────────────────────
+
+export type AiErrorCode =
+  | "NO_KEY"
+  | "INVALID_KEY"
+  | "QUOTA_EXCEEDED"
+  | "RATE_LIMITED"
+  | "TIMEOUT"
+  | "PROVIDER_ERROR"
+  | "PARSE_ERROR";
+
+export class AiError extends Error {
+  code: AiErrorCode;
+  provider: string;
+  userMessage: string;
+  retryable: boolean;
+
+  constructor(
+    code: AiErrorCode,
+    provider: string,
+    originalMessage: string,
+  ) {
+    const userMessage = getErrorUserMessage(code, provider);
+    super(originalMessage);
+    this.name = "AiError";
+    this.code = code;
+    this.provider = provider;
+    this.userMessage = userMessage;
+    this.retryable = code === "RATE_LIMITED" || code === "TIMEOUT";
+  }
+}
+
+function getErrorUserMessage(code: AiErrorCode, provider: string): string {
+  switch (code) {
+    case "NO_KEY":
+      return `No API key configured for ${provider}. Go to Settings → AI Keys to add one, or set it in your environment variables.`;
+    case "INVALID_KEY":
+      return `Your ${provider} API key is invalid or expired. Please update it in Settings → AI Keys.`;
+    case "QUOTA_EXCEEDED":
+      return `Your ${provider} API quota has been exceeded. Wait for it to reset, upgrade your plan, or switch to a different provider in Settings.`;
+    case "RATE_LIMITED":
+      return `${provider} rate limit reached. Wait a moment and try again, or switch to a different provider.`;
+    case "TIMEOUT":
+      return `${provider} request timed out. The service might be busy — try again in a moment.`;
+    case "PROVIDER_ERROR":
+      return `${provider} returned an unexpected error. Try again, or switch to a different provider in Settings.`;
+    case "PARSE_ERROR":
+      return `${provider} returned a response that couldn't be parsed. Try again.`;
+  }
+}
+
+function classifyHttpError(status: number, body: string, provider: string): AiError {
+  if (status === 401 || status === 403) {
+    return new AiError("INVALID_KEY", provider, `${provider} returned ${status}: ${body}`);
+  }
+  if (status === 429) {
+    // Distinguish between rate limit and quota
+    const lower = body.toLowerCase();
+    if (lower.includes("quota") || lower.includes("billing") || lower.includes("exceeded")) {
+      return new AiError("QUOTA_EXCEEDED", provider, `${provider} quota exceeded: ${body}`);
+    }
+    return new AiError("RATE_LIMITED", provider, `${provider} rate limited: ${body}`);
+  }
+  if (status === 408 || status === 504) {
+    return new AiError("TIMEOUT", provider, `${provider} timed out: ${body}`);
+  }
+  return new AiError("PROVIDER_ERROR", provider, `${provider} returned ${status}: ${body}`);
+}
+
+// ── Response Schemas ──────────────────────────────────────────────────────
 
 const CoachResponseSchema = z.object({
   summary: z.string(),
@@ -69,6 +140,8 @@ const PlannerSuggestionPackSchema = z.object({
 
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
 
+// ── Public AI Functions ───────────────────────────────────────────────────
+
 export async function generateMotivationQuotes(userId: string) {
   const dashboard = await getDashboardData(userId);
   const payload = {
@@ -84,7 +157,7 @@ export async function generateMotivationQuotes(userId: string) {
     planner: dashboard.planner.summary,
   };
 
-  const response = await dispatchAiRequest(
+  const response = await dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -112,7 +185,7 @@ export async function generateInsight(
     customAiInstructions: dashboard.settings.customAiInstructions,
   };
   
-  const response = await dispatchAiRequest(
+  const response = await dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -134,7 +207,7 @@ export async function generateWeaknessCurriculum(userId: string) {
     recentProblemsAndInsights: recentDsa.map(d => ({ title: d.title, pattern: d.pattern, insight: d.insight }))
   };
 
-  const response = await dispatchAiRequest(
+  const response = await dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -160,7 +233,7 @@ export async function predictApplicationMatch(
     strengths: dashboard.settings.customAiInstructions,
   };
 
-  const response = await dispatchAiRequest(
+  const response = await dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -201,7 +274,7 @@ export async function generateCoachResponse(userId: string) {
     today: dashboard.today,
   };
 
-  return dispatchAiRequest(
+  return dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -241,7 +314,7 @@ export async function generateStudentStrategy(userId: string): Promise<StudentSt
     history: dashboard.history.slice(-21),
   };
 
-  return dispatchAiRequest(
+  return dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -283,7 +356,7 @@ export async function generatePlannerSuggestionPack(
     recentApplications: dashboard.recentApplications.slice(0, 5),
   };
 
-  return dispatchAiRequest(
+  return dispatchWithFallback(
     payload,
     dashboard.settings.aiProvider,
     dashboard.settings.openAiModel,
@@ -294,88 +367,355 @@ export async function generatePlannerSuggestionPack(
   );
 }
 
-async function dispatchAiRequest<T extends z.ZodTypeAny>(
+// ── Chat (free-form conversational AI) ────────────────────────────────────
+
+export async function streamChat(
+  userId: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  dashboardContext: string,
+): Promise<ReadableStream<Uint8Array>> {
+  const systemMessage = `You are Career OS Assistant — a friendly, knowledgeable career coach built into the user's career tracking dashboard.
+
+You have access to the user's current career data:
+${dashboardContext}
+
+Guidelines:
+- Be concise but helpful. Use bullet points for lists.
+- Give specific, actionable advice based on their actual data.
+- If they ask about DSA, reference their recent problems and patterns.
+- If they ask about applications, reference their recent applications and targets.
+- If they ask about planning, consider their current metrics and goals.
+- Be encouraging but honest. Don't sugarcoat if they're falling behind.
+- Format responses with markdown for readability.`;
+
+  const order: AiProvider[] = ["gemini", "openai", "openrouter"];
+  const errors: AiError[] = [];
+
+  for (const provider of order) {
+    const apiKey = await resolveAiProviderKey(userId, provider);
+    if (!apiKey) continue;
+
+    try {
+      if (provider === "gemini") {
+        return await streamGemini(apiKey, systemMessage, messages);
+      }
+      if (provider === "openai") {
+        return await streamOpenAI(apiKey, systemMessage, messages);
+      }
+      return await streamOpenRouter(apiKey, systemMessage, messages);
+    } catch (err) {
+      const aiErr = err instanceof AiError ? err : new AiError("PROVIDER_ERROR", provider, String(err));
+      errors.push(aiErr);
+      console.warn(`[AI] ${provider} stream failed (${aiErr.code}): ${aiErr.message}, trying next...`);
+    }
+  }
+
+  // Final fallback (keyless, completely free)
+  try {
+    return await streamPollinations(systemMessage, messages);
+  } catch (err) {
+    throw new AiError("PROVIDER_ERROR", "Pollinations", String(err));
+  }
+
+  if (errors.length === 0) {
+    throw new AiError("NO_KEY", "any", "No AI provider configured");
+  }
+
+  // If all failed, throw the first error we encountered
+  throw errors[0];
+}
+
+async function streamPollinations(
+  systemMessage: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<ReadableStream<Uint8Array>> {
+  const client = new OpenAI({ 
+    apiKey: "dummy", 
+    baseURL: "https://text.pollinations.ai/openai/v1" 
+  });
+
+  const stream = await client.chat.completions.create({
+    model: "openai",
+    messages: [{ role: "system", content: systemMessage }, ...messages],
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content || "";
+        if (text) controller.enqueue(encoder.encode(text));
+      }
+      controller.close();
+    }
+  });
+}
+
+async function streamGemini(
+  apiKey: string,
+  systemMessage: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<ReadableStream<Uint8Array>> {
+  const contents = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemMessage }] },
+        contents,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw classifyHttpError(response.status, body, "Gemini");
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+
+  let buffer = "";
+
+  return new ReadableStream({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              controller.enqueue(encoder.encode(text));
+            }
+          } catch {
+            // skip invalid JSON
+          }
+        }
+      }
+    },
+  });
+}
+
+async function streamOpenAI(
+  apiKey: string,
+  systemMessage: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<ReadableStream<Uint8Array>> {
+  const client = new OpenAI({ apiKey });
+  const stream = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "system", content: systemMessage }, ...messages],
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content || "";
+        if (text) controller.enqueue(encoder.encode(text));
+      }
+      controller.close();
+    }
+  });
+}
+
+async function streamOpenRouter(
+  apiKey: string,
+  systemMessage: string,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<ReadableStream<Uint8Array>> {
+  const client = new OpenAI({ 
+    apiKey, 
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer": getApplicationOrigin(),
+      "X-OpenRouter-Title": "Career OS",
+    }
+  });
+
+  const stream = await client.chat.completions.create({
+    model: "google/gemma-2-9b-it:free",
+    messages: [{ role: "system", content: systemMessage }, ...messages],
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content || "";
+        if (text) controller.enqueue(encoder.encode(text));
+      }
+      controller.close();
+    }
+  });
+}
+
+// ── Dispatch with Provider Fallback ───────────────────────────────────────
+
+const providerOrder: AiProvider[] = ["gemini", "openai", "openrouter"];
+
+async function dispatchWithFallback<T extends z.ZodTypeAny>(
   payload: unknown,
-  provider: string,
+  preferredProvider: string,
   model: string,
   sysPrompt: string,
   jsonPrefix: string,
   schema: T,
   userId: string,
 ): Promise<z.infer<T>> {
-  if (provider === "openai") {
-    return generateWithOpenAI(payload, model, sysPrompt, schema, userId);
+  // Build ordered list: preferred provider first, then others
+  const ordered = [
+    preferredProvider as AiProvider,
+    ...providerOrder.filter((p) => p !== preferredProvider),
+  ];
+
+  const errors: AiError[] = [];
+
+  for (const provider of ordered) {
+    const apiKey = await resolveAiProviderKey(userId, provider);
+    if (!apiKey) continue; // skip providers with no key
+
+    try {
+      return await dispatchToProvider(payload, provider, model, sysPrompt, jsonPrefix, schema, apiKey);
+    } catch (err) {
+      const aiErr =
+        err instanceof AiError
+          ? err
+          : new AiError("PROVIDER_ERROR", provider, String(err));
+      errors.push(aiErr);
+      console.warn(`[AI] ${provider} failed (${aiErr.code}): ${aiErr.message}, trying next...`);
+
+      if (aiErr.code === "INVALID_KEY") continue;
+    }
   }
-  if (provider === "gemini") {
-    return generateWithGemini(payload, model, sysPrompt, jsonPrefix, schema, userId);
+
+  // Final fallback (keyless, completely free)
+  try {
+    return await generateWithPollinations(payload, sysPrompt, jsonPrefix, schema);
+  } catch (err) {
+    console.warn(`[AI] Final pollinations fallback failed:`, err);
   }
-  return generateWithOpenRouter(payload, model, sysPrompt, jsonPrefix, schema, userId);
+
+  // All providers failed
+  if (errors.length === 0) {
+    throw new AiError(
+      "NO_KEY",
+      "any",
+      "No AI provider is configured. Add an API key in Settings → AI Keys.",
+    );
+  }
+
+  // Throw the most relevant error
+  throw errors[0];
 }
 
+async function dispatchToProvider<T extends z.ZodTypeAny>(
+  payload: unknown,
+  provider: AiProvider,
+  model: string,
+  sysPrompt: string,
+  jsonPrefix: string,
+  schema: T,
+  apiKey: string,
+): Promise<z.infer<T>> {
+  if (provider === "openai") {
+    return generateWithOpenAI(payload, model, sysPrompt, schema, apiKey);
+  }
+  if (provider === "gemini") {
+    return generateWithGemini(payload, model, sysPrompt, jsonPrefix, schema, apiKey);
+  }
+  return generateWithOpenRouter(payload, model, sysPrompt, jsonPrefix, schema, apiKey);
+}
+
+// ── Provider Implementations ──────────────────────────────────────────────
+
 async function generateWithOpenAI<T extends z.ZodTypeAny>(
-  payload: unknown, 
-  model: string, 
+  payload: unknown,
+  model: string,
   sysPrompt: string,
   schema: T,
-  userId: string,
+  apiKey: string,
 ) {
-  const apiKey = resolveAiProviderKey(userId, "openai");
-  if (!apiKey) {
-    throw new Error("OpenAI is not configured for this account or the server.");
-  }
+  try {
+    const client = new OpenAI({ apiKey });
 
-  const client = new OpenAI({
-    apiKey,
-  });
-
-  const response = await client.responses.parse({
-    model: model || "gpt-4o-mini",
-    input: [
-      {
-        role: "system",
-        content: sysPrompt,
+    const response = await client.responses.parse({
+      model: model || "gpt-4o-mini",
+      input: [
+        { role: "system", content: sysPrompt },
+        { role: "user", content: JSON.stringify(payload, null, 2) },
+      ],
+      text: {
+        format: zodTextFormat(schema, "response"),
       },
-      {
-        role: "user",
-        content: JSON.stringify(payload, null, 2),
-      },
-    ],
-    text: {
-      format: zodTextFormat(schema, "response"),
-    },
-  });
+    });
 
-  const output = response.output
-    .flatMap((item) => (item.type === "message" ? item.content : []))
-    .find((item) => item.type === "output_text" && item.parsed);
+    const output = response.output
+      .flatMap((item) => (item.type === "message" ? item.content : []))
+      .find((item) => item.type === "output_text" && item.parsed);
 
-  if (!output || output.type !== "output_text" || !output.parsed) {
-    throw new Error("OpenAI response could not be parsed");
+    if (!output || output.type !== "output_text" || !output.parsed) {
+      throw new AiError("PARSE_ERROR", "OpenAI", "OpenAI response could not be parsed");
+    }
+
+    return output.parsed as z.infer<T>;
+  } catch (err) {
+    if (err instanceof AiError) throw err;
+
+    // OpenAI SDK throws typed errors
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes("401") || errMsg.includes("Incorrect API key")) {
+      throw new AiError("INVALID_KEY", "OpenAI", errMsg);
+    }
+    if (errMsg.includes("429")) {
+      if (errMsg.toLowerCase().includes("quota")) {
+        throw new AiError("QUOTA_EXCEEDED", "OpenAI", errMsg);
+      }
+      throw new AiError("RATE_LIMITED", "OpenAI", errMsg);
+    }
+    if (errMsg.includes("timeout") || errMsg.includes("ETIMEDOUT")) {
+      throw new AiError("TIMEOUT", "OpenAI", errMsg);
+    }
+    throw new AiError("PROVIDER_ERROR", "OpenAI", errMsg);
   }
-
-  return output.parsed as z.infer<T>;
 }
 
 async function generateWithGemini<T extends z.ZodTypeAny>(
-  payload: unknown, 
-  model: string, 
-  sysPrompt: string, 
+  payload: unknown,
+  model: string,
+  sysPrompt: string,
   jsonPrefix: string,
   schema: T,
-  userId: string,
+  apiKey: string,
 ) {
-  const apiKey = resolveAiProviderKey(userId, "gemini");
-  if (!apiKey) {
-    throw new Error("Gemini is not configured for this account or the server.");
-  }
+  const geminiModel = model && model.startsWith("gemini") ? model : "gemini-2.0-flash";
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: {
           parts: [{ text: sysPrompt }],
@@ -397,7 +737,8 @@ async function generateWithGemini<T extends z.ZodTypeAny>(
   );
 
   if (!response.ok) {
-    throw new Error(`Gemini request failed with ${response.status}`);
+    const body = await response.text();
+    throw classifyHttpError(response.status, body, "Gemini");
   }
 
   const data = (await response.json()) as {
@@ -409,21 +750,26 @@ async function generateWithGemini<T extends z.ZodTypeAny>(
   };
 
   const text = data.candidates?.[0]?.content?.parts?.map((item) => item.text ?? "").join("") ?? "";
-  return parseJsonWithSchema(text, schema);
+
+  try {
+    return parseJsonWithSchema(text, schema);
+  } catch {
+    throw new AiError("PARSE_ERROR", "Gemini", `Failed to parse Gemini response: ${text.slice(0, 200)}`);
+  }
 }
 
 async function generateWithOpenRouter<T extends z.ZodTypeAny>(
-  payload: unknown, 
-  model: string, 
-  sysPrompt: string, 
+  payload: unknown,
+  model: string,
+  sysPrompt: string,
   jsonPrefix: string,
   schema: T,
-  userId: string,
+  apiKey: string,
 ) {
-  const apiKey = resolveAiProviderKey(userId, "openrouter");
-  if (!apiKey) {
-    throw new Error("OpenRouter is not configured for this account or the server.");
-  }
+  // Use a free model by default for OpenRouter
+  const routerModel = model && !model.startsWith("gpt") && !model.startsWith("gemini")
+    ? model
+    : "google/gemma-2-9b-it:free";
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -434,7 +780,7 @@ async function generateWithOpenRouter<T extends z.ZodTypeAny>(
       "X-OpenRouter-Title": "Career OS",
     },
     body: JSON.stringify({
-      model: model || "openai/gpt-4o-mini",
+      model: routerModel,
       messages: [
         { role: "system", content: sysPrompt },
         {
@@ -446,7 +792,8 @@ async function generateWithOpenRouter<T extends z.ZodTypeAny>(
   });
 
   if (!response.ok) {
-    throw new Error(`OpenRouter request failed with ${response.status}`);
+    const body = await response.text();
+    throw classifyHttpError(response.status, body, "OpenRouter");
   }
 
   const data = (await response.json()) as {
@@ -458,6 +805,40 @@ async function generateWithOpenRouter<T extends z.ZodTypeAny>(
   };
 
   const text = data.choices?.[0]?.message?.content ?? "";
+
+  try {
+    return parseJsonWithSchema(text, schema);
+  } catch {
+    throw new AiError("PARSE_ERROR", "OpenRouter", `Failed to parse OpenRouter response: ${text.slice(0, 200)}`);
+  }
+}
+
+async function generateWithPollinations<T extends z.ZodTypeAny>(
+  payload: unknown,
+  sysPrompt: string,
+  jsonPrefix: string,
+  schema: T,
+): Promise<z.infer<T>> {
+  const response = await fetch("https://text.pollinations.ai/openai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "openai",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: sysPrompt + " " + jsonPrefix },
+        { role: "user", content: JSON.stringify(payload) },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Pollinations failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content ?? "";
+
   return parseJsonWithSchema(text, schema);
 }
 

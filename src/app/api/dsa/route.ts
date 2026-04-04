@@ -11,5 +11,5 @@ export async function POST(request: Request) {
   }
 
   const payload = dsaEntrySchema.parse(await request.json());
-  return NextResponse.json(createDsaEntry(session.user.id, payload));
+  return NextResponse.json(await createDsaEntry(session.user.id, payload));
 }

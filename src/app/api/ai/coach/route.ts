@@ -1,7 +1,9 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { getRequestSession } from "@/lib/auth-session";
-import { generateCoachResponse } from "@/lib/ai";
+import { generateCoachResponse, AiError } from "@/lib/ai";
 import { saveCoachResponse } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";
 import { toDateKey } from "@/lib/utils";
@@ -21,6 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
+        code: "RATE_LIMITED",
         message: `Too many AI requests. Try again in ${retryAfterSeconds} seconds.`,
       },
       { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
@@ -29,13 +32,26 @@ export async function POST(request: Request) {
 
   try {
     const coach = await generateCoachResponse(session.user.id);
-    saveCoachResponse(session.user.id, toDateKey(), coach);
+    await saveCoachResponse(session.user.id, toDateKey(), coach);
 
     return NextResponse.json({ ok: true, coach });
   } catch (error) {
+    if (error instanceof AiError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: error.code,
+          provider: error.provider,
+          message: error.userMessage,
+          retryable: error.retryable,
+        },
+        { status: error.code === "NO_KEY" ? 400 : 502 },
+      );
+    }
     return NextResponse.json(
       {
         ok: false,
+        code: "PROVIDER_ERROR",
         message: error instanceof Error ? error.message : "AI coach failed",
       },
       { status: 500 },

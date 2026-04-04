@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const payload = aiKeySchema.parse(await request.json());
-  saveAiCredential(userId, payload.provider, payload.apiKey);
+  await saveAiCredential(userId, payload.provider, payload.apiKey);
 
   return NextResponse.json({ ok: true });
 }
@@ -60,7 +60,7 @@ export async function DELETE(request: Request) {
   }
 
   const payload = aiKeyDeleteSchema.parse(await request.json());
-  deleteAiCredential(session.user.id, payload.provider);
+  await deleteAiCredential(session.user.id, payload.provider);
 
   return NextResponse.json({ ok: true });
 }
