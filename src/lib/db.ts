@@ -2,15 +2,14 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
-const url = process.env.TURSO_DATABASE_URL;
+const url = process.env.TURSO_DATABASE_URL || "";
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (!url) {
-  throw new Error("TURSO_DATABASE_URL is not defined");
-}
+// We don't throw here anymore to allow 'next build' to complete static analysis.
+// If the URL is truly missing at runtime, the libsql client will throw a descriptive error when a query is made.
 
 export const client = createClient({
-  url,
+  url: url,
   authToken,
 });
 

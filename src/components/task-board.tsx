@@ -96,9 +96,12 @@ export function TaskBoard({
   return (
     <div className="grid gap-5">
       <div className="grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/4 p-4">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/6 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-            <ClipboardList className="size-3.5" />
+        <motion.div 
+            variants={itemVariants}
+            className="rounded-[28px] border border-white/5 bg-white/5 p-5 backdrop-blur-sm"
+        >
+          <div className="mb-4 inline-flex items-center gap-2.5 rounded-xl bg-white/5 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
+            <ClipboardList className="size-4" />
             Planner Summary
           </div>
 
@@ -108,16 +111,19 @@ export function TaskBoard({
             <PlannerStat label="Daily done" value={`${summary.daily.completed}/${summary.daily.total}`} />
             <PlannerStat label="Weekend done" value={`${summary.weekend.completed}/${summary.weekend.total}`} />
           </div>
-        </div>
+        </motion.div>
 
-        <div className="rounded-[24px] border border-[var(--line)] bg-white/4 p-4">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[var(--teal-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--teal)]">
-                <BrainCircuit className="size-3.5" />
+        <motion.div 
+            variants={itemVariants}
+            className="rounded-[28px] border border-white/5 bg-white/5 p-5 backdrop-blur-sm"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+            <div className="flex-1 min-w-[240px]">
+              <div className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--teal-soft)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--teal)]">
+                <BrainCircuit className="size-4" />
                 AI Task Pack
               </div>
-              <div className="mt-2 text-sm text-[var(--muted)]">
+              <div className="mt-3 text-sm leading-relaxed text-[var(--muted)] opacity-80">
                 Generate actionable daily, weekly, and weekend tasks from your stored progress.
               </div>
             </div>
@@ -126,14 +132,14 @@ export function TaskBoard({
               disabled={!aiReady || suggestionsLoading}
               onClick={onGenerateSuggestions}
               className={cn(
-                "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition",
+                "inline-flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold tracking-tight transition-all active:scale-95 shadow-lg shadow-black/20 hover:shadow-[0_10px_30px_rgba(45,212,191,0.2)]",
                 aiReady && !suggestionsLoading
-                  ? "bg-[var(--ink)] text-[var(--paper-strong)]"
-                  : "cursor-not-allowed bg-white/10 text-[var(--muted)]",
+                  ? "bg-[var(--teal)] text-black"
+                  : "cursor-not-allowed bg-white/5 text-[var(--muted)] border border-white/5",
               )}
             >
-              <Sparkles className={cn("size-4", suggestionsLoading && "animate-pulse")} />
-              {suggestionsLoading ? "Thinking..." : "Generate suggestions"}
+              <Sparkles className={cn("size-4", suggestionsLoading && "animate-spin")} />
+              {suggestionsLoading ? "Synthesizing..." : "Generate Pack"}
             </button>
           </div>
 
@@ -460,11 +466,12 @@ function PlannerStat({
   value: number | string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[var(--line)] bg-black/20 px-4 py-4">
-      <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+    <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-black/30 p-5 shadow-inner transition-colors hover:bg-black/40">
+      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] opacity-70">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-semibold text-[var(--ink)]">{value}</div>
+      <div className="mt-2 text-2xl font-bold tracking-tight text-[var(--ink)]">{value}</div>
+      <div className="absolute -right-2 -bottom-2 size-12 bg-white/5 blur-2xl rounded-full" />
     </div>
   );
 }

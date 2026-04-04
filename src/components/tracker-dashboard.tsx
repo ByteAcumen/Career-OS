@@ -568,8 +568,9 @@ export function TrackerDashboard({
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
         >
           {metricCards.map((card, index) => {
@@ -577,19 +578,40 @@ export function TrackerDashboard({
             return (
               <motion.div
                 key={card.label}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-                transition={{ delay: index * 0.05 }}
-                className="glass-card rounded-[24px] p-5 cursor-default"
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                whileHover={{ 
+                  y: -4, 
+                  scale: 1.02,
+                  boxShadow: "0 20px 40px -12px rgba(0, 0, 0, 0.4)" 
+                }}
+                transition={{ 
+                  delay: index * 0.08, 
+                  type: "spring", 
+                  stiffness: 260, 
+                  damping: 20 
+                }}
+                className="glass-card relative overflow-hidden rounded-[28px] p-6 cursor-default group"
               >
-                <div className="mb-4 flex items-center justify-between">
-                  <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", card.tone)}>
+                {/* Subtle background glow */}
+                <div className={cn("absolute -right-4 -top-4 size-24 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity", card.tone)} />
+                
+                <div className="mb-5 flex items-center justify-between">
+                  <span className={cn("rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest", card.tone)}>
                     {card.label}
                   </span>
-                  <Icon className="size-4 text-[var(--muted)]" />
+                  <motion.div
+                    whileHover={{ rotate: 15, scale: 1.2 }}
+                  >
+                    <Icon className="size-5 text-[var(--muted)] group-hover:text-[var(--teal)] transition-colors" />
+                  </motion.div>
                 </div>
-                <div className="text-3xl font-semibold">{card.value}</div>
+                <div className="flex items-baseline gap-1">
+                    <div className="text-4xl font-bold tracking-tight text-[var(--ink)]">{card.value}</div>
+                    {typeof card.value === 'number' && card.label.includes('Streak') && (
+                        <div className="text-xs font-medium text-[var(--muted)] ml-1 tracking-wide uppercase opacity-60">Days</div>
+                    )}
+                </div>
               </motion.div>
             );
           })}
@@ -598,7 +620,13 @@ export function TrackerDashboard({
         <div className="mt-2 relative">
           <AnimatePresence mode="wait">
             {activeTab === "overview" && (
-              <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+              <motion.div 
+                key="overview" 
+                initial={{ opacity: 0, scale: 0.98, y: 10 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                exit={{ opacity: 0, scale: 0.98, y: -10 }} 
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              >
                 <OverviewTab
                   data={data}
                   settings={settings}
