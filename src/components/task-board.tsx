@@ -93,11 +93,18 @@ export function TaskBoard({
     tasks: tasks.filter((task) => task.scope === scope),
   }));
 
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
+  };
+
   return (
     <div className="grid gap-5">
       <div className="grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
         <motion.div 
             variants={itemVariants}
+            initial="hidden"
+            animate="show"
             className="rounded-[28px] border border-white/5 bg-white/5 p-5 backdrop-blur-sm"
         >
           <div className="mb-4 inline-flex items-center gap-2.5 rounded-xl bg-white/5 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
@@ -115,6 +122,8 @@ export function TaskBoard({
 
         <motion.div 
             variants={itemVariants}
+            initial="hidden"
+            animate="show"
             className="rounded-[28px] border border-white/5 bg-white/5 p-5 backdrop-blur-sm"
         >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
@@ -190,7 +199,7 @@ export function TaskBoard({
               weekly theme, current weakness areas, and recent study output.
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
 
       <div className="rounded-[24px] border border-[var(--line)] bg-white/4 p-4">
