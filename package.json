@@ -13,7 +13,6 @@
     "@better-auth/drizzle-adapter": "^1.5.6",
     "@libsql/client": "^0.17.2",
     "better-auth": "^1.5.6",
-    "better-sqlite3": "^12.8.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
@@ -30,7 +29,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
