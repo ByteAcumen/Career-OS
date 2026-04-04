@@ -20,6 +20,13 @@ export async function initializeSchema() {
   if (_initialized) return;
   _initialized = true;
 
+  // We skip schema initialization during the build phase (detected via placeholder URL)
+  // this prevents Turso connection errors during static-rendering.
+  if (url.includes("build-placeholder")) {
+    console.log("Skipping Turso schema initialization (Build Phase)");
+    return;
+  }
+
   // Since we're using a serverless DB, we want to ensure tables exist.
   // In a full production app, you'd use 'drizzle-kit push' or 'migrate'.
   // For this migration, we'll run the creation logic once.
