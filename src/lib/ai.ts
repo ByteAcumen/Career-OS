@@ -2,7 +2,8 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
-import { resolveAiProviderKey, getFirstAvailableProvider } from "@/lib/ai-credentials";
+import { resolveAiProviderKey } from "@/lib/ai-credentials";
+import { getConfiguredAppBaseUrl } from "@/lib/app-url";
 import { getDashboardData } from "@/lib/dashboard";
 import type { AiProvider, PlannerSuggestionPack, StudentStrategy } from "@/lib/types";
 
@@ -857,13 +858,8 @@ function parseJsonWithSchema<T extends z.ZodTypeAny>(text: string, schema: T): z
 }
 
 function getApplicationOrigin() {
-  const configured =
-    process.env.BETTER_AUTH_URL?.trim() ||
-    process.env.APP_BASE_URL?.trim() ||
-    "http://localhost:3000";
-
   try {
-    return new URL(configured).origin;
+    return new URL(getConfiguredAppBaseUrl()).origin;
   } catch {
     return "http://localhost:3000";
   }

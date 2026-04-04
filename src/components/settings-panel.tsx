@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
-/*  Types — keep in sync with tracker-dashboard                        */
+/*  Types - keep in sync with tracker-dashboard                        */
 /* ------------------------------------------------------------------ */
 export type AiProvider = "openai" | "gemini" | "openrouter";
 
@@ -76,14 +76,14 @@ function AccordionSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="group rounded-[24px] border border-[var(--line)] bg-[var(--card)] overflow-hidden transition-all duration-300 hover:border-teal-500/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+    <div className="glass-card group overflow-hidden rounded-[28px] border border-white/10 transition-all duration-300 hover:border-teal-500/30 hover:shadow-[var(--shadow-float)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.02]"
+        className="flex w-full items-center gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.035]"
       >
         <div
-          className="flex size-10 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110"
+          className="flex size-11 shrink-0 items-center justify-center rounded-[18px] shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110"
           style={{ 
             background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} 20%, transparent), color-mix(in srgb, ${accentColor} 5%, transparent))`,
           }}
@@ -97,7 +97,7 @@ function AccordionSection({
         <motion.div
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          className="shrink-0 rounded-full bg-white/5 p-1.5 text-[var(--muted)]"
+          className="shrink-0 rounded-full bg-white/7 p-1.5 text-[var(--muted)]"
         >
           <ChevronDown className="size-4" />
         </motion.div>
@@ -112,7 +112,7 @@ function AccordionSection({
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-[var(--line)] bg-black/10 px-6 pb-6 pt-5">
+            <div className="border-t border-[var(--line)] bg-black/12 px-6 pb-6 pt-5">
               {children}
             </div>
           </motion.div>
@@ -210,15 +210,47 @@ export function SettingsPanel({
 
   return (
     <div className="grid gap-5">
-      <div className="flex items-center justify-between px-2">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-white">Account Settings</h2>
-          <p className="text-xs text-[var(--muted)]">Manage your workspace configuration and preferences</p>
+      <div className="glass-card rounded-[30px] px-6 py-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-teal-200">
+              <Sparkles className="size-3.5" />
+              Workspace tuning
+            </span>
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-white">Account Settings</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+                Shape how Career OS plans your week, interprets your progress, and
+                presents your student profile across the app.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="soft-card rounded-[22px] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Targets</p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {settings.weeklyDsaTarget + settings.weeklyApplicationTarget + settings.weeklyBuildTarget} weekly checkpoints
+              </p>
+            </div>
+            <div className="soft-card rounded-[22px] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Planner rhythm</p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {settings.weekdayTaskTarget} weekday / {settings.weekendTaskTarget} weekend tasks
+              </p>
+            </div>
+            <div className="soft-card rounded-[22px] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Focus timer</p>
+              <p className="mt-2 text-sm font-semibold text-white">
+                {settings.timerFocusMinutes}m focus + {settings.timerBreakMinutes}m break
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4">
-        {/* ─── Section 1: Profile ─── */}
+        {/* Section 1: Profile */}
         <AccordionSection
           icon={<User className="size-5" style={{ color: "var(--teal)" }} />}
           title="Profile & Identity"
@@ -274,7 +306,7 @@ export function SettingsPanel({
         </div>
       </AccordionSection>
 
-      {/* ─── Section 2: AI & Strategy ─── */}
+      {/* Section 2: AI & Strategy */}
       <AccordionSection
         icon={<Sparkles className="size-4" style={{ color: "#a78bfa" }} />}
         title="AI & Strategy"
@@ -347,7 +379,7 @@ export function SettingsPanel({
         </div>
       </AccordionSection>
 
-      {/* ─── Section 3: Links ─── */}
+      {/* Section 3: Links */}
       <AccordionSection
         icon={<Link2 className="size-4" style={{ color: "#38bdf8" }} />}
         title="Links & Trackers"
@@ -435,7 +467,7 @@ export function SettingsPanel({
         </div>
       </AccordionSection>
 
-      {/* ─── Section 4: Schedule & Targets ─── */}
+      {/* Section 4: Schedule & Targets */}
       <AccordionSection
         icon={<Target className="size-4" style={{ color: "#f59e0b" }} />}
         title="Targets & Schedule"
@@ -532,14 +564,14 @@ export function SettingsPanel({
         </div>
       </AccordionSection>
 
-      {/* ─── Save Button ─── */}
+      {/* Save Button */}
       <button
         onClick={onSave}
         className={cn(
-          "w-full rounded-2xl px-5 py-3.5 text-sm font-semibold transition-all",
-          "bg-[var(--ink)] text-[var(--paper-strong)]",
-          "hover:opacity-90 active:scale-[0.99]",
-          "shadow-[0_2px_12px_rgba(0,0,0,0.15)]",
+          "w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition-all",
+          "bg-[linear-gradient(120deg,#5eead4,#f8fafc,#fde68a)] text-slate-950",
+          "hover:shadow-[0_18px_34px_rgba(94,234,212,0.2)] active:scale-[0.99]",
+          "shadow-[0_12px_28px_rgba(15,23,42,0.16)]",
         )}
       >
         Save all settings

@@ -2,18 +2,35 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
+import { getConfiguredAppBaseUrl, normalizeOrigin } from "@/lib/app-url";
 import { db, initializeSchema } from "@/lib/db";
 import { sendPasswordResetEmail } from "@/lib/email";
 import * as schema from "@/lib/schema";
 
-const authBaseUrl = process.env.BETTER_AUTH_URL?.trim() || "http://localhost:3000";
+const authBaseUrl = getConfiguredAppBaseUrl();
 const configuredOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+
 const trustedOrigins = Array.from(
-  new Set([authBaseUrl, ...configuredOrigins, "http://localhost:3000", "http://127.0.0.1:3000"]),
+  new Set(
+    [
+      authBaseUrl,
+      process.env.APP_BASE_URL,
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.VERCEL_PROJECT_PRODUCTION_URL,
+      process.env.VERCEL_URL,
+      ...configuredOrigins,
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+    ]
+      .map((origin) => normalizeOrigin(origin))
+      .filter((origin): origin is string => Boolean(origin)),
+  ),
 );
 
 const allowedHosts = Array.from(
@@ -49,17 +66,23 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 12,
     maxPasswordLength: 128,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      // Fire-and-forget to avoid timing attacks
-      void sendPasswordResetEmail(user.email, url);
+      await sendPasswordResetEmail(user.email, url);
     },
   },
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    },
-  },
+  socialProviders:
+    googleClientId && googleClientSecret
+      ? {
+          google: {
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+            scope: ["openid", "email", "profile"],
+            redirectURI: `${authBaseUrl}/api/auth/callback/google`,
+          },
+        }
+      : {},
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,

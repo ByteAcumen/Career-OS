@@ -423,65 +423,77 @@ export function TrackerDashboard({
       value: data.metrics.currentStreak,
       icon: Flame,
       tone: "bg-[var(--gold-soft)] text-amber-500",
+      meta: "Consecutive days with logged work",
     },
     {
       label: "Applications",
       value: data.metrics.weekApplications,
       icon: Briefcase,
       tone: "bg-[var(--rose-soft)] text-rose-400",
+      meta: "Applications saved this week",
     },
     {
       label: "Tasks Open",
       value: data.planner.summary.todayOpen,
       icon: BrainCircuit,
       tone: "bg-[var(--teal-soft)] text-teal-400",
+      meta: "Planner items still needing attention",
     },
     {
       label: "Max Streak",
       value: data.metrics.maxStreak,
       icon: Rocket,
       tone: "bg-[var(--navy-soft)] text-sky-400",
+      meta: "Best consistency run so far",
     },
     {
       label: "Level " + data.metrics.level,
       value: `${data.metrics.levelProgress}%`,
       icon: CheckCircle2,
       tone: "bg-[var(--green-soft)] text-emerald-400",
+      meta: "XP progress toward the next level",
     },
   ];
 
   return (
-    <main className="relative overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+    <main className="relative overflow-hidden px-4 pb-24 pt-6 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-[-12rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,rgba(94,234,212,0.18),transparent_65%)] blur-3xl" />
+        <div className="absolute right-[-12rem] top-[5rem] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,rgba(96,165,250,0.16),transparent_68%)] blur-3xl" />
+        <div className="absolute bottom-[-14rem] left-1/2 h-[28rem] w-[34rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(246,199,104,0.12),transparent_68%)] blur-3xl" />
+      </div>
+
       <div className="mx-auto w-full max-w-[1600px]">
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card mb-5 overflow-hidden rounded-[32px] p-6 sm:p-8"
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="glass-card mb-6 overflow-hidden rounded-[36px] p-6 sm:p-8 lg:p-10"
         >
-          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_26%),radial-gradient(circle_at_85%_15%,rgba(94,234,212,0.1),transparent_24%)]" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.55fr_1fr]">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--gold-soft)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--gold-soft)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--gold)]">
                 Career OS Student Workspace
               </div>
-              <h1 className="heading-font max-w-3xl text-4xl leading-[0.95] sm:text-5xl lg:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-white to-neutral-400">
-                Proper tracker. Proper storage. Proper momentum.
+              <h1 className="heading-font max-w-4xl text-4xl leading-[0.92] sm:text-5xl lg:text-[4.2rem]">
+                Sharper planning, cleaner execution, better interview momentum.
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-base">
-                This app stores your study data in a real database, keeps your
-                links and application systems separate per user, and runs AI on the
-                backend so credentials stay out of the browser. It is designed for
-                interview preparation that needs structure, momentum, and clarity.
+              <p className="mt-5 max-w-2xl text-sm leading-8 text-[var(--muted)] sm:text-base">
+                Career OS brings planning, proof of work, interview prep, and applications into a
+                single polished workspace. Your progress stays organized, your data stays separated
+                per user, and the UI stays focused on the next meaningful move.
               </p>
-              <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-[24px] border border-[var(--line)] bg-[var(--card)] px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+              <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+                <div className="soft-card min-h-[100%] px-5 py-5">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">
                     Primary Goal
                   </div>
                   <div className="mt-3 text-sm leading-7 text-[var(--ink)]">
                     {settings.primaryGoal}
                   </div>
                   {settings.weeklyTheme ? (
-                    <div className="mt-4 inline-flex rounded-full bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                    <div className="mt-4 inline-flex rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
                       Weekly theme: {settings.weeklyTheme}
                     </div>
                   ) : null}
@@ -500,14 +512,14 @@ export function TrackerDashboard({
               ) : null}
             </div>
 
-            <div className="grid gap-3">
-              <div className="soft-card">
+            <div className="grid gap-4">
+              <div className="soft-card p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
                       Signed in as
                     </div>
-                    <div className="mt-2 text-lg font-semibold text-[var(--ink)]">
+                    <div className="mt-2 text-xl font-semibold text-[var(--ink)]">
                       {currentUser.name}
                     </div>
                     <div className="mt-1 text-sm text-[var(--muted)]">
@@ -520,7 +532,7 @@ export function TrackerDashboard({
                         window.location.href = "/sign-in";
                       });
                     }}
-                    className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--line)]"
+                    className="rounded-full border border-[var(--line)] bg-white/6 px-4 py-2 text-sm font-medium text-[var(--ink)] hover:bg-white/10"
                   >
                     Sign out
                   </button>
@@ -528,7 +540,7 @@ export function TrackerDashboard({
               </div>
               <StatusCard
                 title="Connected stack"
-                body="Next.js frontend, SQLite-backed storage, API routes, Google Sheet sync, and a switchable AI coach."
+                body="Next.js frontend, Turso-backed data, API routes, Google Sheet sync, and a switchable AI coach."
                 icon={Database}
               />
               <StatusCard
@@ -545,7 +557,8 @@ export function TrackerDashboard({
           </div>
         </motion.section>
 
-        <div className="mb-5 flex flex-wrap gap-3">
+        <div className="sticky top-4 z-20 mb-6 rounded-[28px] border border-white/6 bg-[rgba(6,10,18,0.82)] p-2 backdrop-blur-xl">
+          <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -554,10 +567,10 @@ export function TrackerDashboard({
                 href={tab.href}
                 aria-current={activeTab === tab.id ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition",
+                  "flex items-center gap-2 rounded-[18px] border px-4 py-3 text-sm font-medium transition",
                   activeTab === tab.id
-                    ? "border-transparent bg-[var(--ink)] text-[var(--paper)]"
-                    : "border-[var(--line)] bg-transparent text-[var(--muted)] hover:bg-[var(--line)] hover:text-[var(--ink)]",
+                    ? "border-transparent bg-[var(--ink)] text-[var(--paper)] shadow-[0_18px_34px_-22px_rgba(255,255,255,0.65)]"
+                    : "border-transparent bg-transparent text-[var(--muted)] hover:bg-white/6 hover:text-[var(--ink)]",
                 )}
               >
                 <Icon className="size-4" />
@@ -565,6 +578,7 @@ export function TrackerDashboard({
               </Link>
             );
           })}
+        </div>
         </div>
 
         <motion.div
@@ -591,10 +605,9 @@ export function TrackerDashboard({
                   stiffness: 260, 
                   damping: 20 
                 }}
-                className="glass-card relative overflow-hidden rounded-[28px] p-6 cursor-default group"
+                className="glass-card group relative overflow-hidden rounded-[28px] p-5 sm:p-6"
               >
-                {/* Subtle background glow */}
-                <div className={cn("absolute -right-4 -top-4 size-24 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity", card.tone)} />
+                <div className={cn("absolute -right-4 -top-4 size-24 rounded-full blur-3xl opacity-15 transition-opacity group-hover:opacity-25", card.tone)} />
                 
                 <div className="mb-5 flex items-center justify-between">
                   <span className={cn("rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest", card.tone)}>
@@ -609,8 +622,22 @@ export function TrackerDashboard({
                 <div className="flex items-baseline gap-1">
                     <div className="text-4xl font-bold tracking-tight text-[var(--ink)]">{card.value}</div>
                     {typeof card.value === 'number' && card.label.includes('Streak') && (
-                        <div className="text-xs font-medium text-[var(--muted)] ml-1 tracking-wide uppercase opacity-60">Days</div>
+                        <div className="ml-1 text-xs font-medium uppercase tracking-wide text-[var(--muted)] opacity-60">Days</div>
                     )}
+                </div>
+                <div className="mt-3 text-sm leading-6 text-[var(--muted)]">{card.meta}</div>
+                <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/6">
+                  <div
+                    className={cn(
+                      "h-full rounded-full bg-gradient-to-r",
+                      index === 0 && "from-amber-300 via-[var(--gold)] to-orange-300",
+                      index === 1 && "from-rose-300 via-[var(--rose)] to-fuchsia-300",
+                      index === 2 && "from-teal-300 via-[var(--teal)] to-cyan-300",
+                      index === 3 && "from-sky-300 via-[var(--navy)] to-indigo-300",
+                      index === 4 && "from-emerald-300 via-[var(--green)] to-teal-300",
+                    )}
+                    style={{ width: `${Math.max(22, typeof card.value === "string" ? Number.parseInt(card.value, 10) || 38 : Math.min(card.value * 10, 100))}%` }}
+                  />
                 </div>
               </motion.div>
             );
@@ -689,12 +716,12 @@ export function TrackerDashboard({
         </div>
 
         {toast ? (
-          <div className="fixed bottom-5 right-5 rounded-full bg-[var(--ink)] px-4 py-2 text-sm text-[var(--paper-strong)] shadow-xl">
+          <div className="fixed bottom-5 right-5 rounded-full border border-white/8 bg-[rgba(255,255,255,0.92)] px-4 py-2 text-sm text-[var(--paper)] shadow-xl backdrop-blur-xl">
             {toast}
           </div>
         ) : null}
         {isPending || action ? (
-          <div className="fixed bottom-5 left-5 rounded-full bg-white/90 px-4 py-2 text-sm text-[var(--muted)] shadow-xl">
+          <div className="fixed bottom-5 left-5 rounded-full border border-white/8 bg-[rgba(255,255,255,0.92)] px-4 py-2 text-sm text-[var(--paper)] shadow-xl backdrop-blur-xl">
             {action ? `Working on ${action}...` : "Refreshing..."}
           </div>
         ) : null}
@@ -2120,12 +2147,15 @@ function Panel({
   return (
     <Component
       variants={variants}
-      className="glass-card flex flex-col overflow-hidden rounded-[28px] p-6 lg:p-8 transition-shadow duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/5"
+      className="glass-card flex flex-col overflow-hidden rounded-[30px] p-5 sm:p-6 lg:p-7"
     >
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <h2 className="text-xl font-semibold tracking-tight text-[var(--ink)] heading-font">{title}</h2>
-          {subtitle ? <p className="text-sm text-[var(--muted)]">{subtitle}</p> : null}
+        <div className="space-y-2">
+          <div className="inline-flex rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+            Section
+          </div>
+          <h2 className="text-xl font-semibold tracking-tight text-[var(--ink)]">{title}</h2>
+          {subtitle ? <p className="max-w-2xl text-sm leading-7 text-[var(--muted)]">{subtitle}</p> : null}
         </div>
         {action}
       </div>
@@ -2179,9 +2209,9 @@ function QuickLink({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--paper-strong)] px-4 py-2.5 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--line)]"
+      className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-4 py-2.5 text-sm font-medium text-[var(--ink)] hover:-translate-y-0.5 hover:border-[var(--line-strong)] hover:bg-white/10"
     >
-      <Icon className="size-4" />
+      <Icon className="size-4 text-[var(--teal)]" />
       {label}
       <ArrowUpRight className="size-4 text-[var(--muted)]" />
     </a>
@@ -2198,8 +2228,8 @@ function StatusCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="soft-card">
-      <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+    <div className="soft-card p-5">
+      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
         <Icon className="size-4 text-[var(--teal)]" />
         {title}
       </div>
@@ -2210,8 +2240,8 @@ function StatusCard({
 
 function InsightCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="soft-card">
-      <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{label}</div>
+    <div className="soft-card p-5">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">{label}</div>
       <div className="mt-3 text-sm leading-7 text-[var(--ink)]">{value}</div>
     </div>
   );
@@ -2219,7 +2249,7 @@ function InsightCard({ label, value }: { label: string; value: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-[var(--line)] bg-transparent px-4 py-5 text-sm text-[var(--muted)]">
+    <div className="rounded-[22px] border border-dashed border-[var(--line)] bg-[rgba(255,255,255,0.015)] px-4 py-5 text-sm leading-7 text-[var(--muted)]">
       {text}
     </div>
   );
@@ -2227,8 +2257,8 @@ function EmptyState({ text }: { text: string }) {
 
 function StatLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-[var(--card)] px-4 py-3">
-      <span>{label}</span>
+    <div className="flex items-center justify-between rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm">
+      <span className="text-[var(--muted)]">{label}</span>
       <span className="font-medium text-[var(--ink)]">{value}</span>
     </div>
   );
@@ -2242,8 +2272,8 @@ function LogColumn({
   items: Array<{ title: string; subtitle: string; meta: string; href?: string }>;
 }) {
   return (
-    <div className="soft-card p-4">
-      <div className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+    <div className="soft-card p-5">
+      <div className="mb-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
         {title}
       </div>
       <div className="space-y-3">
@@ -2251,7 +2281,7 @@ function LogColumn({
           items.map((item, index) => (
             <div
               key={`${item.title}-${index}`}
-              className="rounded-[18px] border border-[var(--line)] bg-black/20 p-3"
+              className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] p-4"
             >
               <div className="font-medium text-[var(--ink)]">{item.title}</div>
               <div className="mt-1 text-sm text-[var(--muted)]">{item.subtitle}</div>
@@ -2291,7 +2321,7 @@ function EntryForm({
       {fields}
       <button
         onClick={onSubmit}
-        className="rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper-strong)]"
+        className="rounded-[18px] bg-[var(--ink)] px-4 py-3 text-sm font-medium text-[var(--paper)] shadow-[0_18px_38px_-24px_rgba(255,255,255,0.45)] hover:-translate-y-0.5"
       >
         {submitLabel}
       </button>

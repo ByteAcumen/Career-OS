@@ -64,19 +64,19 @@ export function AccountSecurityPanel() {
   }
 
   return (
-    <div className="group rounded-[24px] border border-[var(--line)] bg-[var(--card)] overflow-hidden transition-all duration-300 hover:border-teal-500/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-      <div className="flex w-full items-center gap-4 px-6 py-5 border-b border-[var(--line)] bg-black/10">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-teal-500/10 shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110">
+    <div className="glass-card group overflow-hidden rounded-[30px] border border-white/10 transition-all duration-300 hover:border-teal-500/30 hover:shadow-[var(--shadow-float)]">
+      <div className="flex w-full items-center gap-4 border-b border-[var(--line)] bg-white/5 px-6 py-5">
+        <div className="flex size-11 items-center justify-center rounded-[18px] bg-teal-500/12 shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110">
           <KeyRound className="size-5 text-teal-400" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold text-[var(--ink)] tracking-tight">Account Security</div>
-          <div className="mt-0.5 text-xs text-[var(--muted)]">Password management & secure sign-in</div>
+          <div className="text-[15px] font-semibold tracking-tight text-[var(--ink)]">Account Security</div>
+          <div className="mt-0.5 text-xs text-[var(--muted)]">Password management and secure sign-in</div>
         </div>
       </div>
 
-      <div className="px-6 py-6 space-y-6">
-        <div className="rounded-2xl border border-[var(--line)] bg-white/5 p-4">
+      <div className="space-y-6 px-6 py-6">
+        <div className="soft-card rounded-[24px] border border-white/10 p-4">
           <div className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber-400" />
             <p className="text-[13px] leading-relaxed text-[var(--muted)]">
@@ -100,8 +100,8 @@ export function AccountSecurityPanel() {
               type={showPasswords ? "text" : "password"}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="field h-11 w-full bg-black/20 pr-10 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
-              placeholder="••••••••••••"
+              className="field h-11 w-full bg-[var(--card)] pr-10 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
+              placeholder="************"
               autoComplete="current-password"
             />
             <button
@@ -123,7 +123,7 @@ export function AccountSecurityPanel() {
             type={showPasswords ? "text" : "password"}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="field h-11 w-full bg-black/20 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
+            className="field h-11 w-full bg-[var(--card)] text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
             placeholder="At least 12 characters"
             autoComplete="new-password"
             minLength={12}
@@ -163,7 +163,7 @@ export function AccountSecurityPanel() {
             type={showPasswords ? "text" : "password"}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="field h-11 w-full bg-black/20 text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
+            className="field h-11 w-full bg-[var(--card)] text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
             placeholder="Re-enter your new password"
             autoComplete="new-password"
             minLength={12}
@@ -194,7 +194,7 @@ export function AccountSecurityPanel() {
             "mt-2 w-full rounded-2xl px-5 py-3.5 text-sm font-semibold transition-all shadow-lg",
             saving || !newPassword || !confirmPassword
               ? "cursor-not-allowed bg-white/5 text-white/20"
-              : "bg-white text-black hover:bg-neutral-200 active:scale-[0.99]",
+              : "bg-[linear-gradient(120deg,#7dd3fc,#f8fafc,#fde68a)] text-slate-950 hover:shadow-[0_16px_32px_rgba(125,211,252,0.22)] active:scale-[0.99]",
           )}
         >
           {saving ? "Updating..." : "Update password"}

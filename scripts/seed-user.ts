@@ -27,7 +27,7 @@ function loadEnvFile() {
 async function main() {
   loadEnvFile();
 
-  const [{ auth, ensureAuthTables }, { db, client }, { claimLegacyDataForUser }] =
+  const [{ auth, ensureAuthTables }, { client }, { claimLegacyDataForUser }] =
     await Promise.all([
       import("../src/lib/auth"),
       import("../src/lib/db"),

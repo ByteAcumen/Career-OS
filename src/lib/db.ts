@@ -6,6 +6,7 @@ import * as schema from "./schema";
 // The actual queries will fail gracefully if the real URL is missing at runtime.
 const url = process.env.TURSO_DATABASE_URL || "libsql://build-placeholder.turso.io";
 const authToken = process.env.TURSO_AUTH_TOKEN;
+const isBuildPlaceholder = url.includes("build-placeholder");
 
 export const client = createClient({
   url: url,
@@ -22,7 +23,12 @@ export async function initializeSchema() {
 
   // We skip schema initialization during the build phase (detected via placeholder URL)
   // this prevents Turso connection errors during static-rendering.
-  if (url.includes("build-placeholder")) {
+  if (isBuildPlaceholder) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "Skipping Turso schema initialization because TURSO_DATABASE_URL is not configured.",
+      );
+    }
     console.log("Skipping Turso schema initialization (Build Phase)");
     return;
   }
@@ -197,7 +203,21 @@ export async function initializeSchema() {
         createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (userId, provider)
-      );`
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_daily_snapshots_user_date
+       ON daily_snapshots (userId, dateKey);`,
+      `CREATE INDEX IF NOT EXISTS idx_dsa_entries_user_date
+       ON dsa_entries (userId, snapshotDateKey);`,
+      `CREATE INDEX IF NOT EXISTS idx_build_entries_user_date
+       ON build_entries (userId, snapshotDateKey);`,
+      `CREATE INDEX IF NOT EXISTS idx_application_entries_user_date
+       ON application_entries (userId, snapshotDateKey);`,
+      `CREATE INDEX IF NOT EXISTS idx_application_entries_user_sync
+       ON application_entries (userId, syncedToSheet);`,
+      `CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_status
+       ON planner_tasks (userId, status);`,
+      `CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_scope
+       ON planner_tasks (userId, scope);`
     ], "write");
     console.log("Turso schema initialized successfully.");
   } catch (err) {

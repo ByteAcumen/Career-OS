@@ -60,7 +60,7 @@ function FloatingOrbs() {
         className="absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{
           background:
-            "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(96,165,250,0.1) 0%, transparent 70%)",
           willChange: "transform",
         }}
         animate={{ scale: [1, 1.15, 0.95, 1] }}
@@ -112,20 +112,20 @@ const features = [
   {
     icon: ShieldCheck,
     title: "Protected sessions",
-    body: "HTTP‑only cookies, CSRF tokens & rate‑limiting keep your account safe.",
+    body: "HTTP-only cookies, CSRF protection, and rate limiting keep each workspace locked down.",
     gradient: "from-teal-500/20 to-teal-500/5",
   },
   {
     icon: LockKeyhole,
-    title: "Isolated data",
-    body: "Each account gets its own snapshots, builds, and applications.",
+    title: "Private student data",
+    body: "Applications, plans, and progress stay isolated to the signed-in user.",
     gradient: "from-amber-500/20 to-amber-500/5",
   },
   {
     icon: Workflow,
-    title: "Built to scale",
-    body: "Migration‑ready storage, auth routes, and a structured service layer.",
-    gradient: "from-violet-500/20 to-violet-500/5",
+    title: "Built for momentum",
+    body: "Structured dashboards, AI guidance, and tracking stay synced inside one polished workspace.",
+    gradient: "from-sky-500/20 to-sky-500/5",
   },
 ];
 
@@ -181,13 +181,13 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
           email: form.email.trim(),
           password: form.password,
         });
-        if (result.error) throw new Error(result.error.message || "Sign‑up failed.");
+        if (result.error) throw new Error(result.error.message || "Sign-up failed.");
       } else {
         const result = await authClient.signIn.email({
           email: form.email.trim(),
           password: form.password,
         });
-        if (result.error) throw new Error(result.error.message || "Sign‑in failed.");
+        if (result.error) throw new Error(result.error.message || "Sign-in failed.");
       }
       router.push("/home");
       router.refresh();
@@ -208,7 +208,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
         callbackURL: "/home",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign‑in failed.");
+      setError(err instanceof Error ? err.message : "Google sign-in failed.");
       setGooglePending(false);
     }
   }
@@ -219,8 +219,9 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
     setForgotPending(true);
     setForgotError("");
     try {
+      const email = forgotEmail.trim();
       const { error } = await authClient.requestPasswordReset({
-        email: forgotEmail.trim(),
+        email,
         redirectTo: window.location.origin + "/reset-password",
       });
 
@@ -229,7 +230,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
       }
 
       setForgotSuccess(true);
-      setForgotEmail("");
+      setForgotEmail(email);
     } catch (err) {
       setForgotError(
         err instanceof Error ? err.message : "Could not send reset email.",
@@ -246,47 +247,68 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#030712] px-4 py-10 text-white sm:px-6 lg:px-8">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--paper)] px-4 py-10 text-[var(--ink)] sm:px-6 lg:px-8">
       <FloatingOrbs />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:64px_64px]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(20,184,166,0.12),transparent)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.028)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.028)_1px,transparent_1px)] bg-[size:70px_70px] opacity-70" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_50%_-10%,rgba(45,212,191,0.16),transparent)]" />
 
-      {/* Two‑column layout */}
-      <div className="relative z-10 mx-auto grid w-full max-w-[1120px] items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+      {/* Two-column layout */}
+      <div className="relative z-10 mx-auto grid w-full max-w-[1180px] items-center gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:gap-14">
 
-        {/* ---- LEFT SIDE — branding & features ---- */}
+        {/* ---- LEFT SIDE - branding & features ---- */}
         <motion.section
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="space-y-8 lg:pr-4"
         >
-          <motion.div variants={childVariants}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[11px] font-medium uppercase tracking-[0.25em] text-teal-300/90 shadow-[0_0_24px_rgba(20,184,166,0.08)] backdrop-blur-xl">
+          <motion.div variants={childVariants} className="space-y-4">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/7 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-teal-200 shadow-[0_20px_50px_rgba(15,23,42,0.18)] backdrop-blur-xl">
               <Sparkles className="size-3.5" />
-              Career OS · Secure Edition
+              Career OS - secure student workspace
             </span>
-          </motion.div>
 
-          <motion.div variants={childVariants} className="max-w-lg space-y-5">
-            <h1 className="text-[2.75rem] font-bold leading-[1.08] tracking-tight sm:text-[3.25rem]">
-              <span className="bg-gradient-to-br from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                Your private career
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-teal-300 via-emerald-300 to-amber-300 bg-clip-text text-transparent">
-                command centre.
-              </span>
-            </h1>
-            <p className="max-w-md text-[15px] leading-7 text-slate-400">
-              Track applications, solve DSA, ship projects, and let AI plan your
-              day — all inside a secure, private workspace.
-            </p>
+            <div className="max-w-xl space-y-5">
+              <h1 className="text-[2.9rem] font-semibold leading-[1.02] tracking-[-0.04em] text-white sm:text-[3.45rem]">
+                Planning, prep, and progress
+                <span className="block bg-gradient-to-r from-teal-200 via-white to-amber-200 bg-clip-text text-transparent">
+                  in one polished command center.
+                </span>
+              </h1>
+              <p className="max-w-lg text-[15px] leading-7 text-[var(--muted-strong)]">
+                Track applications, ship projects, organize study tasks, and let
+                AI guide your next move inside a workspace that feels focused,
+                private, and built for consistent progress.
+              </p>
+            </div>
           </motion.div>
 
           <motion.div
             variants={childVariants}
             className="grid gap-3 sm:grid-cols-3"
+          >
+            {[
+              { label: "Planner", value: "Daily + weekly focus" },
+              { label: "AI coach", value: "Context from your real data" },
+              { label: "Progress", value: "Track prep without clutter" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="soft-card rounded-[24px] border border-white/10 px-4 py-4"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                  {item.label}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-white">
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </motion.div>
+
+          <motion.div
+            variants={childVariants}
+            className="grid gap-4 sm:grid-cols-3"
           >
             {features.map((f, i) => {
               const Icon = f.icon;
@@ -297,21 +319,23 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 + i * 0.1 }}
                   whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03] p-5 backdrop-blur-xl transition-colors hover:border-white/[0.12] hover:bg-white/[0.05]"
+                  className="glass-card group relative overflow-hidden rounded-[28px] px-5 py-5"
                 >
                   <div
-                    className={`absolute inset-0 bg-gradient-to-br ${f.gradient} opacity-0 transition-opacity group-hover:opacity-100`}
+                    className={`absolute inset-0 bg-gradient-to-br ${f.gradient} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
                   />
-                  <div className="relative">
-                    <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06]">
-                      <Icon className="size-[18px] text-teal-300" />
+                  <div className="relative space-y-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/8 text-teal-200 shadow-[0_12px_28px_rgba(8,15,31,0.2)]">
+                      <Icon className="size-[18px]" />
                     </div>
-                    <h3 className="text-sm font-semibold text-white/90">
-                      {f.title}
-                    </h3>
-                    <p className="mt-1.5 text-[13px] leading-[1.55] text-slate-400">
-                      {f.body}
-                    </p>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">
+                        {f.title}
+                      </h3>
+                      <p className="mt-2 text-[13px] leading-6 text-[var(--muted)]">
+                        {f.body}
+                      </p>
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -320,30 +344,31 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
 
           <motion.div
             variants={childVariants}
-            className="flex items-center gap-3 text-xs text-slate-500"
+            className="inline-flex items-center gap-3 rounded-full border border-white/8 bg-black/15 px-4 py-3 text-xs text-[var(--muted)] backdrop-blur-xl"
           >
-            <Fingerprint className="size-4 text-slate-600" />
+            <Fingerprint className="size-4 text-teal-300" />
             <span>
-              End‑to‑end encrypted cookies · PKCE OAuth · Rate‑limited API
+              HTTP-only sessions - PKCE OAuth - rate-limited auth routes
             </span>
           </motion.div>
         </motion.section>
 
-        {/* ---- RIGHT SIDE — auth card ---- */}
+        {/* ---- RIGHT SIDE - auth card ---- */}
         <motion.section
           initial={{ opacity: 0, scale: 0.95, y: 32 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ delay: 0.18, type: "spring", stiffness: 200, damping: 22 }}
           className="relative"
         >
-          <div className="pointer-events-none absolute -inset-4 rounded-[40px] bg-gradient-to-br from-teal-500/10 via-transparent to-amber-500/10 blur-2xl" />
+          <div className="pointer-events-none absolute -inset-5 rounded-[42px] bg-[radial-gradient(circle_at_top,rgba(45,212,191,0.16),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_45%)] blur-3xl" />
 
-          <div className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[rgba(8,12,20,0.75)] shadow-[0_24px_80px_-16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
-            <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-teal-400/60 to-transparent" />
+          <div className="glass-card relative overflow-hidden rounded-[34px] border border-white/10 shadow-[0_28px_80px_rgba(5,11,24,0.34)]">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+            <div className="absolute inset-x-10 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(45,212,191,0.18),transparent_72%)] blur-3xl" />
 
-            <div className="px-7 pb-8 pt-7 sm:px-9 sm:pb-10 sm:pt-9">
+            <div className="relative px-7 pb-8 pt-7 sm:px-9 sm:pb-10 sm:pt-9">
               <AnimatePresence mode="wait">
-                {/* ─── FORGOT PASSWORD VIEW ─── */}
+                {/* Forgot password view */}
                 {showForgotPassword ? (
                   <motion.div
                     key="forgot"
@@ -353,27 +378,29 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                     transition={{ type: "spring", stiffness: 300, damping: 28 }}
                   >
                     <button
+                      type="button"
                       onClick={() => {
                         setShowForgotPassword(false);
                         setForgotSuccess(false);
                         setForgotError("");
                       }}
-                      className="mb-5 flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-teal-400"
+                      className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/6 px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-teal-200"
                     >
                       <ArrowLeft className="size-3.5" />
                       Back to sign in
                     </button>
 
                     <div className="mb-6 space-y-2">
-                      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-                        <LockKeyhole className="size-3 text-teal-400" />
-                        Password Recovery
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                        <LockKeyhole className="size-3 text-teal-300" />
+                        Password recovery
                       </div>
-                      <h2 className="text-[1.65rem] font-bold tracking-tight text-white">
+                      <h2 className="text-[1.7rem] font-semibold tracking-tight text-white">
                         Reset your password
                       </h2>
-                      <p className="text-sm text-slate-400">
-                        Enter your email and we&apos;ll send a secure link to reset your password.
+                      <p className="text-sm leading-6 text-[var(--muted)]">
+                        Enter your email and we will send a secure link to set a
+                        new password.
                       </p>
                     </div>
 
@@ -381,16 +408,16 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                       <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-6 py-8 text-center"
+                        className="soft-card flex flex-col items-center gap-4 rounded-[26px] border border-emerald-400/18 px-6 py-8 text-center"
                       >
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/20">
-                          <CheckCircle2 className="size-7 text-emerald-400" />
+                          <CheckCircle2 className="size-7 text-emerald-300" />
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-emerald-300">
-                            Reset link sent!
+                            Reset link sent
                           </h3>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs leading-6 text-[var(--muted)]">
                             Check your inbox at <strong className="text-white">{forgotEmail}</strong> for the reset link.
                             It expires in 1 hour.
                           </p>
@@ -420,7 +447,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                               initial={{ opacity: 0, y: -6 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -6 }}
-                              className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+                              className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
                             >
                               {forgotError}
                             </motion.div>
@@ -430,21 +457,21 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                         <motion.button
                           type="submit"
                           disabled={forgotPending}
-                          whileHover={{ scale: 1.015 }}
-                          whileTap={{ scale: 0.975 }}
-                          className="group relative w-full overflow-hidden rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-950 shadow-[0_0_20px_rgba(20,184,166,0.2)] transition-shadow hover:shadow-[0_0_32px_rgba(20,184,166,0.35)] disabled:opacity-60"
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.985 }}
+                          className="group relative w-full overflow-hidden rounded-2xl px-5 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_12px_30px_rgba(45,212,191,0.16)] transition-shadow hover:shadow-[0_18px_38px_rgba(45,212,191,0.28)] disabled:opacity-60"
                         >
-                          <div className="absolute inset-0 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300" />
-                          <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-[100%]" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-teal-300 via-white to-amber-200" />
+                          <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-700 group-hover:translate-x-[100%]" />
                           <span className="relative flex items-center justify-center gap-2">
                             {forgotPending ? (
                               <>
                                 <motion.div
-                                  className="size-4 rounded-full border-2 border-slate-900/30 border-t-slate-900"
+                                  className="size-4 rounded-full border-2 border-slate-900/20 border-t-slate-900"
                                   animate={{ rotate: 360 }}
                                   transition={{ repeat: Infinity, duration: 0.7, ease: "linear" }}
                                 />
-                                Sending reset link…
+                                Sending reset link...
                               </>
                             ) : (
                               <>
@@ -458,7 +485,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                     )}
                   </motion.div>
                 ) : (
-                  /* ─── MAIN SIGN-IN / SIGN-UP VIEW ─── */
+                  /* Main sign-in / sign-up view */
                   <motion.div
                     key="main-auth"
                     initial={{ opacity: 0, x: -20 }}
@@ -467,16 +494,34 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                     transition={{ type: "spring", stiffness: 300, damping: 28 }}
                   >
                     {/* Header */}
-                    <div className="mb-7 space-y-2">
-                      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-slate-500">
-                        <Zap className="size-3 text-teal-400" />
-                        {isSignup ? "Get started" : "Welcome back"}
+                    <div className="mb-7 space-y-3">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                        <Zap className="size-3 text-teal-300" />
+                        {isSignup ? "Create your workspace" : "Welcome back"}
                       </div>
-                      <h2 className="text-[1.65rem] font-bold tracking-tight text-white">
-                        {isSignup
-                          ? "Create your workspace"
-                          : "Sign in to your dashboard"}
-                      </h2>
+                      <div>
+                        <h2 className="text-[1.75rem] font-semibold tracking-tight text-white">
+                          {isSignup
+                            ? "Start your Career OS workspace"
+                            : "Sign in to keep your prep moving"}
+                        </h2>
+                        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                          {isSignup
+                            ? "Set up a private workspace for planning, tracking, and AI coaching."
+                            : "Pick up your plans, progress, and student dashboard right where you left them."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="soft-card mb-5 rounded-[24px] border border-white/8 px-4 py-4">
+                      <div className="flex items-start gap-3">
+                        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-200" />
+                        <p className="text-xs leading-6 text-[var(--muted)]">
+                          Google sign-in and email sign-in both land in the same
+                          secure workspace with protected sessions and isolated
+                          data.
+                        </p>
+                      </div>
                     </div>
 
                     {/* Google OAuth */}
@@ -484,28 +529,28 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                       type="button"
                       onClick={handleGoogleSignIn}
                       disabled={googlePending}
-                      whileHover={{ scale: 1.015 }}
-                      whileTap={{ scale: 0.985 }}
-                      className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/[0.1] bg-white/[0.04] px-5 py-3.5 text-sm font-semibold text-white transition-all hover:border-white/20 hover:bg-white/[0.07] disabled:opacity-50"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/7 px-5 py-3.5 text-sm font-semibold text-white transition-all hover:border-white/20 hover:bg-white/10 disabled:opacity-50"
                     >
                       <GoogleIcon className="size-5" />
                       {googlePending ? (
-                        <span className="animate-pulse">Redirecting to Google…</span>
+                        <span className="animate-pulse">Redirecting to Google...</span>
                       ) : (
                         <>
                           Continue with Google
-                          <ArrowRight className="size-4 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                          <ArrowRight className="size-4 text-[var(--muted)] transition-transform group-hover:translate-x-0.5" />
                         </>
                       )}
                     </motion.button>
 
                     {/* Divider */}
                     <div className="my-6 flex items-center gap-4">
-                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
-                      <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-600">
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                      <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--muted)]">
                         or continue with email
                       </span>
-                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
                     </div>
 
                     {/* Form */}
@@ -520,7 +565,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                             transition={{ type: "spring", stiffness: 300, damping: 28 }}
                           >
                             <label className="block">
-                              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
                                 <User className="size-3" />
                                 Full name
                               </span>
@@ -541,7 +586,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                       {/* Email */}
                       <div>
                         <label className="block">
-                          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
                             <Mail className="size-3" />
                             Email address
                           </span>
@@ -561,7 +606,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                       {/* Password */}
                       <div>
                         <label className="block">
-                          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
                             <LockKeyhole className="size-3" />
                             Password
                           </span>
@@ -580,7 +625,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                             <button
                               type="button"
                               onClick={() => setShowPassword((v) => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 transition-colors hover:text-slate-300"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-1 text-[var(--muted)] transition-colors hover:text-white"
                               aria-label={showPassword ? "Hide password" : "Show password"}
                             >
                               {showPassword ? (
@@ -603,7 +648,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                                 setShowForgotPassword(true);
                                 setForgotEmail(form.email);
                               }}
-                              className="text-xs font-medium text-teal-400/80 transition-colors hover:text-teal-300"
+                              className="text-xs font-medium text-teal-300 transition-colors hover:text-teal-200"
                             >
                               Forgot password?
                             </button>
@@ -618,7 +663,7 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                             initial={{ opacity: 0, y: -6 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
-                            className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+                            className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
                           >
                             {error}
                           </motion.div>
@@ -629,25 +674,25 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                       <motion.button
                         type="submit"
                         disabled={isPending}
-                        whileHover={{ scale: 1.015 }}
-                        whileTap={{ scale: 0.975 }}
-                        className="group relative w-full overflow-hidden rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-950 shadow-[0_0_20px_rgba(20,184,166,0.2)] transition-shadow hover:shadow-[0_0_32px_rgba(20,184,166,0.35)] disabled:opacity-60"
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.985 }}
+                        className="group relative w-full overflow-hidden rounded-2xl px-5 py-3.5 text-sm font-semibold text-slate-950 shadow-[0_12px_30px_rgba(45,212,191,0.16)] transition-shadow hover:shadow-[0_18px_38px_rgba(45,212,191,0.28)] disabled:opacity-60"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300" />
-                        <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-[100%]" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-teal-300 via-white to-amber-200" />
+                        <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/35 to-transparent transition-transform duration-700 group-hover:translate-x-[100%]" />
                         <span className="relative flex items-center justify-center gap-2">
                           {isPending ? (
                             <>
                               <motion.div
-                                className="size-4 rounded-full border-2 border-slate-900/30 border-t-slate-900"
+                                className="size-4 rounded-full border-2 border-slate-900/20 border-t-slate-900"
                                 animate={{ rotate: 360 }}
                                 transition={{ repeat: Infinity, duration: 0.7, ease: "linear" }}
                               />
-                              Securing session…
+                              Securing session...
                             </>
                           ) : (
                             <>
-                              {isSignup ? "Create secure account" : "Sign in"}
+                              {isSignup ? "Create account" : "Sign in"}
                               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
                             </>
                           )}
@@ -656,13 +701,13 @@ export function AuthScreen({ mode }: { mode: AuthMode }) {
                     </form>
 
                     {/* Toggle link */}
-                    <div className="mt-7 text-center text-sm text-slate-500">
+                    <div className="mt-7 text-center text-sm text-[var(--muted)]">
                       {isSignup
                         ? "Already have an account? "
-                        : "Don't have an account? "}
+                        : "Do not have an account? "}
                       <Link
                         href={isSignup ? "/sign-in" : "/sign-up"}
-                        className="font-semibold text-teal-400 transition-colors hover:text-teal-300"
+                        className="font-semibold text-teal-300 transition-colors hover:text-teal-200"
                       >
                         {isSignup ? "Sign in" : "Create one"}
                       </Link>

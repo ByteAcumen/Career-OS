@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Send, X, LoaderCircle, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,12 +13,13 @@ type Message = {
 };
 
 export function CareerAssistant() {
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       role: "assistant",
-      content: "Hi! I'm your Career OS Assistant. I have context on your dashboard, goals, tasks, and applications. Ask me anything about your prep or let's review your progress!"
+      content: "I can see your goals, planning data, tasks, and application activity. Ask for a review, a study plan, or help deciding what to do next."
     }
   ]);
   const [input, setInput] = useState("");
@@ -27,6 +29,10 @@ export function CareerAssistant() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -83,7 +89,7 @@ export function CareerAssistant() {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMessageId
-              ? { ...m, content: `⚠️ Error: ${errorMessage}` }
+              ? { ...m, content: `Warning: ${errorMessage}` }
               : m
           )
         );
@@ -112,11 +118,11 @@ export function CareerAssistant() {
           )
         );
       }
-    } catch (error) {
+    } catch {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessageId
-            ? { ...m, content: "⚠️ Connection error while streaming." }
+            ? { ...m, content: "Connection error while streaming." }
             : m
         )
       );
@@ -165,7 +171,11 @@ export function CareerAssistant() {
     return elements;
   };
 
-  return (
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(
     <>
       <AnimatePresence>
         {!isOpen && (
@@ -176,7 +186,7 @@ export function CareerAssistant() {
             whileHover={{ scale: 1.1, y: -2 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full bg-[var(--teal)] text-black shadow-[0_12px_40px_rgba(45,212,191,0.4)] transition-shadow hover:shadow-[0_16px_48px_rgba(45,212,191,0.5)]"
+            className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-[22px] bg-[linear-gradient(140deg,rgba(45,212,191,0.95),rgba(125,211,252,0.95))] text-slate-950 shadow-[0_18px_40px_rgba(45,212,191,0.26)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_48px_rgba(45,212,191,0.34)]"
           >
             <Bot className="size-7" />
           </motion.button>
@@ -191,17 +201,17 @@ export function CareerAssistant() {
             exit={{ opacity: 0, y: 40, scale: 0.92 }}
             transition={{ type: "spring", damping: 25, stiffness: 240 }}
             className={cn(
-              "fixed bottom-6 right-6 z-50 flex flex-col overflow-hidden rounded-[32px] border border-white/10 glass-card shadow-xl transition-all duration-500",
+              "fixed bottom-6 right-6 z-50 flex flex-col overflow-hidden rounded-[32px] border border-white/10 glass-card shadow-[0_30px_70px_rgba(3,8,20,0.32)] transition-all duration-500",
               isExpanded 
                 ? "w-[850px] h-[85vh] max-w-[calc(100vw-48px)] bottom-6 right-6" 
                 : "w-[420px] h-[640px] max-w-[calc(100vw-48px)]"
             )}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/5 bg-white/5 p-5 backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-5 backdrop-blur-md">
               <div className="flex items-center gap-4">
                 <div className="relative">
-                    <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--teal)] text-black shadow-[0_0_20px_rgba(45,212,191,0.3)]">
+                    <div className="flex size-10 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgba(45,212,191,1),rgba(125,211,252,0.95))] text-slate-950 shadow-[0_12px_28px_rgba(45,212,191,0.24)]">
                         <Bot className="size-5.5" />
                     </div>
                     <div className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#111] bg-emerald-500" />
@@ -236,9 +246,9 @@ export function CareerAssistant() {
             {/* Chat Area */}
             <div 
                 ref={scrollContainerRef}
-                className="custom-scrollbar flex-1 overflow-y-auto p-5 space-y-6 bg-[radial-gradient(circle_at_50%_0%,rgba(45,212,191,0.03)_0%,transparent_50%)]"
+                className="custom-scrollbar flex-1 space-y-6 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,rgba(45,212,191,0.04)_0%,transparent_52%)] p-5"
             >
-              {messages.map((m, idx) => (
+              {messages.map((m) => (
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -251,17 +261,17 @@ export function CareerAssistant() {
                 >
                   <div
                     className={cn(
-                        "relative max-w-[88%] rounded-[22px] px-5 py-3.5 shadow-sm lg:px-6 lg:py-4",
+                        "relative max-w-[88%] rounded-[24px] px-5 py-3.5 shadow-sm lg:px-6 lg:py-4",
                         m.role === "user"
-                        ? "bg-[var(--teal)] text-black font-medium"
-                        : "bg-white/5 border border-white/5 text-[var(--ink)] backdrop-blur-sm"
+                        ? "bg-[linear-gradient(135deg,rgba(45,212,191,0.98),rgba(125,211,252,0.9))] text-slate-950 font-medium"
+                        : "border border-white/8 bg-white/6 text-[var(--ink)] backdrop-blur-sm"
                     )}
                   >
                     {m.role === "assistant" ? formatText(m.content) : m.content}
                     
                     {/* Timestamp or Status */}
                     <div className={cn(
-                        "mt-2 text-[9px] opacity-40 uppercase tracking-widest",
+                        "mt-2 text-[9px] uppercase tracking-widest opacity-45",
                         m.role === "user" ? "text-right" : "text-left"
                     )}>
                         {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -273,7 +283,7 @@ export function CareerAssistant() {
                 <motion.div 
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="mr-auto flex items-center gap-3 rounded-[22px] border border-white/5 bg-white/5 px-5 py-3 text-[var(--muted)] shadow-sm"
+                    className="mr-auto flex items-center gap-3 rounded-[22px] border border-white/8 bg-white/6 px-5 py-3 text-[var(--muted)] shadow-sm"
                 >
                   <LoaderCircle className="size-4 animate-spin text-[var(--teal)]" />
                   <span className="text-sm font-medium tracking-wide">AI is deep thinking...</span>
@@ -288,14 +298,14 @@ export function CareerAssistant() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="px-5 pb-4 flex gap-2.5 overflow-x-auto custom-scrollbar no-scrollbar::-webkit-scrollbar"
+                    className="flex gap-2.5 overflow-x-auto px-5 pb-4 custom-scrollbar no-scrollbar::-webkit-scrollbar"
                 >
                     {["Review my progress", "What should I build?", "Help me plan"].map((suggestion) => (
                         <button
                             key={suggestion}
                             type="button"
                             onClick={() => setInput(suggestion)}
-                            className="whitespace-nowrap flex-none rounded-2xl border border-white/5 bg-white/5 px-4 py-2 text-xs font-medium text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--teal)] hover:bg-[var(--teal-soft)] transition-all duration-300"
+                            className="soft-card whitespace-nowrap flex-none rounded-2xl border border-white/8 px-4 py-2 text-xs font-medium text-[var(--muted)] transition-all duration-300 hover:border-[var(--teal)] hover:bg-[var(--teal-soft)] hover:text-[var(--ink)]"
                         >
                             {suggestion}
                         </button>
@@ -304,7 +314,7 @@ export function CareerAssistant() {
             )}
 
             {/* Input Form */}
-            <div className="border-t border-white/5 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="border-t border-white/8 bg-white/5 p-5 backdrop-blur-xl">
               <form onSubmit={handleSubmit} className="relative flex items-end gap-3">
                 <div className="relative flex-1">
                     <textarea
@@ -316,8 +326,8 @@ export function CareerAssistant() {
                         handleSubmit(e);
                         }
                     }}
-                    className="field-area min-h-[52px] max-h-[180px] !py-[14px] !pr-12 !pl-5 flex-1 custom-scrollbar resize-none border-white/10 bg-white/5 focus:border-[var(--teal)] focus:ring-1 focus:ring-[var(--teal)/20] transition-all"
-                    placeholder="Ask about your prep or sync data..."
+                    className="field-area custom-scrollbar min-h-[52px] max-h-[180px] flex-1 resize-none border-white/10 bg-white/6 !py-[14px] !pl-5 !pr-12 transition-all focus:border-[var(--teal)] focus:ring-1 focus:ring-[var(--teal)/20]"
+                    placeholder="Ask about your prep, planning, or next move..."
                     />
                     <div className="absolute right-4 bottom-3.5 flex items-center gap-2">
                          <span className="text-[10px] text-[var(--muted)] opacity-50 hidden sm:inline">Enter to send</span>
@@ -329,7 +339,7 @@ export function CareerAssistant() {
                   className={cn(
                     "flex size-12 items-center justify-center rounded-2xl transition-all duration-500 shadow-lg",
                     input.trim() && !isStreaming
-                      ? "bg-[var(--teal)] text-black shadow-[0_8px_24px_rgba(45,212,191,0.3)] hover:scale-105 active:scale-95"
+                      ? "bg-[linear-gradient(135deg,rgba(45,212,191,0.98),rgba(125,211,252,0.95))] text-slate-950 shadow-[0_12px_26px_rgba(45,212,191,0.26)] hover:scale-105 active:scale-95"
                       : "bg-white/5 text-[var(--muted)] cursor-not-allowed opacity-50"
                   )}
                 >
@@ -340,6 +350,7 @@ export function CareerAssistant() {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </>,
+    document.body,
   );
 }

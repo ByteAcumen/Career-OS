@@ -99,15 +99,15 @@ export function TaskBoard({
   };
 
   return (
-    <div className="grid gap-5">
-      <div className="grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
+    <div className="grid gap-6">
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <motion.div 
             variants={itemVariants}
             initial="hidden"
             animate="show"
-            className="rounded-[28px] border border-white/5 bg-white/5 p-5 backdrop-blur-sm"
+            className="glass-card rounded-[30px] p-5 sm:p-6"
         >
-          <div className="mb-4 inline-flex items-center gap-2.5 rounded-xl bg-white/5 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
+          <div className="mb-4 inline-flex items-center gap-2.5 rounded-full bg-white/6 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
             <ClipboardList className="size-4" />
             Planner Summary
           </div>
@@ -124,16 +124,17 @@ export function TaskBoard({
             variants={itemVariants}
             initial="hidden"
             animate="show"
-            className="rounded-[28px] border border-white/5 bg-white/5 p-5 backdrop-blur-sm"
+            className="glass-card rounded-[30px] p-5 sm:p-6"
         >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1 min-w-[240px]">
-              <div className="inline-flex items-center gap-2.5 rounded-xl bg-[var(--teal-soft)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--teal)]">
+              <div className="inline-flex items-center gap-2.5 rounded-full bg-[var(--teal-soft)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--teal)]">
                 <BrainCircuit className="size-4" />
                 AI Task Pack
               </div>
-              <div className="mt-3 text-sm leading-relaxed text-[var(--muted)] opacity-80">
-                Generate actionable daily, weekly, and weekend tasks from your stored progress.
+              <div className="mt-3 max-w-xl text-sm leading-7 text-[var(--muted)]">
+                Generate a structured daily, weekly, and weekend queue based on your stored progress,
+                weekly theme, and current momentum.
               </div>
             </div>
             <button
@@ -141,10 +142,10 @@ export function TaskBoard({
               disabled={!aiReady || suggestionsLoading}
               onClick={onGenerateSuggestions}
               className={cn(
-                "inline-flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold tracking-tight transition-all active:scale-95 shadow-lg shadow-black/20 hover:shadow-[0_10px_30px_rgba(45,212,191,0.2)]",
+                "inline-flex items-center gap-2.5 rounded-[18px] px-5 py-3 text-sm font-semibold tracking-tight transition-all active:scale-95",
                 aiReady && !suggestionsLoading
-                  ? "bg-[var(--teal)] text-black"
-                  : "cursor-not-allowed bg-white/5 text-[var(--muted)] border border-white/5",
+                  ? "bg-[var(--teal)] text-[var(--paper)] shadow-[0_16px_40px_-20px_rgba(94,234,212,0.75)] hover:-translate-y-0.5"
+                  : "cursor-not-allowed border border-[var(--line)] bg-white/6 text-[var(--muted)]",
               )}
             >
               <Sparkles className={cn("size-4", suggestionsLoading && "animate-spin")} />
@@ -155,7 +156,7 @@ export function TaskBoard({
           {suggestions ? (
             <div className="grid gap-3 lg:grid-cols-3">
               {scopeOrder.map((scope) => (
-                <div key={scope} className="soft-card space-y-3">
+                <div key={scope} className="soft-card space-y-4">
                   <div>
                     <div className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${scopeMeta[scope].tone}`}>
                       {scopeMeta[scope].label}
@@ -166,15 +167,15 @@ export function TaskBoard({
                   </div>
                   <div className="space-y-3">
                     {suggestions[scope].map((suggestion, index) => (
-                      <div key={`${scope}-${index}-${suggestion.title}`} className="rounded-[18px] border border-[var(--line)] bg-black/20 p-3">
+                      <div key={`${scope}-${index}-${suggestion.title}`} className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] p-4">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="text-sm font-semibold text-[var(--ink)]">
+                          <div className="text-sm font-semibold leading-6 text-[var(--ink)]">
                             {suggestion.title}
                           </div>
                           <button
                             type="button"
                             onClick={() => onImportSuggestion(suggestion)}
-                            className="rounded-full bg-[var(--ink)] px-3 py-1 text-xs font-medium text-[var(--paper-strong)]"
+                            className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs font-medium text-[var(--ink)] hover:bg-white/10"
                           >
                             Add
                           </button>
@@ -183,9 +184,9 @@ export function TaskBoard({
                           {suggestion.details}
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
-                          <span>{suggestion.category}</span>
-                          <span>{suggestion.priority}</span>
-                          <span>{suggestion.estimateMinutes} min</span>
+                          <span className="rounded-full bg-white/6 px-2.5 py-1">{suggestion.category}</span>
+                          <span className="rounded-full bg-white/6 px-2.5 py-1">{suggestion.priority}</span>
+                          <span className="rounded-full bg-white/6 px-2.5 py-1">{suggestion.estimateMinutes} min</span>
                         </div>
                       </div>
                     ))}
@@ -194,7 +195,7 @@ export function TaskBoard({
               ))}
             </div>
           ) : (
-            <div className="rounded-[18px] border border-[var(--line)] bg-black/20 px-4 py-4 text-sm leading-7 text-[var(--muted)]">
+            <div className="rounded-[22px] border border-dashed border-[var(--line)] bg-black/10 px-5 py-5 text-sm leading-7 text-[var(--muted)]">
               Generate a planner pack to get AI-suggested tasks that match your targets,
               weekly theme, current weakness areas, and recent study output.
             </div>
@@ -202,18 +203,18 @@ export function TaskBoard({
         </motion.div>
       </div>
 
-      <div className="rounded-[24px] border border-[var(--line)] bg-white/4 p-4">
+      <div className="glass-card rounded-[30px] p-5 sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/6 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
               <Plus className="size-3.5" />
               Add Planner Task
             </div>
-            <div className="mt-2 text-sm text-[var(--muted)]">
+            <div className="mt-2 max-w-xl text-sm leading-7 text-[var(--muted)]">
               Save specific tasks instead of keeping your weekly intent in your head.
             </div>
           </div>
-          <div className="rounded-full border border-[var(--line)] px-3 py-1 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+          <div className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
             Today {todayKey}
           </div>
         </div>
@@ -309,14 +310,14 @@ export function TaskBoard({
               className="field"
               disabled={form.scope !== "daily"}
             />
-            <div className="rounded-[16px] border border-[var(--line)] bg-black/20 px-3 py-3 text-xs leading-6 text-[var(--muted)]">
+            <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-3 py-3 text-xs leading-6 text-[var(--muted)]">
               Daily tasks can be date-specific. Weekly and weekend tasks stay visible until you complete them.
             </div>
           </div>
           <button
             type="button"
             onClick={onCreateTask}
-            className="rounded-[18px] bg-[var(--ink)] px-5 py-4 text-sm font-semibold text-[var(--paper-strong)]"
+            className="rounded-[18px] bg-[var(--ink)] px-5 py-4 text-sm font-semibold text-[var(--paper)] shadow-[0_16px_40px_-24px_rgba(255,255,255,0.45)] hover:-translate-y-0.5"
           >
             Save task
           </button>
@@ -325,7 +326,7 @@ export function TaskBoard({
 
       <div className="grid gap-4 xl:grid-cols-3">
         {groupedTasks.map(({ scope, tasks: scopedTasks }) => (
-          <div key={scope} className="rounded-[24px] border border-[var(--line)] bg-white/4 p-4">
+          <div key={scope} className="glass-card rounded-[28px] p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${scopeMeta[scope].tone}`}>
@@ -335,7 +336,7 @@ export function TaskBoard({
                   {scopeMeta[scope].subtitle}
                 </div>
               </div>
-              <div className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--muted)]">
+              <div className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs text-[var(--muted)]">
                 {scopedTasks.length}
               </div>
             </div>
@@ -366,10 +367,10 @@ export function TaskBoard({
                       }}
                       exit={{ opacity: 0, scale: 0.95, x: -20, transition: { duration: 0.2 } }}
                       className={cn(
-                        "rounded-[18px] border p-4 transition-all duration-300 hover:shadow-lg",
+                        "rounded-[22px] border p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-28px_rgba(0,0,0,0.9)]",
                         task.status === "done"
-                          ? "border-emerald-500/20 bg-emerald-500/8 hover:border-emerald-500/40"
-                          : "border-[var(--line)] bg-[var(--card)] hover:border-white/15 hover:bg-white-[0.02]"
+                          ? "border-emerald-500/20 bg-emerald-500/10 hover:border-emerald-500/40"
+                          : "border-[var(--line)] bg-[rgba(255,255,255,0.03)] hover:border-white/16"
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -385,7 +386,7 @@ export function TaskBoard({
                         <button
                           type="button"
                           onClick={() => onDeleteTask(task.id)}
-                          className="shrink-0 rounded-full border border-[var(--line)] p-2 text-[var(--muted)] hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition"
+                          className="shrink-0 rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] hover:border-rose-500/24 hover:bg-rose-500/10 hover:text-rose-400"
                           aria-label={`Delete ${task.title}`}
                         >
                           <Trash2 className="size-4" />
@@ -411,11 +412,11 @@ export function TaskBoard({
                         )}>
                           {task.priority}
                         </span>
-                        <span className="rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)] border border-[var(--line)]">
+                        <span className="rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1 text-[var(--muted)]">
                           {task.estimateMinutes} min
                         </span>
                         {task.targetDateKey ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/6 px-2.5 py-1 text-[var(--muted)] border border-[var(--line)]">
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1 text-[var(--muted)]">
                             <CalendarRange className="size-3.5" />
                             {task.targetDateKey}
                           </span>
@@ -431,17 +432,17 @@ export function TaskBoard({
                           type="button"
                           onClick={() => onAdvanceTask(task, nextTaskStatus(task.status))}
                           className={cn(
-                            "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 shadow-sm active:scale-95",
+                            "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 active:scale-95",
                             task.status === "done"
-                              ? "bg-[var(--ink)] text-[var(--paper-strong)] hover:shadow-md hover:-translate-y-0.5"
-                              : "bg-[var(--teal)] text-[var(--paper-strong)] hover:shadow-[0_4px_12px_rgba(20,184,166,0.3)] hover:-translate-y-0.5"
+                              ? "bg-white/92 text-[var(--paper)] hover:-translate-y-0.5"
+                              : "bg-[var(--teal)] text-[var(--paper)] shadow-[0_16px_40px_-24px_rgba(94,234,212,0.7)] hover:-translate-y-0.5"
                           )}
                         >
                           <CheckCircle2 className="size-4" />
                           {task.status === "todo"
-                            ? "Start Task"
+                            ? "Start task"
                             : task.status === "in_progress"
-                              ? "Complete"
+                              ? "Mark complete"
                               : "Reopen"}
                         </button>
                       </div>
@@ -453,7 +454,7 @@ export function TaskBoard({
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="rounded-[18px] border border-dashed border-[var(--line)] px-4 py-8 text-center text-sm leading-7 text-[var(--muted)] bg-black/10"
+                    className="rounded-[22px] border border-dashed border-[var(--line)] bg-black/10 px-4 py-8 text-center text-sm leading-7 text-[var(--muted)]"
                   >
                     No {scope} tasks yet. <br/> Add one manually or import the AI suggestions.
                   </motion.div>
@@ -475,12 +476,14 @@ function PlannerStat({
   value: number | string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-black/30 p-5 shadow-inner transition-colors hover:bg-black/40">
-      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] opacity-70">
+    <div className="soft-card min-h-[122px] bg-[rgba(255,255,255,0.03)]">
+      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] opacity-80">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-bold tracking-tight text-[var(--ink)]">{value}</div>
-      <div className="absolute -right-2 -bottom-2 size-12 bg-white/5 blur-2xl rounded-full" />
+      <div className="mt-3 text-3xl font-bold tracking-tight text-[var(--ink)]">{value}</div>
+      <div className="mt-4 h-1.5 rounded-full bg-white/6">
+        <div className="h-full rounded-full bg-gradient-to-r from-[var(--teal)] via-[#8cc6ff] to-[var(--gold)] opacity-80" />
+      </div>
     </div>
   );
 }

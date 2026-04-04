@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { startOfWeek, subDays } from "date-fns";
 import { getAiProviderStatus } from "@/lib/ai-credentials";
-import { db, client } from "@/lib/db";
+import { client } from "@/lib/db";
 import { fetchGithubActivity } from "@/lib/github";
 import type { DashboardData } from "@/lib/types";
 import { previousDateKey, toDateKey } from "@/lib/utils";
@@ -25,6 +25,10 @@ type SnapshotRow = {
   aiOneCut: string | null;
   aiWeekendMission: string | null;
 };
+
+type DailyDetailDsaRow = DashboardData["recentDsa"][number];
+type DailyDetailBuildRow = DashboardData["recentBuilds"][number];
+type DailyDetailApplicationRow = DashboardData["recentApplications"][number];
 
 const defaultSettings = {
   sheetUrl: "",
@@ -787,9 +791,9 @@ export async function getDailyDetail(userId: string, dateKey: string) {
     note: snapshot.note ?? "",
     tomorrowTask: snapshot.tomorrowTask ?? "",
     aiSummary: snapshot.aiSummary ?? null,
-    dsa: dsaRs.rows as unknown as any[],
-    builds: buildRs.rows as unknown as any[],
-    applications: appRs.rows as unknown as any[],
+    dsa: dsaRs.rows as unknown as DailyDetailDsaRow[],
+    builds: buildRs.rows as unknown as DailyDetailBuildRow[],
+    applications: appRs.rows as unknown as DailyDetailApplicationRow[],
   };
 }
 

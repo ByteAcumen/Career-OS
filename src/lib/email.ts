@@ -1,7 +1,27 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_ADDRESS = "Career OS <onboarding@resend.dev>";
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const FROM_ADDRESS =
+  process.env.RESEND_FROM_EMAIL?.trim() ||
+  process.env.EMAIL_FROM?.trim() ||
+  (process.env.NODE_ENV === "production"
+    ? ""
+    : "Career OS <onboarding@resend.dev>");
+
+function getResendClient() {
+  if (!resend) {
+    throw new Error("Missing RESEND_API_KEY. Password reset email cannot be sent.");
+  }
+
+  if (!FROM_ADDRESS) {
+    throw new Error(
+      "Missing RESEND_FROM_EMAIL. Set a verified sender address for password reset email.",
+    );
+  }
+
+  return resend;
+}
 
 /**
  * Send a password-reset email with a secure link.
@@ -11,7 +31,8 @@ export async function sendPasswordResetEmail(
   resetUrl: string,
 ) {
   try {
-    await resend.emails.send({
+    const emailClient = getResendClient();
+    await emailClient.emails.send({
       from: FROM_ADDRESS,
       to: email,
       subject: "Reset your Career OS password",
@@ -54,7 +75,8 @@ export async function sendVerificationEmail(
   verificationUrl: string,
 ) {
   try {
-    await resend.emails.send({
+    const emailClient = getResendClient();
+    await emailClient.emails.send({
       from: FROM_ADDRESS,
       to: email,
       subject: "Verify your Career OS email",
