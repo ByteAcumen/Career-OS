@@ -2,11 +2,10 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
-const url = process.env.TURSO_DATABASE_URL || "";
+// We provide a dummy URL for the build phase to prevent 'URL_INVALID' from libsql.
+// The actual queries will fail gracefully if the real URL is missing at runtime.
+const url = process.env.TURSO_DATABASE_URL || "libsql://build-placeholder.turso.io";
 const authToken = process.env.TURSO_AUTH_TOKEN;
-
-// We don't throw here anymore to allow 'next build' to complete static analysis.
-// If the URL is truly missing at runtime, the libsql client will throw a descriptive error when a query is made.
 
 export const client = createClient({
   url: url,

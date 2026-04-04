@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 import { getRequestSession } from "@/lib/auth-session";
 import { saveSettings } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";

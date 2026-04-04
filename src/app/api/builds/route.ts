@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 import { getRequestSession } from "@/lib/auth-session";
 import { createBuildEntry } from "@/lib/dashboard";
 import { buildEntrySchema } from "@/lib/validators";
