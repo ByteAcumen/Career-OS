@@ -86,16 +86,16 @@ export function ActivityBarChart({
             dataKey="dsaCount"
             name="DSA"
             stackId="a"
-            fill="#2dd4bf"
+            fill="#ffffff"
             radius={[0, 0, 4, 4]}
             maxBarSize={40}
           />
-          <Bar dataKey="buildCount" name="Builds" stackId="a" fill="#0ea5e9" maxBarSize={40} />
+          <Bar dataKey="buildCount" name="Builds" stackId="a" fill="rgba(255,255,255,0.72)" maxBarSize={40} />
           <Bar
             dataKey="appCount"
             name="Apps"
             stackId="a"
-            fill="#f43f5e"
+            fill="rgba(255,255,255,0.42)"
             radius={[4, 4, 0, 0]}
             maxBarSize={40}
           />

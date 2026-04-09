@@ -2,12 +2,33 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
+import {
+  createAiFingerprint,
+  readAiArtifact,
+  stableJsonStringify,
+  writeAiArtifact,
+  type AiArtifactFeature,
+} from "@/lib/ai-cache";
 import { resolveAiProviderKey } from "@/lib/ai-credentials";
 import { getConfiguredAppBaseUrl } from "@/lib/app-url";
 import { getDashboardData } from "@/lib/dashboard";
-import type { AiProvider, PlannerSuggestionPack, StudentStrategy } from "@/lib/types";
+import type {
+  AiProvider,
+  DashboardData,
+  PlannerSuggestionPack,
+  StudentStrategy,
+} from "@/lib/types";
 
-// ── Error Classification ──────────────────────────────────────────────────
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type ChatStreamResult = {
+  stream: ReadableStream<Uint8Array>;
+  provider: AiProvider;
+  model: string;
+};
 
 export type AiErrorCode =
   | "NO_KEY"
@@ -24,11 +45,7 @@ export class AiError extends Error {
   userMessage: string;
   retryable: boolean;
 
-  constructor(
-    code: AiErrorCode,
-    provider: string,
-    originalMessage: string,
-  ) {
+  constructor(code: AiErrorCode, provider: string, originalMessage: string) {
     const userMessage = getErrorUserMessage(code, provider);
     super(originalMessage);
     this.name = "AiError";
@@ -42,19 +59,19 @@ export class AiError extends Error {
 function getErrorUserMessage(code: AiErrorCode, provider: string): string {
   switch (code) {
     case "NO_KEY":
-      return `No API key configured for ${provider}. Go to Settings → AI Keys to add one, or set it in your environment variables.`;
+      return `No API key configured for ${provider}. Add one in Settings -> AI Keys.`;
     case "INVALID_KEY":
-      return `Your ${provider} API key is invalid or expired. Please update it in Settings → AI Keys.`;
+      return `Your ${provider} API key is invalid or expired. Update it in Settings -> AI Keys.`;
     case "QUOTA_EXCEEDED":
-      return `Your ${provider} API quota has been exceeded. Wait for it to reset, upgrade your plan, or switch to a different provider in Settings.`;
+      return `Your ${provider} quota is exhausted. Wait for reset, top up, or switch providers.`;
     case "RATE_LIMITED":
-      return `${provider} rate limit reached. Wait a moment and try again, or switch to a different provider.`;
+      return `${provider} rate limit reached. Wait a moment and try again.`;
     case "TIMEOUT":
-      return `${provider} request timed out. The service might be busy — try again in a moment.`;
+      return `${provider} timed out. Try again in a moment.`;
     case "PROVIDER_ERROR":
-      return `${provider} returned an unexpected error. Try again, or switch to a different provider in Settings.`;
+      return `${provider} returned an unexpected error. Try again or switch providers.`;
     case "PARSE_ERROR":
-      return `${provider} returned a response that couldn't be parsed. Try again.`;
+      return `${provider} returned an unreadable response. Try again.`;
   }
 }
 
@@ -63,7 +80,6 @@ function classifyHttpError(status: number, body: string, provider: string): AiEr
     return new AiError("INVALID_KEY", provider, `${provider} returned ${status}: ${body}`);
   }
   if (status === 429) {
-    // Distinguish between rate limit and quota
     const lower = body.toLowerCase();
     if (lower.includes("quota") || lower.includes("billing") || lower.includes("exceeded")) {
       return new AiError("QUOTA_EXCEEDED", provider, `${provider} quota exceeded: ${body}`);
@@ -75,8 +91,6 @@ function classifyHttpError(status: number, body: string, provider: string): AiEr
   }
   return new AiError("PROVIDER_ERROR", provider, `${provider} returned ${status}: ${body}`);
 }
-
-// ── Response Schemas ──────────────────────────────────────────────────────
 
 const CoachResponseSchema = z.object({
   summary: z.string(),
@@ -141,32 +155,31 @@ const PlannerSuggestionPackSchema = z.object({
 
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
 
-// ── Public AI Functions ───────────────────────────────────────────────────
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+const DEFAULT_OPENROUTER_MODEL = "google/gemma-2-9b-it:free";
+const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
+const COACH_SYSTEM_PROMPT =
+  "You are a strict but caring study coach for a final-year CS student targeting product engineering roles. Be direct, realistic, and actionable.";
+const COACH_JSON_PROMPT =
+  "Return only a JSON object with these exact string fields: summary, biggestRisk, focusTheme, morningPlan, nightPlan, applyPlan, oneCut, weekendMission.";
 
 export async function generateMotivationQuotes(userId: string) {
   const dashboard = await getDashboardData(userId);
-  const payload = {
-    profile: {
-      targetRole: dashboard.settings.targetRole,
-      planStyle: dashboard.settings.planStyle,
-      university: dashboard.settings.university,
-      graduationYear: dashboard.settings.graduationYear,
-      weeklyTheme: dashboard.settings.weeklyTheme,
-    },
-    metrics: dashboard.metrics,
-    todayCompleted: dashboard.today.checkins,
-    planner: dashboard.planner.summary,
-  };
-
-  const response = await dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    "You are an intense but constructive engineering career coach. Generate 4 short, sharp motivational quotes that feel specific to the student's current progress and targets. Each quote must be one sentence and should push the user toward immediate action.",
-    "Return only a JSON object with a single array field 'quotes'.",
-    MotivationSchema,
+  const payload = buildMotivationPayload(dashboard);
+  const response = await runStructuredTask({
     userId,
-  );
+    dashboard,
+    feature: "motivation",
+    payload,
+    schema: MotivationSchema,
+    systemPrompt:
+      "You are an intense but constructive engineering career coach. Generate four short motivational lines grounded in the student's real momentum, not generic hype.",
+    jsonPrompt:
+      "Return only a JSON object with a single array field named quotes. Each quote must be one sentence and under 20 words.",
+    cacheMinutes: 12 * 60,
+  });
+
   return response.quotes;
 }
 
@@ -177,46 +190,58 @@ export async function generateInsight(
   context: string,
 ) {
   const dashboard = await getDashboardData(userId);
-  const payload = {
+  const payload = compactObject({
     type,
-    title,
-    context,
-    targetRole: dashboard.settings.targetRole,
-    primaryGoal: dashboard.settings.primaryGoal,
-    customAiInstructions: dashboard.settings.customAiInstructions,
-  };
-  
-  const response = await dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    "You are a principal engineer mentoring a mid-level dev. Generate a 1-2 sentence core technical insight/takeaway based on the problem title and minimal context.",
-    "Return only a JSON object with a single string field 'insight'.",
-    InsightSchema,
+    title: clipText(title, 120),
+    context: clipText(context, 700),
+    role: dashboard.settings.targetRole,
+    goal: dashboard.settings.primaryGoal,
+    customInstructions: clipText(dashboard.settings.customAiInstructions, 300),
+  });
+
+  const response = await runStructuredTask({
     userId,
-  );
+    dashboard,
+    feature: "insight",
+    payload,
+    schema: InsightSchema,
+    systemPrompt:
+      "You are a principal engineer mentoring a student. Produce one technical takeaway that is sharp, specific, and immediately useful.",
+    jsonPrompt:
+      "Return only a JSON object with a single string field named insight.",
+    cacheMinutes: 7 * 24 * 60,
+  });
+
   return response.insight;
 }
 
 export async function generateWeaknessCurriculum(userId: string) {
   const dashboard = await getDashboardData(userId);
-  const recentDsa = dashboard.recentDsa;
-  
-  const payload = {
+  const payload = compactObject({
     targetRole: dashboard.settings.targetRole,
     targetCompanies: dashboard.settings.targetCompanies,
-    recentProblemsAndInsights: recentDsa.map(d => ({ title: d.title, pattern: d.pattern, insight: d.insight }))
-  };
+    learningSignals: buildLearningSignals(dashboard),
+    recentProblems: dashboard.recentDsa.slice(0, 8).map((item) => ({
+      title: clipText(item.title, 90),
+      difficulty: item.difficulty,
+      pattern: item.pattern,
+      insight: clipText(item.insight, 140),
+    })),
+  });
 
-  const response = await dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    "You are an expert technical interviewer. Analyze these recent data structure problems and the user's insights to cluster their WEAKNESSES. Generate a 2-3 sentence strict weekend curriculum focusing on their most frequent blind spots.",
-    "Return only a JSON object with a single string field 'curriculum'.",
-    WeaknessSchema,
+  const response = await runStructuredTask({
     userId,
-  );
+    dashboard,
+    feature: "weakness",
+    payload,
+    schema: WeaknessSchema,
+    systemPrompt:
+      "You are an expert technical interviewer. Analyze the student's recent DSA work and identify the highest-value weakness cluster to attack next.",
+    jsonPrompt:
+      "Return only a JSON object with a single string field named curriculum. Keep it short and practical.",
+    cacheMinutes: 24 * 60,
+  });
+
   return response.curriculum;
 }
 
@@ -226,245 +251,475 @@ export async function predictApplicationMatch(
   role: string,
 ) {
   const dashboard = await getDashboardData(userId);
-  const payload = {
-    company,
-    role,
-    primaryGoal: dashboard.settings.primaryGoal,
+  const payload = compactObject({
+    company: clipText(company, 120),
+    role: clipText(role, 160),
     targetRole: dashboard.settings.targetRole,
-    strengths: dashboard.settings.customAiInstructions,
-  };
+    primaryGoal: dashboard.settings.primaryGoal,
+    recentSignals: {
+      weeklyApplications: dashboard.metrics.weekApplications,
+      weeklyBuilds: dashboard.metrics.weekBuilds,
+      weeklyDsa: dashboard.metrics.weekDsa,
+      currentStreak: dashboard.metrics.currentStreak,
+    },
+    learningSignals: buildLearningSignals(dashboard),
+    customInstructions: clipText(dashboard.settings.customAiInstructions, 260),
+  });
 
-  const response = await dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    "You are an elite career matching algorithm. Score the match (0-100) between the user's primary goal and this specific job application. Provide a 1-sentence harsh analysis.",
-    "Return only a JSON object with 'score' (number) and 'analysis' (string).",
-    MatchSchema,
+  const response = await runStructuredTask({
     userId,
-  );
+    dashboard,
+    feature: "match",
+    payload,
+    schema: MatchSchema,
+    systemPrompt:
+      "You are an elite career matching assistant. Score fit for the role using only the stored student profile and recent evidence.",
+    jsonPrompt:
+      "Return only a JSON object with score as a number from 0 to 100 and analysis as one concise sentence.",
+    cacheMinutes: 7 * 24 * 60,
+  });
+
   return response;
 }
 
 export async function generateCoachResponse(userId: string) {
   const dashboard = await getDashboardData(userId);
-  const payload = {
-    target: dashboard.settings.primaryGoal,
-    targetRole: dashboard.settings.targetRole,
-    targetCompanies: dashboard.settings.targetCompanies,
-    university: dashboard.settings.university,
-    degree: dashboard.settings.degree,
-    graduationYear: dashboard.settings.graduationYear,
-    planStyle: dashboard.settings.planStyle,
-    customAiInstructions: dashboard.settings.customAiInstructions,
-    provider: dashboard.settings.aiProvider,
-    metrics: dashboard.metrics,
-    profileLinks: {
-      github: dashboard.settings.githubUrl,
-      leetcode: dashboard.settings.leetcodeUrl,
-      linkedin: dashboard.settings.linkedinUrl,
-      codeforces: dashboard.settings.codeforcesUrl,
-      codechef: dashboard.settings.codechefUrl,
-      hackerrank: dashboard.settings.hackerrankUrl,
-      jobTracker: dashboard.settings.jobTrackerUrl,
-    },
-    previousDay: dashboard.previousDay,
-    recentDsa: dashboard.recentDsa.slice(0, 4),
-    recentBuilds: dashboard.recentBuilds.slice(0, 3),
-    recentApplications: dashboard.recentApplications.slice(0, 4),
-    today: dashboard.today,
-  };
+  const payload = buildCoachPayload(dashboard);
 
-  return dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    systemPrompt,
-    jsonPromptPrefix,
-    CoachResponseSchema,
+  return runStructuredTask({
     userId,
-  );
+    dashboard,
+    feature: "coach",
+    payload,
+    schema: CoachResponseSchema,
+    systemPrompt: COACH_SYSTEM_PROMPT,
+    jsonPrompt: COACH_JSON_PROMPT,
+    cacheMinutes: 4 * 60,
+  });
 }
 
 export async function generateStudentStrategy(userId: string): Promise<StudentStrategy> {
   const dashboard = await getDashboardData(userId);
-  const payload = {
-    studentProfile: {
-      targetRole: dashboard.settings.targetRole,
-      primaryGoal: dashboard.settings.primaryGoal,
-      targetCompanies: dashboard.settings.targetCompanies,
-      university: dashboard.settings.university,
-      degree: dashboard.settings.degree,
-      graduationYear: dashboard.settings.graduationYear,
-      planStyle: dashboard.settings.planStyle,
-      customAiInstructions: dashboard.settings.customAiInstructions,
-      links: {
-        github: dashboard.settings.githubUrl,
-        leetcode: dashboard.settings.leetcodeUrl,
-        codeforces: dashboard.settings.codeforcesUrl,
-        codechef: dashboard.settings.codechefUrl,
-        hackerrank: dashboard.settings.hackerrankUrl,
-        jobTracker: dashboard.settings.jobTrackerUrl,
-      },
-    },
-    metrics: dashboard.metrics,
-    today: dashboard.today,
-    recentDsa: dashboard.recentDsa.slice(0, 6),
-    recentBuilds: dashboard.recentBuilds.slice(0, 4),
-    recentApplications: dashboard.recentApplications.slice(0, 6),
-    history: dashboard.history.slice(-21),
-  };
+  const payload = buildStrategyPayload(dashboard);
 
-  return dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    "You are an elite placement strategist for engineering students. Produce a practical, student-specific interview preparation strategy using the stored profile, history, and current momentum. Be concrete, realistic, and prioritize the highest ROI actions.",
-    "Return only a JSON object with these exact string fields: headline, todayMission, dsaPriority, buildPriority, applicationPriority, mockInterviewTask, realityCheck.",
-    StudentStrategySchema,
+  return runStructuredTask({
     userId,
-  );
+    dashboard,
+    feature: "strategy",
+    payload,
+    schema: StudentStrategySchema,
+    systemPrompt:
+      "You are an elite placement strategist for engineering students. Prioritize the highest-ROI moves using the student's actual momentum, targets, and weak spots.",
+    jsonPrompt:
+      "Return only a JSON object with these exact string fields: headline, todayMission, dsaPriority, buildPriority, applicationPriority, mockInterviewTask, realityCheck.",
+    cacheMinutes: 6 * 60,
+  });
 }
 
 export async function generatePlannerSuggestionPack(
   userId: string,
 ): Promise<PlannerSuggestionPack> {
   const dashboard = await getDashboardData(userId);
-  const payload = {
-    studentProfile: {
-      targetRole: dashboard.settings.targetRole,
-      primaryGoal: dashboard.settings.primaryGoal,
-      targetCompanies: dashboard.settings.targetCompanies,
-      university: dashboard.settings.university,
-      degree: dashboard.settings.degree,
-      graduationYear: dashboard.settings.graduationYear,
-      planStyle: dashboard.settings.planStyle,
-      weeklyTheme: dashboard.settings.weeklyTheme,
-      customAiInstructions: dashboard.settings.customAiInstructions,
-    },
-    targets: {
-      dailyTaskTarget: dashboard.settings.weekdayTaskTarget,
-      weekendTaskTarget: dashboard.settings.weekendTaskTarget,
-      weeklyDsaTarget: dashboard.settings.weeklyDsaTarget,
-      weeklyApplicationTarget: dashboard.settings.weeklyApplicationTarget,
-      weeklyBuildTarget: dashboard.settings.weeklyBuildTarget,
-    },
-    planner: dashboard.planner,
-    metrics: dashboard.metrics,
-    today: dashboard.today,
-    recentDsa: dashboard.recentDsa.slice(0, 5),
-    recentBuilds: dashboard.recentBuilds.slice(0, 4),
-    recentApplications: dashboard.recentApplications.slice(0, 5),
-  };
+  const payload = buildPlannerPayload(dashboard);
 
-  return dispatchWithFallback(
-    payload,
-    dashboard.settings.aiProvider,
-    dashboard.settings.openAiModel,
-    "You are an elite interview-preparation planner for students. Generate a practical task pack with daily, weekly, and weekend tasks based on the student's stored progress, weak spots, targets, and current workload. Weekend tasks should be heavier and more ambitious than weekday tasks. Keep tasks specific, realistic, and action-oriented.",
-    "Return only a JSON object with these exact fields: headline, daily, weekly, weekend. Each task item must include title, details, scope, category, priority, and estimateMinutes.",
-    PlannerSuggestionPackSchema,
+  return runStructuredTask({
     userId,
+    dashboard,
+    feature: "planner",
+    payload,
+    schema: PlannerSuggestionPackSchema,
+    systemPrompt:
+      "You are an elite interview-preparation planner for students. Generate practical daily, weekly, and weekend tasks based on stored goals, momentum, weak patterns, and current workload. Weekend work should be more ambitious than weekday work.",
+    jsonPrompt:
+      "Return only a JSON object with these exact fields: headline, daily, weekly, weekend. Every task item must contain title, details, scope, category, priority, and estimateMinutes.",
+    cacheMinutes: 4 * 60,
+  });
+}
+
+export function buildChatContext(dashboard: DashboardData) {
+  return stableJsonStringify(
+    compactObject({
+      profile: {
+        goal: dashboard.settings.primaryGoal,
+        role: dashboard.settings.targetRole,
+        companies: splitCompanies(dashboard.settings.targetCompanies).slice(0, 6),
+        planStyle: dashboard.settings.planStyle,
+        weeklyTheme: dashboard.settings.weeklyTheme,
+      },
+      momentum: {
+        currentStreak: dashboard.metrics.currentStreak,
+        todayScore: dashboard.metrics.todayScore,
+        weeklyDsa: dashboard.metrics.weekDsa,
+        weeklyApplications: dashboard.metrics.weekApplications,
+        weeklyBuilds: dashboard.metrics.weekBuilds,
+      },
+      planner: {
+        active: dashboard.planner.summary.active,
+        completed: dashboard.planner.summary.completed,
+        todayOpen: dashboard.planner.summary.todayOpen,
+      },
+      learningSignals: buildLearningSignals(dashboard),
+      recentDsa: dashboard.recentDsa.slice(0, 4).map((item) => ({
+        title: clipText(item.title, 70),
+        pattern: item.pattern,
+      })),
+      recentBuilds: dashboard.recentBuilds.slice(0, 3).map((item) => ({
+        title: clipText(item.title, 70),
+        area: item.area,
+      })),
+      recentApplications: dashboard.recentApplications.slice(0, 4).map((item) => ({
+        company: clipText(item.company, 40),
+        role: clipText(item.role, 60),
+        status: item.status,
+      })),
+    }),
   );
 }
 
-// ── Chat (free-form conversational AI) ────────────────────────────────────
-
 export async function streamChat(
   userId: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  messages: ChatMessage[],
   dashboardContext: string,
-): Promise<ReadableStream<Uint8Array>> {
-  const systemMessage = `You are Career OS Assistant — a friendly, knowledgeable career coach built into the user's career tracking dashboard.
+  preferredProvider: AiProvider,
+  configuredModel: string,
+): Promise<ChatStreamResult> {
+  const systemMessage = `You are Career OS Assistant, an embedded interview-prep coach inside a student's private dashboard.
 
-You have access to the user's current career data:
+You have access to current user context:
 ${dashboardContext}
 
 Guidelines:
-- Be concise but helpful. Use bullet points for lists.
-- Give specific, actionable advice based on their actual data.
-- If they ask about DSA, reference their recent problems and patterns.
-- If they ask about applications, reference their recent applications and targets.
-- If they ask about planning, consider their current metrics and goals.
-- Be encouraging but honest. Don't sugarcoat if they're falling behind.
-- Format responses with markdown for readability.`;
+- Be concise, specific, and honest.
+- Use the user's real momentum, planner, recent DSA work, builds, and applications.
+- Prefer next actions over long explanations.
+- If the user is behind, say so clearly and suggest the smallest meaningful recovery step.
+- Use markdown lists only when they improve clarity.`;
 
-  const order: AiProvider[] = ["gemini", "openai", "openrouter"];
+  const boundedMessages = normalizeChatMessages(messages);
+  const orderedProviders = buildOrderedProviders(preferredProvider);
   const errors: AiError[] = [];
 
-  for (const provider of order) {
+  for (const provider of orderedProviders) {
     const apiKey = await resolveAiProviderKey(userId, provider);
     if (!apiKey) continue;
 
+    const model = resolveProviderModel(provider, configuredModel);
+
     try {
       if (provider === "gemini") {
-        return await streamGemini(apiKey, systemMessage, messages);
+        return {
+          stream: await streamGemini(apiKey, model, systemMessage, boundedMessages),
+          provider,
+          model,
+        };
       }
-      if (provider === "openai") {
-        return await streamOpenAI(apiKey, systemMessage, messages);
-      }
-      return await streamOpenRouter(apiKey, systemMessage, messages);
-    } catch (err) {
-      const aiErr = err instanceof AiError ? err : new AiError("PROVIDER_ERROR", provider, String(err));
-      errors.push(aiErr);
-      console.warn(`[AI] ${provider} stream failed (${aiErr.code}): ${aiErr.message}, trying next...`);
-    }
-  }
 
-  // Final fallback (keyless, completely free)
-  try {
-    return await streamPollinations(systemMessage, messages);
-  } catch (err) {
-    throw new AiError("PROVIDER_ERROR", "Pollinations", String(err));
+      if (provider === "openai") {
+        return {
+          stream: await streamOpenAI(apiKey, model, systemMessage, boundedMessages),
+          provider,
+          model,
+        };
+      }
+
+      return {
+        stream: await streamOpenRouter(apiKey, model, systemMessage, boundedMessages),
+        provider,
+        model,
+      };
+    } catch (error) {
+      const aiError =
+        error instanceof AiError
+          ? error
+          : new AiError("PROVIDER_ERROR", provider, String(error));
+      errors.push(aiError);
+      console.warn(`[AI] ${provider} stream failed (${aiError.code}): ${aiError.message}`);
+    }
   }
 
   if (errors.length === 0) {
     throw new AiError("NO_KEY", "any", "No AI provider configured");
   }
 
-  // If all failed, throw the first error we encountered
   throw errors[0];
 }
 
-async function streamPollinations(
-  systemMessage: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>,
-): Promise<ReadableStream<Uint8Array>> {
-  const client = new OpenAI({ 
-    apiKey: "dummy", 
-    baseURL: "https://text.pollinations.ai/openai/v1" 
+async function runStructuredTask<T extends z.ZodTypeAny>(options: {
+  userId: string;
+  dashboard: DashboardData;
+  feature: AiArtifactFeature;
+  payload: unknown;
+  schema: T;
+  systemPrompt: string;
+  jsonPrompt: string;
+  cacheMinutes: number;
+}): Promise<z.infer<T>> {
+  const fingerprint = createAiFingerprint({
+    feature: options.feature,
+    provider: options.dashboard.settings.aiProvider,
+    model: options.dashboard.settings.openAiModel,
+    payload: options.payload,
   });
 
-  const stream = await client.chat.completions.create({
-    model: "openai",
-    messages: [{ role: "system", content: systemMessage }, ...messages],
-    stream: true,
+  const cached = await readAiArtifact({
+    userId: options.userId,
+    feature: options.feature,
+    fingerprint,
+    schema: options.schema,
+    maxAgeMinutes: options.cacheMinutes,
   });
 
-  const encoder = new TextEncoder();
-  return new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || "";
-        if (text) controller.enqueue(encoder.encode(text));
-      }
-      controller.close();
+  if (cached) {
+    return cached;
+  }
+
+  const dispatched = await dispatchWithFallback({
+    payload: options.payload,
+    preferredProvider: options.dashboard.settings.aiProvider,
+    configuredModel: options.dashboard.settings.openAiModel,
+    systemPrompt: options.systemPrompt,
+    jsonPrompt: options.jsonPrompt,
+    schema: options.schema,
+    userId: options.userId,
+  });
+
+  await writeAiArtifact({
+    userId: options.userId,
+    feature: options.feature,
+    fingerprint,
+    provider: dispatched.provider,
+    model: dispatched.model,
+    payload: dispatched.data,
+  });
+
+  return dispatched.data;
+}
+
+async function dispatchWithFallback<T extends z.ZodTypeAny>(options: {
+  payload: unknown;
+  preferredProvider: AiProvider;
+  configuredModel: string;
+  systemPrompt: string;
+  jsonPrompt: string;
+  schema: T;
+  userId: string;
+}): Promise<{ data: z.infer<T>; provider: AiProvider; model: string }> {
+  const orderedProviders = buildOrderedProviders(options.preferredProvider);
+  const errors: AiError[] = [];
+
+  for (const provider of orderedProviders) {
+    const apiKey = await resolveAiProviderKey(options.userId, provider);
+    if (!apiKey) continue;
+
+    const model = resolveProviderModel(provider, options.configuredModel);
+
+    try {
+      const data = await dispatchToProvider(
+        options.payload,
+        provider,
+        model,
+        options.systemPrompt,
+        options.jsonPrompt,
+        options.schema,
+        apiKey,
+      );
+
+      return { data, provider, model };
+    } catch (error) {
+      const aiError =
+        error instanceof AiError
+          ? error
+          : new AiError("PROVIDER_ERROR", provider, String(error));
+      errors.push(aiError);
+      console.warn(`[AI] ${provider} failed (${aiError.code}): ${aiError.message}`);
     }
+  }
+
+  if (errors.length === 0) {
+    throw new AiError(
+      "NO_KEY",
+      "any",
+      "No AI provider is configured. Add a provider key in Settings -> AI Keys.",
+    );
+  }
+
+  throw errors[0];
+}
+
+async function dispatchToProvider<T extends z.ZodTypeAny>(
+  payload: unknown,
+  provider: AiProvider,
+  model: string,
+  systemPrompt: string,
+  jsonPrompt: string,
+  schema: T,
+  apiKey: string,
+): Promise<z.infer<T>> {
+  if (provider === "openai") {
+    return generateWithOpenAI(payload, model, systemPrompt, schema, apiKey);
+  }
+  if (provider === "gemini") {
+    return generateWithGemini(payload, model, systemPrompt, jsonPrompt, schema, apiKey);
+  }
+  return generateWithOpenRouter(payload, model, systemPrompt, jsonPrompt, schema, apiKey);
+}
+
+async function generateWithOpenAI<T extends z.ZodTypeAny>(
+  payload: unknown,
+  model: string,
+  systemPrompt: string,
+  schema: T,
+  apiKey: string,
+): Promise<z.infer<T>> {
+  try {
+    const client = new OpenAI({ apiKey });
+
+    const response = await client.responses.parse({
+      model,
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: stableJsonStringify(payload) },
+      ],
+      text: {
+        format: zodTextFormat(schema, "response"),
+      },
+    });
+
+    const output = response.output
+      .flatMap((item) => (item.type === "message" ? item.content : []))
+      .find((item) => item.type === "output_text" && item.parsed);
+
+    if (!output || output.type !== "output_text" || !output.parsed) {
+      throw new AiError("PARSE_ERROR", "OpenAI", "OpenAI response could not be parsed");
+    }
+
+    return output.parsed as z.infer<T>;
+  } catch (error) {
+    throw normalizeProviderError(error, "OpenAI");
+  }
+}
+
+async function generateWithGemini<T extends z.ZodTypeAny>(
+  payload: unknown,
+  model: string,
+  systemPrompt: string,
+  jsonPrompt: string,
+  schema: T,
+  apiKey: string,
+): Promise<z.infer<T>> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
+        },
+        contents: [
+          {
+            parts: [
+              {
+                text: `${jsonPrompt}\n${stableJsonStringify(payload)}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw classifyHttpError(response.status, body, "Gemini");
+  }
+
+  const data = (await response.json()) as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{ text?: string }>;
+      };
+    }>;
+  };
+
+  const text =
+    data.candidates?.[0]?.content?.parts?.map((item) => item.text ?? "").join("") ?? "";
+
+  try {
+    return parseJsonWithSchema(text, schema);
+  } catch {
+    throw new AiError("PARSE_ERROR", "Gemini", `Failed to parse Gemini response: ${text.slice(0, 200)}`);
+  }
+}
+
+async function generateWithOpenRouter<T extends z.ZodTypeAny>(
+  payload: unknown,
+  model: string,
+  systemPrompt: string,
+  jsonPrompt: string,
+  schema: T,
+  apiKey: string,
+): Promise<z.infer<T>> {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": getApplicationOrigin(),
+      "X-OpenRouter-Title": "Career OS",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `${jsonPrompt}\n${stableJsonStringify(payload)}` },
+      ],
+      temperature: 0.3,
+    }),
   });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw classifyHttpError(response.status, body, "OpenRouter");
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{
+      message?: {
+        content?: string;
+      };
+    }>;
+  };
+
+  const text = data.choices?.[0]?.message?.content ?? "";
+
+  try {
+    return parseJsonWithSchema(text, schema);
+  } catch {
+    throw new AiError(
+      "PARSE_ERROR",
+      "OpenRouter",
+      `Failed to parse OpenRouter response: ${text.slice(0, 200)}`,
+    );
+  }
 }
 
 async function streamGemini(
   apiKey: string,
+  model: string,
   systemMessage: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  messages: ChatMessage[],
 ): Promise<ReadableStream<Uint8Array>> {
-  const contents = messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
+  const contents = messages.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }],
   }));
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -500,16 +755,16 @@ async function streamGemini(
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(trimmed.slice(6));
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              controller.enqueue(encoder.encode(text));
-            }
-          } catch {
-            // skip invalid JSON
+        if (!trimmed.startsWith("data: ")) continue;
+
+        try {
+          const data = JSON.parse(trimmed.slice(6));
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            controller.enqueue(encoder.encode(text));
           }
+        } catch {
+          continue;
         }
       }
     },
@@ -518,46 +773,57 @@ async function streamGemini(
 
 async function streamOpenAI(
   apiKey: string,
+  model: string,
   systemMessage: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  messages: ChatMessage[],
 ): Promise<ReadableStream<Uint8Array>> {
-  const client = new OpenAI({ apiKey });
-  const stream = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "system", content: systemMessage }, ...messages],
-    stream: true,
-  });
+  try {
+    const client = new OpenAI({ apiKey });
+    const stream = await client.chat.completions.create({
+      model,
+      messages: [{ role: "system", content: systemMessage }, ...messages],
+      stream: true,
+      temperature: 0.4,
+    });
 
-  const encoder = new TextEncoder();
-  return new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || "";
-        if (text) controller.enqueue(encoder.encode(text));
-      }
-      controller.close();
-    }
-  });
+    const encoder = new TextEncoder();
+
+    return new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content || "";
+          if (text) {
+            controller.enqueue(encoder.encode(text));
+          }
+        }
+        controller.close();
+      },
+    });
+  } catch (error) {
+    throw normalizeProviderError(error, "OpenAI");
+  }
 }
 
 async function streamOpenRouter(
   apiKey: string,
+  model: string,
   systemMessage: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  messages: ChatMessage[],
 ): Promise<ReadableStream<Uint8Array>> {
-  const client = new OpenAI({ 
-    apiKey, 
+  const client = new OpenAI({
+    apiKey,
     baseURL: "https://openrouter.ai/api/v1",
     defaultHeaders: {
       "HTTP-Referer": getApplicationOrigin(),
       "X-OpenRouter-Title": "Career OS",
-    }
+    },
   });
 
   const stream = await client.chat.completions.create({
-    model: "google/gemma-2-9b-it:free",
+    model,
     messages: [{ role: "system", content: systemMessage }, ...messages],
     stream: true,
+    temperature: 0.4,
   });
 
   const encoder = new TextEncoder();
@@ -565,282 +831,355 @@ async function streamOpenRouter(
     async start(controller) {
       for await (const chunk of stream) {
         const text = chunk.choices[0]?.delta?.content || "";
-        if (text) controller.enqueue(encoder.encode(text));
+        if (text) {
+          controller.enqueue(encoder.encode(text));
+        }
       }
       controller.close();
-    }
+    },
   });
 }
 
-// ── Dispatch with Provider Fallback ───────────────────────────────────────
+function normalizeProviderError(error: unknown, provider: string): AiError {
+  if (error instanceof AiError) {
+    return error;
+  }
 
-const providerOrder: AiProvider[] = ["gemini", "openai", "openrouter"];
+  const message = error instanceof Error ? error.message : String(error);
 
-async function dispatchWithFallback<T extends z.ZodTypeAny>(
-  payload: unknown,
-  preferredProvider: string,
-  model: string,
-  sysPrompt: string,
-  jsonPrefix: string,
-  schema: T,
-  userId: string,
-): Promise<z.infer<T>> {
-  // Build ordered list: preferred provider first, then others
-  const ordered = [
-    preferredProvider as AiProvider,
-    ...providerOrder.filter((p) => p !== preferredProvider),
+  if (message.includes("401") || message.includes("Incorrect API key")) {
+    return new AiError("INVALID_KEY", provider, message);
+  }
+  if (message.includes("429")) {
+    if (message.toLowerCase().includes("quota")) {
+      return new AiError("QUOTA_EXCEEDED", provider, message);
+    }
+    return new AiError("RATE_LIMITED", provider, message);
+  }
+  if (message.includes("timeout") || message.includes("ETIMEDOUT")) {
+    return new AiError("TIMEOUT", provider, message);
+  }
+
+  return new AiError("PROVIDER_ERROR", provider, message);
+}
+
+function buildOrderedProviders(preferredProvider: AiProvider): AiProvider[] {
+  return [
+    preferredProvider,
+    ...PROVIDER_ORDER.filter((provider) => provider !== preferredProvider),
+  ];
+}
+
+function resolveProviderModel(provider: AiProvider, configuredModel: string) {
+  if (provider === "openai") {
+    return configuredModel && configuredModel.startsWith("gpt")
+      ? configuredModel
+      : DEFAULT_OPENAI_MODEL;
+  }
+
+  if (provider === "gemini") {
+    return configuredModel && configuredModel.startsWith("gemini")
+      ? configuredModel
+      : DEFAULT_GEMINI_MODEL;
+  }
+
+  return configuredModel &&
+    !configuredModel.startsWith("gpt") &&
+    !configuredModel.startsWith("gemini")
+    ? configuredModel
+    : DEFAULT_OPENROUTER_MODEL;
+}
+
+function buildMotivationPayload(dashboard: DashboardData) {
+  return compactObject({
+    student: {
+      targetRole: dashboard.settings.targetRole,
+      primaryGoal: dashboard.settings.primaryGoal,
+      weeklyTheme: dashboard.settings.weeklyTheme,
+      planStyle: dashboard.settings.planStyle,
+    },
+    momentum: {
+      currentStreak: dashboard.metrics.currentStreak,
+      todayScore: dashboard.metrics.todayScore,
+      weeklyDsa: dashboard.metrics.weekDsa,
+      weeklyApplications: dashboard.metrics.weekApplications,
+      weeklyBuilds: dashboard.metrics.weekBuilds,
+    },
+    today: {
+      completedCheckins: countCompletedCheckins(dashboard.today.checkins),
+      tomorrowTask: clipText(dashboard.today.tomorrowTask, 120),
+    },
+    planner: {
+      todayOpen: dashboard.planner.summary.todayOpen,
+      active: dashboard.planner.summary.active,
+    },
+  });
+}
+
+function buildCoachPayload(dashboard: DashboardData) {
+  return compactObject({
+    student: buildStudentProfile(dashboard),
+    momentum: buildMomentumSnapshot(dashboard),
+    planning: buildPlannerSnapshot(dashboard),
+    learningSignals: buildLearningSignals(dashboard),
+    historyTrend: buildHistoryTrend(dashboard),
+    recentWork: {
+      dsa: dashboard.recentDsa.slice(0, 4).map((item) => ({
+        title: clipText(item.title, 80),
+        pattern: item.pattern,
+        insight: clipText(item.insight, 120),
+      })),
+      builds: dashboard.recentBuilds.slice(0, 3).map((item) => ({
+        title: clipText(item.title, 80),
+        area: item.area,
+        impact: clipText(item.impact, 120),
+      })),
+      applications: dashboard.recentApplications.slice(0, 4).map((item) => ({
+        company: clipText(item.company, 40),
+        role: clipText(item.role, 60),
+        status: item.status,
+      })),
+    },
+    today: {
+      note: clipText(dashboard.today.note, 180),
+      tomorrowTask: clipText(dashboard.today.tomorrowTask, 120),
+      completedCheckins: countCompletedCheckins(dashboard.today.checkins),
+    },
+  });
+}
+
+function buildStrategyPayload(dashboard: DashboardData) {
+  return compactObject({
+    student: buildStudentProfile(dashboard),
+    momentum: buildMomentumSnapshot(dashboard),
+    learningSignals: buildLearningSignals(dashboard),
+    historyTrend: buildHistoryTrend(dashboard),
+    planTargets: {
+      weeklyDsaTarget: dashboard.settings.weeklyDsaTarget,
+      weeklyApplicationTarget: dashboard.settings.weeklyApplicationTarget,
+      weeklyBuildTarget: dashboard.settings.weeklyBuildTarget,
+      weekdayTaskTarget: dashboard.settings.weekdayTaskTarget,
+      weekendTaskTarget: dashboard.settings.weekendTaskTarget,
+    },
+    planner: buildPlannerSnapshot(dashboard),
+  });
+}
+
+function buildPlannerPayload(dashboard: DashboardData) {
+  return compactObject({
+    student: buildStudentProfile(dashboard),
+    momentum: buildMomentumSnapshot(dashboard),
+    learningSignals: buildLearningSignals(dashboard),
+    planTargets: {
+      weeklyTheme: dashboard.settings.weeklyTheme,
+      weekdayTaskTarget: dashboard.settings.weekdayTaskTarget,
+      weekendTaskTarget: dashboard.settings.weekendTaskTarget,
+      weeklyDsaTarget: dashboard.settings.weeklyDsaTarget,
+      weeklyApplicationTarget: dashboard.settings.weeklyApplicationTarget,
+      weeklyBuildTarget: dashboard.settings.weeklyBuildTarget,
+      weekdayDeepWorkMinutes: dashboard.settings.weekdayDeepWorkMinutes,
+      weekdaySupportMinutes: dashboard.settings.weekdaySupportMinutes,
+      weekendDsaMinutes: dashboard.settings.weekendDsaMinutes,
+      weekendBuildMinutes: dashboard.settings.weekendBuildMinutes,
+    },
+    planner: {
+      summary: dashboard.planner.summary,
+      activeDaily: dashboard.planner.tasks
+        .filter((task) => task.scope === "daily" && task.status !== "done")
+        .slice(0, 5)
+        .map((task) => ({
+          title: clipText(task.title, 80),
+          category: task.category,
+          priority: task.priority,
+          estimateMinutes: task.estimateMinutes,
+        })),
+      activeWeekly: dashboard.planner.tasks
+        .filter((task) => task.scope !== "daily" && task.status !== "done")
+        .slice(0, 6)
+        .map((task) => ({
+          title: clipText(task.title, 80),
+          scope: task.scope,
+          category: task.category,
+          priority: task.priority,
+          estimateMinutes: task.estimateMinutes,
+        })),
+    },
+    today: {
+      completedCheckins: countCompletedCheckins(dashboard.today.checkins),
+      note: clipText(dashboard.today.note, 160),
+      tomorrowTask: clipText(dashboard.today.tomorrowTask, 120),
+    },
+  });
+}
+
+function buildStudentProfile(dashboard: DashboardData) {
+  return compactObject({
+    targetRole: dashboard.settings.targetRole,
+    primaryGoal: dashboard.settings.primaryGoal,
+    targetCompanies: splitCompanies(dashboard.settings.targetCompanies).slice(0, 8),
+    university: dashboard.settings.university,
+    degree: dashboard.settings.degree,
+    graduationYear: dashboard.settings.graduationYear,
+    planStyle: dashboard.settings.planStyle,
+    weeklyTheme: dashboard.settings.weeklyTheme,
+    linkedProfiles: listEnabledProfiles(dashboard),
+    customInstructions: clipText(dashboard.settings.customAiInstructions, 300),
+  });
+}
+
+function buildMomentumSnapshot(dashboard: DashboardData) {
+  return {
+    revisionStreak: dashboard.metrics.revisionStreak,
+    currentStreak: dashboard.metrics.currentStreak,
+    maxStreak: dashboard.metrics.maxStreak,
+    totalXP: dashboard.metrics.totalXP,
+    level: dashboard.metrics.level,
+    todayScore: dashboard.metrics.todayScore,
+    weeklyDsa: dashboard.metrics.weekDsa,
+    weeklyApplications: dashboard.metrics.weekApplications,
+    weeklyBuilds: dashboard.metrics.weekBuilds,
+    targetProgress: dashboard.metrics.targetProgress,
+  };
+}
+
+function buildPlannerSnapshot(dashboard: DashboardData) {
+  return {
+    totalTasks: dashboard.planner.summary.total,
+    completedTasks: dashboard.planner.summary.completed,
+    activeTasks: dashboard.planner.summary.active,
+    todayOpenTasks: dashboard.planner.summary.todayOpen,
+    daily: dashboard.planner.summary.daily,
+    weekly: dashboard.planner.summary.weekly,
+    weekend: dashboard.planner.summary.weekend,
+  };
+}
+
+function buildLearningSignals(dashboard: DashboardData) {
+  return compactObject({
+    topPatterns: topCounts(dashboard.recentDsa.map((item) => item.pattern), 4),
+    topBuildAreas: topCounts(dashboard.recentBuilds.map((item) => item.area), 3),
+    applicationStatuses: topCounts(
+      dashboard.recentApplications.map((item) => item.status),
+      4,
+    ),
+    insightCoverage: {
+      recentDsaWithInsights: dashboard.recentDsa.filter((item) => Boolean(item.insight)).length,
+      recentDsaWithoutInsights: dashboard.recentDsa.filter((item) => !item.insight).length,
+    },
+  });
+}
+
+function buildHistoryTrend(dashboard: DashboardData) {
+  const recent = dashboard.history.slice(-14);
+  const latestWeek = recent.slice(-7);
+  const previousWeek = recent.slice(0, Math.max(0, recent.length - 7));
+
+  return {
+    last7Days: aggregateHistory(latestWeek),
+    previousWindow: aggregateHistory(previousWeek),
+    activeDaysLast7: latestWeek.filter((item) => item.completedCount > 0).length,
+  };
+}
+
+function aggregateHistory(history: DashboardData["history"]) {
+  return history.reduce(
+    (acc, item) => {
+      acc.completed += item.completedCount;
+      acc.dsa += item.dsaCount;
+      acc.builds += item.buildCount;
+      acc.applications += item.appCount;
+      return acc;
+    },
+    { completed: 0, dsa: 0, builds: 0, applications: 0 },
+  );
+}
+
+function normalizeChatMessages(messages: ChatMessage[]) {
+  const cleaned = messages
+    .map((message) => ({
+      role: message.role,
+      content: clipText(message.content, message.role === "user" ? 1200 : 1600),
+    }))
+    .filter((message) => Boolean(message.content.trim()));
+
+  while (cleaned.length > 0 && cleaned[0]?.role === "assistant") {
+    cleaned.shift();
+  }
+
+  return cleaned.slice(-10);
+}
+
+function listEnabledProfiles(dashboard: DashboardData) {
+  const profiles = [
+    dashboard.settings.githubUrl ? "github" : null,
+    dashboard.settings.leetcodeUrl ? "leetcode" : null,
+    dashboard.settings.linkedinUrl ? "linkedin" : null,
+    dashboard.settings.portfolioUrl ? "portfolio" : null,
+    dashboard.settings.codeforcesUrl ? "codeforces" : null,
+    dashboard.settings.codechefUrl ? "codechef" : null,
+    dashboard.settings.hackerrankUrl ? "hackerrank" : null,
+    dashboard.settings.jobTrackerUrl ? "jobTracker" : null,
   ];
 
-  const errors: AiError[] = [];
-
-  for (const provider of ordered) {
-    const apiKey = await resolveAiProviderKey(userId, provider);
-    if (!apiKey) continue; // skip providers with no key
-
-    try {
-      return await dispatchToProvider(payload, provider, model, sysPrompt, jsonPrefix, schema, apiKey);
-    } catch (err) {
-      const aiErr =
-        err instanceof AiError
-          ? err
-          : new AiError("PROVIDER_ERROR", provider, String(err));
-      errors.push(aiErr);
-      console.warn(`[AI] ${provider} failed (${aiErr.code}): ${aiErr.message}, trying next...`);
-
-      if (aiErr.code === "INVALID_KEY") continue;
-    }
-  }
-
-  // Final fallback (keyless, completely free)
-  try {
-    return await generateWithPollinations(payload, sysPrompt, jsonPrefix, schema);
-  } catch (err) {
-    console.warn(`[AI] Final pollinations fallback failed:`, err);
-  }
-
-  // All providers failed
-  if (errors.length === 0) {
-    throw new AiError(
-      "NO_KEY",
-      "any",
-      "No AI provider is configured. Add an API key in Settings → AI Keys.",
-    );
-  }
-
-  // Throw the most relevant error
-  throw errors[0];
+  return profiles.filter(Boolean);
 }
 
-async function dispatchToProvider<T extends z.ZodTypeAny>(
-  payload: unknown,
-  provider: AiProvider,
-  model: string,
-  sysPrompt: string,
-  jsonPrefix: string,
-  schema: T,
-  apiKey: string,
-): Promise<z.infer<T>> {
-  if (provider === "openai") {
-    return generateWithOpenAI(payload, model, sysPrompt, schema, apiKey);
-  }
-  if (provider === "gemini") {
-    return generateWithGemini(payload, model, sysPrompt, jsonPrefix, schema, apiKey);
-  }
-  return generateWithOpenRouter(payload, model, sysPrompt, jsonPrefix, schema, apiKey);
+function splitCompanies(value: string) {
+  return value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-// ── Provider Implementations ──────────────────────────────────────────────
+function topCounts(items: string[], limit: number) {
+  const counts = new Map<string, number>();
 
-async function generateWithOpenAI<T extends z.ZodTypeAny>(
-  payload: unknown,
-  model: string,
-  sysPrompt: string,
-  schema: T,
-  apiKey: string,
-) {
-  try {
-    const client = new OpenAI({ apiKey });
-
-    const response = await client.responses.parse({
-      model: model || "gpt-4o-mini",
-      input: [
-        { role: "system", content: sysPrompt },
-        { role: "user", content: JSON.stringify(payload, null, 2) },
-      ],
-      text: {
-        format: zodTextFormat(schema, "response"),
-      },
-    });
-
-    const output = response.output
-      .flatMap((item) => (item.type === "message" ? item.content : []))
-      .find((item) => item.type === "output_text" && item.parsed);
-
-    if (!output || output.type !== "output_text" || !output.parsed) {
-      throw new AiError("PARSE_ERROR", "OpenAI", "OpenAI response could not be parsed");
-    }
-
-    return output.parsed as z.infer<T>;
-  } catch (err) {
-    if (err instanceof AiError) throw err;
-
-    // OpenAI SDK throws typed errors
-    const errMsg = err instanceof Error ? err.message : String(err);
-    if (errMsg.includes("401") || errMsg.includes("Incorrect API key")) {
-      throw new AiError("INVALID_KEY", "OpenAI", errMsg);
-    }
-    if (errMsg.includes("429")) {
-      if (errMsg.toLowerCase().includes("quota")) {
-        throw new AiError("QUOTA_EXCEEDED", "OpenAI", errMsg);
-      }
-      throw new AiError("RATE_LIMITED", "OpenAI", errMsg);
-    }
-    if (errMsg.includes("timeout") || errMsg.includes("ETIMEDOUT")) {
-      throw new AiError("TIMEOUT", "OpenAI", errMsg);
-    }
-    throw new AiError("PROVIDER_ERROR", "OpenAI", errMsg);
+  for (const item of items) {
+    const normalized = item.trim();
+    if (!normalized) continue;
+    counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
   }
+
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, limit)
+    .map(([label, count]) => ({ label, count }));
 }
 
-async function generateWithGemini<T extends z.ZodTypeAny>(
-  payload: unknown,
-  model: string,
-  sysPrompt: string,
-  jsonPrefix: string,
-  schema: T,
-  apiKey: string,
-) {
-  const geminiModel = model && model.startsWith("gemini") ? model : "gemini-2.0-flash";
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: sysPrompt }],
-        },
-        contents: [
-          {
-            parts: [
-              {
-                text: `${jsonPrefix}\n${JSON.stringify(payload, null, 2)}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-        },
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw classifyHttpError(response.status, body, "Gemini");
-  }
-
-  const data = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-  };
-
-  const text = data.candidates?.[0]?.content?.parts?.map((item) => item.text ?? "").join("") ?? "";
-
-  try {
-    return parseJsonWithSchema(text, schema);
-  } catch {
-    throw new AiError("PARSE_ERROR", "Gemini", `Failed to parse Gemini response: ${text.slice(0, 200)}`);
-  }
+function countCompletedCheckins(checkins: DashboardData["today"]["checkins"]) {
+  return Object.values(checkins).filter(Boolean).length;
 }
 
-async function generateWithOpenRouter<T extends z.ZodTypeAny>(
-  payload: unknown,
-  model: string,
-  sysPrompt: string,
-  jsonPrefix: string,
-  schema: T,
-  apiKey: string,
-) {
-  // Use a free model by default for OpenRouter
-  const routerModel = model && !model.startsWith("gpt") && !model.startsWith("gemini")
-    ? model
-    : "google/gemma-2-9b-it:free";
-
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": getApplicationOrigin(),
-      "X-OpenRouter-Title": "Career OS",
-    },
-    body: JSON.stringify({
-      model: routerModel,
-      messages: [
-        { role: "system", content: sysPrompt },
-        {
-          role: "user",
-          content: `${jsonPrefix}\n${JSON.stringify(payload, null, 2)}`,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw classifyHttpError(response.status, body, "OpenRouter");
+function compactObject<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => compactObject(item))
+      .filter((item) => item !== null && item !== undefined) as T;
   }
 
-  const data = (await response.json()) as {
-    choices?: Array<{
-      message?: {
-        content?: string;
-      };
-    }>;
-  };
-
-  const text = data.choices?.[0]?.message?.content ?? "";
-
-  try {
-    return parseJsonWithSchema(text, schema);
-  } catch {
-    throw new AiError("PARSE_ERROR", "OpenRouter", `Failed to parse OpenRouter response: ${text.slice(0, 200)}`);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([key, entryValue]) => [key, compactObject(entryValue)])
+        .filter(([, entryValue]) => {
+          if (entryValue === null || entryValue === undefined) return false;
+          if (typeof entryValue === "string") return entryValue.trim().length > 0;
+          if (Array.isArray(entryValue)) return entryValue.length > 0;
+          return true;
+        }),
+    ) as T;
   }
+
+  return value;
 }
 
-async function generateWithPollinations<T extends z.ZodTypeAny>(
-  payload: unknown,
-  sysPrompt: string,
-  jsonPrefix: string,
-  schema: T,
-): Promise<z.infer<T>> {
-  const response = await fetch("https://text.pollinations.ai/openai", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "openai",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: sysPrompt + " " + jsonPrefix },
-        { role: "user", content: JSON.stringify(payload) },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Pollinations failed: ${response.status}`);
+function clipText(value: string | null | undefined, maxLength: number) {
+  if (!value) return "";
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
   }
-
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content ?? "";
-
-  return parseJsonWithSchema(text, schema);
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
 }
 
 function parseJsonWithSchema<T extends z.ZodTypeAny>(text: string, schema: T): z.infer<T> {
@@ -864,9 +1203,3 @@ function getApplicationOrigin() {
     return "http://localhost:3000";
   }
 }
-
-const systemPrompt =
-  "You are a strict but caring study coach for a final-year CS student targeting MAANG-style product roles. Be direct, realistic, and actionable. Return concise advice only.";
-
-const jsonPromptPrefix =
-  "Return only a JSON object with these exact string fields: summary, biggestRisk, focusTheme, morningPlan, nightPlan, applyPlan, oneCut, weekendMission.";

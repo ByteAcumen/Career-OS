@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getRequestSession } from "@/lib/auth-session";
-import { streamChat, AiError } from "@/lib/ai";
+import { buildChatContext, streamChat, AiError } from "@/lib/ai";
 import { getDashboardData } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -37,27 +37,23 @@ export async function POST(request: Request) {
       return new Response("Bad Request: messages array is required", { status: 400 });
     }
 
-    // Capture context
     const dashboard = await getDashboardData(session.user.id);
-    const contextStr = JSON.stringify({
-      profile: {
-        goal: dashboard.settings.primaryGoal,
-        role: dashboard.settings.targetRole,
-        companies: dashboard.settings.targetCompanies,
-      },
-      metrics: dashboard.metrics,
-      recentDsa: dashboard.recentDsa.map(d => ({ title: d.title, pattern: d.pattern })),
-      recentApplications: dashboard.recentApplications.map(a => ({ company: a.company, role: a.role, status: a.status })),
-      todayPlan: dashboard.planner.summary.daily,
-    }, null, 2);
+    const contextStr = buildChatContext(dashboard);
+    const result = await streamChat(
+      session.user.id,
+      messages,
+      contextStr,
+      dashboard.settings.aiProvider,
+      dashboard.settings.openAiModel,
+    );
 
-    const stream = await streamChat(session.user.id, messages, contextStr);
-
-    return new Response(stream, {
+    return new Response(result.stream, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "x-ai-provider": result.provider,
+        "x-ai-model": result.model,
       },
     });
 

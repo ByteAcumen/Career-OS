@@ -1,17 +1,26 @@
-import { defineConfig, globalIgnores } from "eslint/config";
+﻿import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "old-dashboard.tsx",
+    "refactor-dashboard.js",
+    "restore.js",
+    "delete-lines.py",
+    "fix-layout.py",
+    "recover.py",
+    "refactor-sidebar.py",
+    "refactor.py",
+    "split_tabs.py",
+    "check.js",
+    "test.js",
   ]),
 ]);
 

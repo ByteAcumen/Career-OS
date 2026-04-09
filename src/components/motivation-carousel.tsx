@@ -64,7 +64,7 @@ export function MotivationCarousel({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex gap-2">
+      <div className="flex gap-2">
           {resolvedQuotes.map((quote, quoteIndex) => (
             <button
               key={`${quoteIndex}-${quote.slice(0, 12)}`}
@@ -72,7 +72,7 @@ export function MotivationCarousel({
               onClick={() => setIndex(quoteIndex)}
               className={`rounded-full transition-all duration-300 ${
                 quoteIndex === index % resolvedQuotes.length
-                  ? "h-2 w-10 bg-[var(--teal)] shadow-[0_0_18px_rgba(94,234,212,0.35)]"
+                  ? "h-2 w-10 bg-white shadow-[0_0_18px_rgba(255,255,255,0.18)]"
                   : "h-2 w-3 bg-white/14 hover:bg-white/28"
               }`}
               aria-label={`Show quote ${quoteIndex + 1}`}

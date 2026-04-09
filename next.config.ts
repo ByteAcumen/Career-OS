@@ -8,11 +8,11 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: https:",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "connect-src 'self' https://api.github.com https://api.openai.com https://generativelanguage.googleapis.com https://openrouter.ai",
+  "connect-src 'self' https://api.github.com https://api.openai.com https://generativelanguage.googleapis.com https://openrouter.ai https://accounts.google.com https://oauth2.googleapis.com",
   "object-src 'none'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://accounts.google.com",
 ].join("; ");
 
 const nextConfig: NextConfig = {

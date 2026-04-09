@@ -2,30 +2,30 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 
-import { WorkspaceSettingsPage } from "@/components/workspace/settings-page";
+import { WorkspaceLoggerPage } from "@/components/workspace/logger-page";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { getServerSession } from "@/lib/auth-session";
-import { getSettingsPageData } from "@/lib/workspace-data";
+import { getLoggerPageData } from "@/lib/workspace-data";
 
-export default async function SettingsPage() {
+export default async function LoggerPage() {
   const session = await getServerSession();
 
   if (!session) {
     redirect("/sign-in");
   }
 
-  const data = await getSettingsPageData(session.user.id);
+  const data = await getLoggerPageData(session.user.id);
 
   return (
     <WorkspaceShell
-      page="settings"
+      page="logger"
       currentUser={{
         id: session.user.id,
         name: session.user.name,
         email: session.user.email,
       }}
     >
-      <WorkspaceSettingsPage data={data} />
+      <WorkspaceLoggerPage data={data} />
     </WorkspaceShell>
   );
 }

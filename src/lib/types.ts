@@ -233,3 +233,12 @@ export type PlannerSuggestionPack = {
   weekly: PlannerSuggestion[];
   weekend: PlannerSuggestion[];
 };
+
+export type WorkspaceSettings = DashboardData["settings"];
+
+export type WorkspaceUser = {
+  id: string;
+  name: string;
+  email: string;
+  image?: string | null;
+};

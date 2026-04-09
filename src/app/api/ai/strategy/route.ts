@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const retryAfterSeconds = rateLimit(request, "ai-strategy", {
+  const retryAfterSeconds = rateLimit(request, `ai-strategy:${session.user.id}`, {
     limit: 10,
     windowMs: 60_000,
   });

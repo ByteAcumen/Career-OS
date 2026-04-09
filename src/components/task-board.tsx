@@ -42,17 +42,17 @@ const scopeMeta: Record<
   daily: {
     label: "Daily Tasks",
     subtitle: "Small, repeatable work that keeps momentum alive.",
-    tone: "bg-[var(--teal-soft)] text-[var(--teal)]",
+    tone: "bg-white/10 text-white",
   },
   weekly: {
     label: "Weekly Tasks",
     subtitle: "Bigger work items that need consistent follow-through.",
-    tone: "bg-[var(--navy-soft)] text-sky-300",
+    tone: "bg-white/6 text-[var(--ink)]",
   },
   weekend: {
     label: "Weekend Tasks",
     subtitle: "Heavier tasks for longer, less interrupted sessions.",
-    tone: "bg-[var(--gold-soft)] text-amber-300",
+    tone: "bg-white/6 text-[var(--ink)]",
   },
 };
 
@@ -105,7 +105,7 @@ export function TaskBoard({
             variants={itemVariants}
             initial="hidden"
             animate="show"
-            className="glass-card rounded-[30px] p-5 sm:p-6"
+            className="glass-card section-panel rounded-[30px] p-5 sm:p-6"
         >
           <div className="mb-4 inline-flex items-center gap-2.5 rounded-full bg-white/6 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
             <ClipboardList className="size-4" />
@@ -124,7 +124,7 @@ export function TaskBoard({
             variants={itemVariants}
             initial="hidden"
             animate="show"
-            className="glass-card rounded-[30px] p-5 sm:p-6"
+            className="glass-card section-panel rounded-[30px] p-5 sm:p-6"
         >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1 min-w-[240px]">
@@ -144,7 +144,7 @@ export function TaskBoard({
               className={cn(
                 "inline-flex items-center gap-2.5 rounded-[18px] px-5 py-3 text-sm font-semibold tracking-tight transition-all active:scale-95",
                 aiReady && !suggestionsLoading
-                  ? "bg-[var(--teal)] text-[var(--paper)] shadow-[0_16px_40px_-20px_rgba(94,234,212,0.75)] hover:-translate-y-0.5"
+                  ? "bg-white text-black hover:-translate-y-0.5"
                   : "cursor-not-allowed border border-[var(--line)] bg-white/6 text-[var(--muted)]",
               )}
             >
@@ -175,7 +175,7 @@ export function TaskBoard({
                           <button
                             type="button"
                             onClick={() => onImportSuggestion(suggestion)}
-                            className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs font-medium text-[var(--ink)] hover:bg-white/10"
+                            className="rounded-full border border-[var(--line)] bg-white/95 px-3 py-1 text-xs font-medium text-[var(--paper)] hover:border-[var(--line-strong)]"
                           >
                             Add
                           </button>
@@ -203,7 +203,7 @@ export function TaskBoard({
         </motion.div>
       </div>
 
-      <div className="glass-card rounded-[30px] p-5 sm:p-6">
+      <div className="glass-card section-panel rounded-[30px] p-5 sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/6 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
@@ -317,7 +317,7 @@ export function TaskBoard({
           <button
             type="button"
             onClick={onCreateTask}
-            className="rounded-[18px] bg-[var(--ink)] px-5 py-4 text-sm font-semibold text-[var(--paper)] shadow-[0_16px_40px_-24px_rgba(255,255,255,0.45)] hover:-translate-y-0.5"
+            className="rounded-[18px] bg-white px-5 py-4 text-sm font-semibold text-black hover:-translate-y-0.5"
           >
             Save task
           </button>
@@ -326,7 +326,7 @@ export function TaskBoard({
 
       <div className="grid gap-4 xl:grid-cols-3">
         {groupedTasks.map(({ scope, tasks: scopedTasks }) => (
-          <div key={scope} className="glass-card rounded-[28px] p-5">
+          <div key={scope} className="glass-card section-panel rounded-[28px] p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${scopeMeta[scope].tone}`}>
@@ -369,8 +369,8 @@ export function TaskBoard({
                       className={cn(
                         "rounded-[22px] border p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-28px_rgba(0,0,0,0.9)]",
                         task.status === "done"
-                          ? "border-emerald-500/20 bg-emerald-500/10 hover:border-emerald-500/40"
-                          : "border-[var(--line)] bg-[rgba(255,255,255,0.03)] hover:border-white/16"
+                          ? "border-[var(--green-soft)] bg-[rgba(121,199,159,0.12)] hover:border-[rgba(121,199,159,0.26)]"
+                          : "border-[var(--line)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--line-strong)]"
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -386,7 +386,7 @@ export function TaskBoard({
                         <button
                           type="button"
                           onClick={() => onDeleteTask(task.id)}
-                          className="shrink-0 rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] hover:border-rose-500/24 hover:bg-rose-500/10 hover:text-rose-400"
+                          className="shrink-0 rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] hover:border-[var(--line-strong)] hover:bg-white/10 hover:text-white"
                           aria-label={`Delete ${task.title}`}
                         >
                           <Trash2 className="size-4" />
@@ -396,18 +396,18 @@ export function TaskBoard({
                       <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] font-medium">
                         <span className={cn(
                           "rounded-full px-2.5 py-1",
-                          task.category === "dsa" ? "bg-[var(--teal-soft)] text-[var(--teal)]" :
-                          task.category === "build" ? "bg-[var(--navy-soft)] text-sky-400" :
-                          task.category === "application" ? "bg-[var(--rose-soft)] text-rose-400" :
-                          task.category === "interview" ? "bg-[var(--gold-soft)] text-amber-400" :
+                          task.category === "dsa" ? "bg-white/10 text-white" :
+                          task.category === "build" ? "bg-white/8 text-white" :
+                          task.category === "application" ? "bg-white/8 text-white" :
+                          task.category === "interview" ? "bg-white/8 text-white" :
                           "bg-white/6 text-[var(--muted)]"
                         )}>
                           {task.category}
                         </span>
                         <span className={cn(
                           "rounded-full px-2.5 py-1",
-                          task.priority === "high" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" :
-                          task.priority === "medium" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                          task.priority === "high" ? "border border-white/12 bg-white/10 text-white" :
+                          task.priority === "medium" ? "border border-white/10 bg-white/8 text-white" :
                           "bg-white/6 text-[var(--muted)] border border-[var(--line)]"
                         )}>
                           {task.priority}
@@ -435,7 +435,7 @@ export function TaskBoard({
                             "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-300 active:scale-95",
                             task.status === "done"
                               ? "bg-white/92 text-[var(--paper)] hover:-translate-y-0.5"
-                              : "bg-[var(--teal)] text-[var(--paper)] shadow-[0_16px_40px_-24px_rgba(94,234,212,0.7)] hover:-translate-y-0.5"
+                              : "bg-white text-black hover:-translate-y-0.5"
                           )}
                         >
                           <CheckCircle2 className="size-4" />
@@ -482,7 +482,7 @@ function PlannerStat({
       </div>
       <div className="mt-3 text-3xl font-bold tracking-tight text-[var(--ink)]">{value}</div>
       <div className="mt-4 h-1.5 rounded-full bg-white/6">
-        <div className="h-full rounded-full bg-gradient-to-r from-[var(--teal)] via-[#8cc6ff] to-[var(--gold)] opacity-80" />
+        <div className="h-full rounded-full bg-white opacity-90" />
       </div>
     </div>
   );

@@ -10,50 +10,9 @@ import {
   Target,
   User,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
-
-/* ------------------------------------------------------------------ */
-/*  Types - keep in sync with tracker-dashboard                        */
-/* ------------------------------------------------------------------ */
-export type AiProvider = "openai" | "gemini" | "openrouter";
-
-export interface SettingsForm {
-  primaryGoal: string;
-  targetRole: string;
-  graduationYear: string;
-  university: string;
-  degree: string;
-  targetCompanies: string;
-  planStyle: string;
-  weeklyTheme: string;
-  customAiInstructions: string;
-  sheetUrl: string;
-  googleAppsScriptUrl: string;
-  resumeUrl: string;
-  githubUrl: string;
-  leetcodeUrl: string;
-  linkedinUrl: string;
-  portfolioUrl: string;
-  jobTrackerUrl: string;
-  codeforcesUrl: string;
-  codechefUrl: string;
-  hackerrankUrl: string;
-  aiProvider: AiProvider;
-  openAiModel: string;
-  weeklyDsaTarget: number;
-  weeklyApplicationTarget: number;
-  weeklyBuildTarget: number;
-  weekdayTaskTarget: number;
-  weekendTaskTarget: number;
-  weekendDsaMinutes: number;
-  weekendBuildMinutes: number;
-  weekdayDeepWorkMinutes: number;
-  weekdaySupportMinutes: number;
-  timerFocusMinutes: number;
-  timerBreakMinutes: number;
-  onboardingCompleted: boolean;
-  [key: string]: string | number | boolean;
-}
+import type { AiProvider, WorkspaceSettings } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
 /*  Collapsible accordion section                                      */
@@ -76,14 +35,14 @@ function AccordionSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="glass-card group overflow-hidden rounded-[28px] border border-white/10 transition-all duration-300 hover:border-teal-500/30 hover:shadow-[var(--shadow-float)]">
+    <div className="glass-card section-panel group overflow-hidden rounded-[28px] border border-[var(--line)] transition-all duration-200 hover:border-[var(--line-strong)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.035]"
+        className="flex w-full items-center gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.03]"
       >
         <div
-          className="flex size-11 shrink-0 items-center justify-center rounded-[18px] shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-110"
+          className="flex size-11 shrink-0 items-center justify-center rounded-[18px] shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-[1.03]"
           style={{ 
             background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} 20%, transparent), color-mix(in srgb, ${accentColor} 5%, transparent))`,
           }}
@@ -112,7 +71,7 @@ function AccordionSection({
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-[var(--line)] bg-black/12 px-6 pb-6 pt-5">
+            <div className="border-t border-[var(--line)] bg-white/[0.02] px-6 pb-6 pt-5">
               {children}
             </div>
           </motion.div>
@@ -140,14 +99,14 @@ function FieldInput({
 }) {
   return (
     <div className="group/field space-y-2">
-      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
+      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-[var(--teal)]">
         {label}
       </label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="field h-11 w-full bg-[var(--card)] text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
+        className="field h-11 w-full bg-[var(--card)] text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-[var(--teal-soft)]"
         placeholder={placeholder}
       />
     </div>
@@ -170,7 +129,7 @@ function FieldTextarea({
   return (
     <div className="group/field space-y-2">
       <div className="flex items-center justify-between">
-        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-teal-400">
+        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-[var(--teal)]">
           {label}
         </label>
         {description && (
@@ -180,7 +139,7 @@ function FieldTextarea({
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="field-area min-h-[90px] w-full bg-[var(--card)] text-[14px] leading-relaxed transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-teal-400/20"
+        className="field-area min-h-[90px] w-full bg-[var(--card)] text-[14px] leading-relaxed transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-[var(--teal-soft)]"
         placeholder={placeholder}
         rows={3}
       />
@@ -192,8 +151,8 @@ function FieldTextarea({
 /*  Main Settings Panel                                                */
 /* ------------------------------------------------------------------ */
 interface SettingsPanelProps {
-  settings: SettingsForm;
-  setSettings: React.Dispatch<React.SetStateAction<SettingsForm | null>>;
+  settings: WorkspaceSettings;
+  setSettings: React.Dispatch<React.SetStateAction<WorkspaceSettings>>;
   onSave: () => void;
   aiKeyManager: ReactNode;
 }
@@ -204,16 +163,16 @@ export function SettingsPanel({
   onSave,
   aiKeyManager,
 }: SettingsPanelProps) {
-  function update<K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) {
-    setSettings((current) => (current ? { ...current, [key]: value } : current));
+  function update<K extends keyof WorkspaceSettings>(key: K, value: WorkspaceSettings[K]) {
+    setSettings((current) => ({ ...current, [key]: value }));
   }
 
   return (
     <div className="grid gap-5">
-      <div className="glass-card rounded-[30px] px-6 py-6">
+      <div className="glass-card section-panel rounded-[30px] px-6 py-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-teal-200">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--teal)]">
               <Sparkles className="size-3.5" />
               Workspace tuning
             </span>
@@ -308,10 +267,10 @@ export function SettingsPanel({
 
       {/* Section 2: AI & Strategy */}
       <AccordionSection
-        icon={<Sparkles className="size-4" style={{ color: "#a78bfa" }} />}
+        icon={<Sparkles className="size-4" style={{ color: "var(--teal)" }} />}
         title="AI & Strategy"
         subtitle="Provider, model, coaching style, and weekly theme"
-        accentColor="#a78bfa"
+        accentColor="var(--teal)"
       >
         <div className="grid gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -381,10 +340,10 @@ export function SettingsPanel({
 
       {/* Section 3: Links */}
       <AccordionSection
-        icon={<Link2 className="size-4" style={{ color: "#38bdf8" }} />}
+        icon={<Link2 className="size-4" style={{ color: "var(--teal)" }} />}
         title="Links & Trackers"
         subtitle="GitHub, LeetCode, LinkedIn, portfolio, and other profiles"
-        accentColor="#38bdf8"
+        accentColor="var(--teal)"
       >
         <div className="grid gap-4">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -469,10 +428,10 @@ export function SettingsPanel({
 
       {/* Section 4: Schedule & Targets */}
       <AccordionSection
-        icon={<Target className="size-4" style={{ color: "#f59e0b" }} />}
+        icon={<Target className="size-4" style={{ color: "var(--teal)" }} />}
         title="Targets & Schedule"
         subtitle="Weekly goals, time blocks, and focus timer config"
-        accentColor="#f59e0b"
+        accentColor="var(--teal)"
       >
         <div className="grid gap-4">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -556,9 +515,9 @@ export function SettingsPanel({
             />
           </div>
 
-          <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3 text-xs text-amber-400">
+          <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] px-4 py-3 text-xs text-[var(--muted)]">
             Weekend template reserves{" "}
-            <strong>{settings.weekendDsaMinutes + settings.weekendBuildMinutes}</strong>{" "}
+            <strong className="text-[var(--ink)]">{settings.weekendDsaMinutes + settings.weekendBuildMinutes}</strong>{" "}
             focused minutes across DSA and project work.
           </div>
         </div>
@@ -569,9 +528,9 @@ export function SettingsPanel({
         onClick={onSave}
         className={cn(
           "w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition-all",
-          "bg-[linear-gradient(120deg,#5eead4,#f8fafc,#fde68a)] text-slate-950",
-          "hover:shadow-[0_18px_34px_rgba(94,234,212,0.2)] active:scale-[0.99]",
-          "shadow-[0_12px_28px_rgba(15,23,42,0.16)]",
+          "bg-white text-black",
+          "hover:shadow-[0_0_30px_rgba(45,212,191,0.3)] hover:-translate-y-0.5 active:scale-[0.99]",
+          "shadow-[0_0_20px_rgba(45,212,191,0.2)]",
         )}
       >
         Save all settings
