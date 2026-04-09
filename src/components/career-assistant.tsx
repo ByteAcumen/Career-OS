@@ -37,6 +37,29 @@ function formatAssistantText(text: string) {
   ));
 }
 
+async function readAssistantError(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const payload = (await response.json()) as {
+      message?: string;
+      provider?: string;
+      code?: string;
+    };
+
+    if (payload.message) {
+      return payload.message;
+    }
+
+    if (payload.provider || payload.code) {
+      return [payload.provider, payload.code].filter(Boolean).join(": ");
+    }
+  }
+
+  const text = await response.text();
+  return text || "The assistant could not complete that request.";
+}
+
 export function CareerAssistant() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -95,8 +118,12 @@ export function CareerAssistant() {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error("Failed to reach the assistant.");
+      if (!response.ok) {
+        throw new Error(await readAssistantError(response));
+      }
+
+      if (!response.body) {
+        throw new Error("The assistant did not return a response stream.");
       }
 
       const reader = response.body.getReader();

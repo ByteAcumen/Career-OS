@@ -7,6 +7,23 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
+function getAiErrorStatus(error: AiError) {
+  switch (error.code) {
+    case "RATE_LIMITED":
+      return 429;
+    case "TIMEOUT":
+      return 504;
+    case "PARSE_ERROR":
+      return 502;
+    case "INVALID_KEY":
+    case "NO_KEY":
+    case "QUOTA_EXCEEDED":
+    case "PROVIDER_ERROR":
+    default:
+      return 503;
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getRequestSession(request);
   if (!session) {
@@ -71,7 +88,7 @@ export async function POST(request: Request) {
           message: error.userMessage,
           retryable: error.retryable,
         },
-        { status: 400 },
+        { status: getAiErrorStatus(error) },
       );
     }
 

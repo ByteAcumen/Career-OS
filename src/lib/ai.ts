@@ -30,6 +30,12 @@ type ChatStreamResult = {
   model: string;
 };
 
+type ProviderHealthEntry = {
+  until: number;
+  code: AiErrorCode;
+  message: string;
+};
+
 const aiDashboardOptions = {
   includeGithubActivity: false,
   includeIntegrations: false,
@@ -51,14 +57,20 @@ export class AiError extends Error {
   userMessage: string;
   retryable: boolean;
 
-  constructor(code: AiErrorCode, provider: string, originalMessage: string) {
-    const userMessage = getErrorUserMessage(code, provider);
+  constructor(
+    code: AiErrorCode,
+    provider: string,
+    originalMessage: string,
+    options?: { userMessage?: string; retryable?: boolean },
+  ) {
+    const userMessage = options?.userMessage ?? getErrorUserMessage(code, provider);
     super(originalMessage);
     this.name = "AiError";
     this.code = code;
     this.provider = provider;
     this.userMessage = userMessage;
-    this.retryable = code === "RATE_LIMITED" || code === "TIMEOUT";
+    this.retryable =
+      options?.retryable ?? (code === "RATE_LIMITED" || code === "TIMEOUT");
   }
 }
 
@@ -163,8 +175,9 @@ export type CoachResponse = z.infer<typeof CoachResponseSchema>;
 
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
-const DEFAULT_OPENROUTER_MODEL = "google/gemma-2-9b-it:free";
+const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
 const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
+const providerHealth = new Map<string, ProviderHealthEntry>();
 const COACH_SYSTEM_PROMPT =
   "You are a strict but caring study coach for a final-year CS student targeting product engineering roles. Be direct, realistic, and actionable.";
 const COACH_JSON_PROMPT =
@@ -404,15 +417,23 @@ Guidelines:
   const boundedMessages = normalizeChatMessages(messages);
   const orderedProviders = buildOrderedProviders(preferredProvider);
   const errors: AiError[] = [];
+  const skippedErrors: AiError[] = [];
 
   for (const provider of orderedProviders) {
     const apiKey = await resolveAiProviderKey(userId, provider);
     if (!apiKey) continue;
 
+    const cooldown = readProviderCooldown(userId, provider);
+    if (cooldown) {
+      skippedErrors.push(cooldown);
+      continue;
+    }
+
     const model = resolveProviderModel(provider, configuredModel);
 
     try {
       if (provider === "gemini") {
+        clearProviderCooldown(userId, provider);
         return {
           stream: await streamGemini(apiKey, model, systemMessage, boundedMessages),
           provider,
@@ -421,6 +442,7 @@ Guidelines:
       }
 
       if (provider === "openai") {
+        clearProviderCooldown(userId, provider);
         return {
           stream: await streamOpenAI(apiKey, model, systemMessage, boundedMessages),
           provider,
@@ -428,6 +450,7 @@ Guidelines:
         };
       }
 
+      clearProviderCooldown(userId, provider);
       return {
         stream: await streamOpenRouter(apiKey, model, systemMessage, boundedMessages),
         provider,
@@ -439,15 +462,19 @@ Guidelines:
           ? error
           : new AiError("PROVIDER_ERROR", provider, String(error));
       errors.push(aiError);
+      markProviderCooldown(userId, provider, aiError);
       console.warn(`[AI] ${provider} stream failed (${aiError.code}): ${aiError.message}`);
     }
   }
 
   if (errors.length === 0) {
+    if (skippedErrors.length > 0) {
+      throw combineProviderErrors(skippedErrors);
+    }
     throw new AiError("NO_KEY", "any", "No AI provider configured");
   }
 
-  throw errors[0];
+  throw combineProviderErrors(errors, skippedErrors);
 }
 
 async function runStructuredTask<T extends z.ZodTypeAny>(options: {
@@ -512,10 +539,17 @@ async function dispatchWithFallback<T extends z.ZodTypeAny>(options: {
 }): Promise<{ data: z.infer<T>; provider: AiProvider; model: string }> {
   const orderedProviders = buildOrderedProviders(options.preferredProvider);
   const errors: AiError[] = [];
+  const skippedErrors: AiError[] = [];
 
   for (const provider of orderedProviders) {
     const apiKey = await resolveAiProviderKey(options.userId, provider);
     if (!apiKey) continue;
+
+    const cooldown = readProviderCooldown(options.userId, provider);
+    if (cooldown) {
+      skippedErrors.push(cooldown);
+      continue;
+    }
 
     const model = resolveProviderModel(provider, options.configuredModel);
 
@@ -530,6 +564,7 @@ async function dispatchWithFallback<T extends z.ZodTypeAny>(options: {
         apiKey,
       );
 
+      clearProviderCooldown(options.userId, provider);
       return { data, provider, model };
     } catch (error) {
       const aiError =
@@ -537,11 +572,15 @@ async function dispatchWithFallback<T extends z.ZodTypeAny>(options: {
           ? error
           : new AiError("PROVIDER_ERROR", provider, String(error));
       errors.push(aiError);
+      markProviderCooldown(options.userId, provider, aiError);
       console.warn(`[AI] ${provider} failed (${aiError.code}): ${aiError.message}`);
     }
   }
 
   if (errors.length === 0) {
+    if (skippedErrors.length > 0) {
+      throw combineProviderErrors(skippedErrors);
+    }
     throw new AiError(
       "NO_KEY",
       "any",
@@ -549,7 +588,7 @@ async function dispatchWithFallback<T extends z.ZodTypeAny>(options: {
     );
   }
 
-  throw errors[0];
+  throw combineProviderErrors(errors, skippedErrors);
 }
 
 async function dispatchToProvider<T extends z.ZodTypeAny>(
@@ -669,48 +708,86 @@ async function generateWithOpenRouter<T extends z.ZodTypeAny>(
   schema: T,
   apiKey: string,
 ): Promise<z.infer<T>> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  const candidates = buildOpenRouterModelCandidates(model);
+  let lastError: AiError | null = null;
+
+  for (const candidate of candidates) {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": getApplicationOrigin(),
+        "X-OpenRouter-Title": "Career OS",
+      },
+      body: JSON.stringify({
+        model: candidate,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `${jsonPrompt}\n${stableJsonStringify(payload)}` },
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      const error = classifyHttpError(response.status, body, "OpenRouter");
+      if (shouldRetryOpenRouterWithAlternateModel(candidate, error)) {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+
+    const data = (await response.json()) as {
+      choices?: Array<{
+        message?: {
+          content?: string;
+        };
+      }>;
+    };
+
+    const text = data.choices?.[0]?.message?.content ?? "";
+
+    try {
+      return parseJsonWithSchema(text, schema);
+    } catch {
+      throw new AiError(
+        "PARSE_ERROR",
+        "OpenRouter",
+        `Failed to parse OpenRouter response: ${text.slice(0, 200)}`,
+      );
+    }
+  }
+
+  throw (
+    lastError ??
+    new AiError("PROVIDER_ERROR", "OpenRouter", "OpenRouter did not return a usable response")
+  );
+}
+
+async function tryOpenRouterStream(
+  apiKey: string,
+  model: string,
+  systemMessage: string,
+  messages: ChatMessage[],
+) {
+  const client = new OpenAI({
+    apiKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
       "HTTP-Referer": getApplicationOrigin(),
       "X-OpenRouter-Title": "Career OS",
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `${jsonPrompt}\n${stableJsonStringify(payload)}` },
-      ],
-      temperature: 0.3,
-    }),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw classifyHttpError(response.status, body, "OpenRouter");
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{
-      message?: {
-        content?: string;
-      };
-    }>;
-  };
-
-  const text = data.choices?.[0]?.message?.content ?? "";
-
-  try {
-    return parseJsonWithSchema(text, schema);
-  } catch {
-    throw new AiError(
-      "PARSE_ERROR",
-      "OpenRouter",
-      `Failed to parse OpenRouter response: ${text.slice(0, 200)}`,
-    );
-  }
+  return client.chat.completions.create({
+    model,
+    messages: [{ role: "system", content: systemMessage }, ...messages],
+    stream: true,
+    temperature: 0.4,
+  });
 }
 
 async function streamGemini(
@@ -816,21 +893,32 @@ async function streamOpenRouter(
   systemMessage: string,
   messages: ChatMessage[],
 ): Promise<ReadableStream<Uint8Array>> {
-  const client = new OpenAI({
-    apiKey,
-    baseURL: "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer": getApplicationOrigin(),
-      "X-OpenRouter-Title": "Career OS",
-    },
-  });
+  const candidates = buildOpenRouterModelCandidates(model);
+  let stream:
+    | Awaited<ReturnType<typeof tryOpenRouterStream>>
+    | null = null;
+  let lastError: AiError | null = null;
 
-  const stream = await client.chat.completions.create({
-    model,
-    messages: [{ role: "system", content: systemMessage }, ...messages],
-    stream: true,
-    temperature: 0.4,
-  });
+  for (const candidate of candidates) {
+    try {
+      stream = await tryOpenRouterStream(apiKey, candidate, systemMessage, messages);
+      break;
+    } catch (error) {
+      const normalized = normalizeProviderError(error, "OpenRouter");
+      if (shouldRetryOpenRouterWithAlternateModel(candidate, normalized)) {
+        lastError = normalized;
+        continue;
+      }
+      throw normalized;
+    }
+  }
+
+  if (!stream) {
+    throw (
+      lastError ??
+      new AiError("PROVIDER_ERROR", "OpenRouter", "OpenRouter streaming could not start")
+    );
+  }
 
   const encoder = new TextEncoder();
   return new ReadableStream({
@@ -876,6 +964,17 @@ function buildOrderedProviders(preferredProvider: AiProvider): AiProvider[] {
   ];
 }
 
+function buildOpenRouterModelCandidates(requestedModel: string) {
+  return Array.from(
+    new Set(
+      [
+        requestedModel?.trim(),
+        DEFAULT_OPENROUTER_MODEL,
+      ].filter((value): value is string => Boolean(value)),
+    ),
+  );
+}
+
 function resolveProviderModel(provider: AiProvider, configuredModel: string) {
   if (provider === "openai") {
     return configuredModel && configuredModel.startsWith("gpt")
@@ -894,6 +993,103 @@ function resolveProviderModel(provider: AiProvider, configuredModel: string) {
     !configuredModel.startsWith("gemini")
     ? configuredModel
     : DEFAULT_OPENROUTER_MODEL;
+}
+
+function shouldRetryOpenRouterWithAlternateModel(model: string, error: AiError) {
+  if (model === DEFAULT_OPENROUTER_MODEL) {
+    return false;
+  }
+
+  const lowerMessage = error.message.toLowerCase();
+  return (
+    error.code === "PROVIDER_ERROR" &&
+    (lowerMessage.includes("404") ||
+      lowerMessage.includes("no endpoints found") ||
+      lowerMessage.includes("unknown model") ||
+      lowerMessage.includes("not found"))
+  );
+}
+
+function readProviderCooldown(userId: string, provider: AiProvider) {
+  const key = `${userId}:${provider}`;
+  const value = providerHealth.get(key);
+  if (!value) {
+    return null;
+  }
+
+  if (value.until <= Date.now()) {
+    providerHealth.delete(key);
+    return null;
+  }
+
+  const seconds = Math.max(1, Math.ceil((value.until - Date.now()) / 1000));
+  return new AiError(value.code, provider, value.message, {
+    userMessage:
+      value.code === "QUOTA_EXCEEDED" || value.code === "INVALID_KEY"
+        ? `${provider} is temporarily skipped for ${seconds}s after the last failure. Another provider will be used if available.`
+        : `${provider} is cooling down for ${seconds}s after the last failure. Another provider will be used if available.`,
+    retryable: true,
+  });
+}
+
+function clearProviderCooldown(userId: string, provider: AiProvider) {
+  providerHealth.delete(`${userId}:${provider}`);
+}
+
+function markProviderCooldown(userId: string, provider: AiProvider, error: AiError) {
+  const durationMs = getProviderCooldownMs(error.code);
+  if (!durationMs) {
+    clearProviderCooldown(userId, provider);
+    return;
+  }
+
+  providerHealth.set(`${userId}:${provider}`, {
+    until: Date.now() + durationMs,
+    code: error.code,
+    message: error.message,
+  });
+}
+
+function getProviderCooldownMs(code: AiErrorCode) {
+  switch (code) {
+    case "INVALID_KEY":
+      return 10 * 60_000;
+    case "QUOTA_EXCEEDED":
+      return 5 * 60_000;
+    case "RATE_LIMITED":
+      return 30_000;
+    case "TIMEOUT":
+      return 45_000;
+    case "PROVIDER_ERROR":
+      return 90_000;
+    default:
+      return 0;
+  }
+}
+
+function combineProviderErrors(errors: AiError[], skippedErrors: AiError[] = []) {
+  const combined = [...errors, ...skippedErrors];
+  const code = pickAggregateErrorCode(combined);
+  const summary = combined
+    .map((error) => `${error.provider}: ${error.userMessage}`)
+    .join(" ");
+
+  return new AiError(code, "multiple", combined.map((error) => error.message).join(" | "), {
+    userMessage:
+      summary ||
+      "All configured AI providers are currently unavailable. Check your keys, quota, or try again shortly.",
+    retryable: combined.some((error) => error.retryable),
+  });
+}
+
+function pickAggregateErrorCode(errors: AiError[]): AiErrorCode {
+  if (errors.some((error) => error.code === "RATE_LIMITED")) return "RATE_LIMITED";
+  if (errors.some((error) => error.code === "TIMEOUT")) return "TIMEOUT";
+  if (errors.some((error) => error.code === "QUOTA_EXCEEDED")) return "QUOTA_EXCEEDED";
+  if (errors.some((error) => error.code === "INVALID_KEY")) return "INVALID_KEY";
+  if (errors.some((error) => error.code === "PARSE_ERROR")) return "PARSE_ERROR";
+  if (errors.some((error) => error.code === "PROVIDER_ERROR")) return "PROVIDER_ERROR";
+  return "NO_KEY";
 }
 
 function buildMotivationPayload(dashboard: DashboardData) {
