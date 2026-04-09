@@ -29,6 +29,14 @@ type SnapshotRow = {
 type DailyDetailDsaRow = DashboardData["recentDsa"][number];
 type DailyDetailBuildRow = DashboardData["recentBuilds"][number];
 type DailyDetailApplicationRow = DashboardData["recentApplications"][number];
+type HistoryPoint = DashboardData["history"][number];
+type DashboardQueryOptions = {
+  includeGithubActivity?: boolean;
+  includeIntegrations?: boolean;
+  includePlannerTasks?: boolean;
+  includeRecentEntries?: boolean;
+  includePreviousDay?: boolean;
+};
 
 const defaultSettings = {
   sheetUrl: "",
@@ -577,49 +585,102 @@ export async function saveCoachResponse(
 export async function getDashboardData(
   userId: string,
   targetDateKey?: string,
+  options: DashboardQueryOptions = {},
 ): Promise<DashboardData> {
+  const includeGithubActivity = options.includeGithubActivity ?? true;
+  const includeIntegrations = options.includeIntegrations ?? true;
+  const includePlannerTasks = options.includePlannerTasks ?? true;
+  const includeRecentEntries = options.includeRecentEntries ?? true;
+  const includePreviousDay = options.includePreviousDay ?? true;
+
   const settings = await ensureSettings(userId);
   const todayKey = targetDateKey ?? toDateKey();
-  const today = await ensureSnapshot(userId, todayKey);
-  const previous = await getSnapshot(
-    userId,
-    previousDateKey(1, new Date(`${todayKey}T12:00:00`)),
-  );
-  
-  const historyRs = await client.execute({
-    sql: `SELECT * FROM daily_snapshots WHERE userId = ? AND dateKey >= ? ORDER BY dateKey ASC`,
-    args: [userId, toDateKey(subDays(new Date(), 89))],
-  });
+  const baseDate = new Date(`${todayKey}T12:00:00`);
+  const historyStartKey = toDateKey(subDays(baseDate, 89));
+  const previousKey = previousDateKey(1, baseDate);
+  const githubActivityPromise = includeGithubActivity
+    ? fetchGithubActivity(settings.githubUrl)
+    : Promise.resolve([] satisfies DashboardData["githubActivity"]);
+  const emptyRows = { rows: [] as unknown[] };
+
+  const [
+    today,
+    previous,
+    historyRs,
+    recentDsaRs,
+    recentBuildsRs,
+    rawApplicationsRs,
+    plannerTasksRs,
+    dsaCounts,
+    buildCounts,
+    applicationCounts,
+    applicationSyncCounts,
+    providerStatus,
+    githubActivity,
+  ] = await Promise.all([
+    ensureSnapshot(userId, todayKey),
+    includePreviousDay ? getSnapshot(userId, previousKey) : Promise.resolve(null),
+    client.execute({
+      sql: `SELECT * FROM daily_snapshots WHERE userId = ? AND dateKey >= ? ORDER BY dateKey ASC`,
+      args: [userId, historyStartKey],
+    }),
+    includeRecentEntries
+      ? client.execute({
+          sql: `SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt
+             FROM dsa_entries
+             WHERE userId = ?
+             ORDER BY createdAt DESC
+             LIMIT 6`,
+          args: [userId],
+        })
+      : Promise.resolve(emptyRows),
+    includeRecentEntries
+      ? client.execute({
+          sql: `SELECT id, title, area, proof, impact, repositoryUrl, createdAt
+             FROM build_entries
+             WHERE userId = ?
+             ORDER BY createdAt DESC
+             LIMIT 6`,
+          args: [userId],
+        })
+      : Promise.resolve(emptyRows),
+    includeRecentEntries
+      ? client.execute({
+          sql: `SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt
+             FROM application_entries
+             WHERE userId = ?
+             ORDER BY createdAt DESC
+             LIMIT 8`,
+          args: [userId],
+        })
+      : Promise.resolve(emptyRows),
+    includePlannerTasks
+      ? client.execute({
+          sql: `SELECT id, title, details, scope, category, priority, status, estimateMinutes, targetDateKey, createdAt, updatedAt
+             FROM planner_tasks
+             WHERE userId = ?
+             ORDER BY
+              CASE scope WHEN 'daily' THEN 0 WHEN 'weekly' THEN 1 ELSE 2 END,
+              CASE status WHEN 'todo' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
+              CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+              COALESCE(targetDateKey, '9999-12-31') ASC,
+              updatedAt DESC
+             LIMIT 36`,
+          args: [userId],
+        })
+      : Promise.resolve(emptyRows),
+    getCountMap("dsa_entries", userId, historyStartKey),
+    getCountMap("build_entries", userId, historyStartKey),
+    getCountMap("application_entries", userId, historyStartKey),
+    getApplicationSyncCounts(userId),
+    includeIntegrations ? getAiProviderStatus(userId) : Promise.resolve(null),
+    githubActivityPromise,
+  ]);
+
   const history = historyRs.rows as unknown as SnapshotRow[];
-
-  const recentDsaRs = await client.execute({
-    sql: `SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt
-       FROM dsa_entries
-       WHERE userId = ?
-       ORDER BY createdAt DESC
-       LIMIT 6`,
-    args: [userId],
-  });
   const recentDsa = recentDsaRs.rows as unknown as DashboardData["recentDsa"];
-
-  const recentBuildsRs = await client.execute({
-    sql: `SELECT id, title, area, proof, impact, repositoryUrl, createdAt
-       FROM build_entries
-       WHERE userId = ?
-       ORDER BY createdAt DESC
-       LIMIT 6`,
-    args: [userId],
-  });
   const recentBuilds = recentBuildsRs.rows as unknown as DashboardData["recentBuilds"];
-
-  const rawApplicationsRs = await client.execute({
-    sql: `SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt
-       FROM application_entries
-       WHERE userId = ?
-       ORDER BY createdAt DESC
-       LIMIT 8`,
-    args: [userId],
-  });
+  const plannerTasks = plannerTasksRs.rows as unknown as DashboardData["planner"]["tasks"];
   const rawApplications = rawApplicationsRs.rows as unknown as Array<
     Omit<DashboardData["recentApplications"][number], "syncedToSheet"> & {
       syncedToSheet: number;
@@ -631,34 +692,23 @@ export async function getDashboardData(
     syncedToSheet: Boolean(item.syncedToSheet),
   }));
 
-  const plannerTasksRs = await client.execute({
-    sql: `SELECT id, title, details, scope, category, priority, status, estimateMinutes, targetDateKey, createdAt, updatedAt
-       FROM planner_tasks
-       WHERE userId = ?
-       ORDER BY
-        CASE scope WHEN 'daily' THEN 0 WHEN 'weekly' THEN 1 ELSE 2 END,
-        CASE status WHEN 'todo' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
-        CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
-        COALESCE(targetDateKey, '9999-12-31') ASC,
-        updatedAt DESC
-       LIMIT 36`,
-    args: [userId],
-  });
-  const plannerTasks = plannerTasksRs.rows as unknown as DashboardData["planner"]["tasks"];
+  const historyWithCounts = history.map((item) => ({
+    dateKey: item.dateKey,
+    completedCount: calculateCompletedCount(item),
+    dsaCount: getMapCount(dsaCounts, item.dateKey),
+    buildCount: getMapCount(buildCounts, item.dateKey),
+    appCount: getMapCount(applicationCounts, item.dateKey),
+  }));
 
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
-  const currentWeekSnapshots = history.filter(
-    (item) => new Date(`${item.dateKey}T00:00:00`) >= weekStart,
+  const totalXP = historyWithCounts.reduce(
+    (sum, item) =>
+      sum +
+      item.dsaCount * 15 +
+      item.buildCount * 25 +
+      item.appCount * 10 +
+      item.completedCount * 5,
+    0,
   );
-
-  let totalXP = 0;
-  for (const item of history) {
-    const dsaCount = await getCount("dsa_entries", userId, item.dateKey);
-    const buildCount = await getCount("build_entries", userId, item.dateKey);
-    const appCount = await getCount("application_entries", userId, item.dateKey);
-    const checks = calculateCompletedCount(item);
-    totalXP += dsaCount * 15 + buildCount * 25 + appCount * 10 + checks * 5;
-  }
 
   const currentLevel = Math.floor(totalXP / 250) + 1;
   const xpForCurrentLevel = (currentLevel - 1) * 250;
@@ -667,32 +717,20 @@ export async function getDashboardData(
     ((totalXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100,
   );
 
-  const { currentStreak, maxStreak } = await calculateActiveStreaks(userId, history);
-
-  const weekDsaPromises = currentWeekSnapshots.map(item => getCount("dsa_entries", userId, item.dateKey));
-  const weekApplicationsPromises = currentWeekSnapshots.map(item => getCount("application_entries", userId, item.dateKey));
-  const weekBuildsPromises = currentWeekSnapshots.map(item => getCount("build_entries", userId, item.dateKey));
-
-  const weekDsas = await Promise.all(weekDsaPromises);
-  const weekApplicationsList = await Promise.all(weekApplicationsPromises);
-  const weekBuildsList = await Promise.all(weekBuildsPromises);
-
-  const weekDsa = weekDsas.reduce((a, b) => a + b, 0);
-  const weekApplications = weekApplicationsList.reduce((a, b) => a + b, 0);
-  const weekBuilds = weekBuildsList.reduce((a, b) => a + b, 0);
-
-  const githubActivity = await fetchGithubActivity(settings.githubUrl);
-  const providerStatus = await getAiProviderStatus(userId);
+  const { currentStreak, maxStreak } = calculateActiveStreaks(historyWithCounts, toDateKey());
+  const weekStartKey = toDateKey(startOfWeek(baseDate, { weekStartsOn: 0 }));
+  const weekEntries = historyWithCounts.filter((item) => item.dateKey >= weekStartKey);
+  const weekDsa = weekEntries.reduce((sum, item) => sum + item.dsaCount, 0);
+  const weekApplications = weekEntries.reduce((sum, item) => sum + item.appCount, 0);
+  const weekBuilds = weekEntries.reduce((sum, item) => sum + item.buildCount, 0);
   const plannerSummary = summarizePlannerTasks(plannerTasks, todayKey);
-
-  // We need to fetch counts for each history item to display in the UI map
-  const historyWithCounts = await Promise.all(history.map(async (item) => ({
-    dateKey: item.dateKey,
-    completedCount: calculateCompletedCount(item),
-    dsaCount: await getCount("dsa_entries", userId, item.dateKey),
-    buildCount: await getCount("build_entries", userId, item.dateKey),
-    appCount: await getCount("application_entries", userId, item.dateKey),
-  })));
+  const safeProviderStatus =
+    providerStatus ??
+    ({
+      providers: { openai: false, gemini: false, openrouter: false },
+      providerSources: { openai: "none", gemini: "none", openrouter: "none" },
+      savedApiKeys: { openai: false, gemini: false, openrouter: false },
+    } as const);
 
   return {
     settings,
@@ -707,8 +745,8 @@ export async function getDashboardData(
       weekApplications,
       weekBuilds,
       todayScore: calculateTodayScore(today),
-      syncedApplications: await getBooleanCount(userId, true),
-      pendingApplications: await getBooleanCount(userId, false),
+      syncedApplications: applicationSyncCounts.synced,
+      pendingApplications: applicationSyncCounts.pending,
       targetProgress: {
         dsa: calculateTargetProgress(weekDsa, settings.weeklyDsaTarget),
         applications: calculateTargetProgress(
@@ -719,11 +757,11 @@ export async function getDashboardData(
       },
     },
     integrations: {
-      aiReady: providerStatus.providers[settings.aiProvider],
+      aiReady: safeProviderStatus.providers[settings.aiProvider],
       googleSheetsReady: Boolean(settings.googleAppsScriptUrl),
-      providers: providerStatus.providers,
-      providerSources: providerStatus.providerSources,
-      savedApiKeys: providerStatus.savedApiKeys,
+      providers: safeProviderStatus.providers,
+      providerSources: safeProviderStatus.providerSources,
+      savedApiKeys: safeProviderStatus.savedApiKeys,
     },
     planner: {
       tasks: plannerTasks.map((task) => ({
@@ -737,9 +775,9 @@ export async function getDashboardData(
     previousDay: previous
       ? {
           dateKey: previous.dateKey,
-          dsaCount: await getCount("dsa_entries", userId, previous.dateKey),
-          buildCount: await getCount("build_entries", userId, previous.dateKey),
-          appCount: await getCount("application_entries", userId, previous.dateKey),
+          dsaCount: getMapCount(dsaCounts, previous.dateKey),
+          buildCount: getMapCount(buildCounts, previous.dateKey),
+          appCount: getMapCount(applicationCounts, previous.dateKey),
           note: previous.note ?? "",
         }
       : null,
@@ -813,24 +851,42 @@ async function getSnapshotOrThrow(userId: string, dateKey: string) {
   return snapshot;
 }
 
-async function getCount(
+async function getCountMap(
   table: "dsa_entries" | "build_entries" | "application_entries",
   userId: string,
-  dateKey: string,
+  minDateKey: string,
 ) {
   const rs = await client.execute({
-    sql: `SELECT COUNT(*) as count FROM ${table} WHERE userId = ? AND snapshotDateKey = ?`,
-    args: [userId, dateKey],
+    sql: `SELECT snapshotDateKey as dateKey, COUNT(*) as count
+      FROM ${table}
+      WHERE userId = ? AND snapshotDateKey >= ?
+      GROUP BY snapshotDateKey`,
+    args: [userId, minDateKey],
   });
-  return Number(rs.rows[0]?.count ?? 0);
+
+  return new Map(
+    rs.rows.map((row) => [String(row.dateKey ?? ""), Number(row.count ?? 0)]),
+  );
 }
 
-async function getBooleanCount(userId: string, value: boolean) {
+async function getApplicationSyncCounts(userId: string) {
   const rs = await client.execute({
-    sql: `SELECT COUNT(*) as count FROM application_entries WHERE userId = ? AND syncedToSheet = ?`,
-    args: [userId, value ? 1 : 0],
+    sql: `SELECT
+        COALESCE(SUM(CASE WHEN syncedToSheet = 1 THEN 1 ELSE 0 END), 0) as synced,
+        COALESCE(SUM(CASE WHEN syncedToSheet = 0 THEN 1 ELSE 0 END), 0) as pending
+      FROM application_entries
+      WHERE userId = ?`,
+    args: [userId],
   });
-  return Number(rs.rows[0]?.count ?? 0);
+
+  return {
+    synced: Number(rs.rows[0]?.synced ?? 0),
+    pending: Number(rs.rows[0]?.pending ?? 0),
+  };
+}
+
+function getMapCount(map: Map<string, number>, dateKey: string) {
+  return map.get(dateKey) ?? 0;
 }
 
 async function getPlannerTaskOrThrow(userId: string, id: string) {
@@ -1029,20 +1085,20 @@ function calculateRevisionStreak(snapshots: SnapshotRow[]) {
   return streak;
 }
 
-async function calculateActiveStreaks(userId: string, snapshots: SnapshotRow[]) {
+function calculateActiveStreaks(history: HistoryPoint[], currentDateKey: string) {
   let currentStreak = 0;
   let maxStreak = 0;
   let tempStreak = 0;
 
-  for (let i = 0; i < snapshots.length; i += 1) {
-    const item = snapshots[i];
+  for (let i = 0; i < history.length; i += 1) {
+    const item = history[i];
     if (!item) continue;
 
     const hasActivity =
-      calculateCompletedCount(item) > 0 ||
-      (await getCount("dsa_entries", userId, item.dateKey)) > 0 ||
-      (await getCount("build_entries", userId, item.dateKey)) > 0 ||
-      (await getCount("application_entries", userId, item.dateKey)) > 0;
+      item.completedCount > 0 ||
+      item.dsaCount > 0 ||
+      item.buildCount > 0 ||
+      item.appCount > 0;
 
     if (hasActivity) {
       tempStreak += 1;
@@ -1054,19 +1110,19 @@ async function calculateActiveStreaks(userId: string, snapshots: SnapshotRow[]) 
     }
   }
 
-  for (let i = snapshots.length - 1; i >= 0; i -= 1) {
-    const item = snapshots[i];
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const item = history[i];
     if (!item) break;
 
     const hasActivity =
-      calculateCompletedCount(item) > 0 ||
-      (await getCount("dsa_entries", userId, item.dateKey)) > 0 ||
-      (await getCount("build_entries", userId, item.dateKey)) > 0 ||
-      (await getCount("application_entries", userId, item.dateKey)) > 0;
+      item.completedCount > 0 ||
+      item.dsaCount > 0 ||
+      item.buildCount > 0 ||
+      item.appCount > 0;
 
     if (hasActivity) {
       currentStreak += 1;
-    } else if (item.dateKey !== toDateKey()) {
+    } else if (item.dateKey !== currentDateKey) {
       break;
     }
   }

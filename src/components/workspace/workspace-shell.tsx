@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -25,10 +26,14 @@ import {
   X,
 } from "lucide-react";
 
-import { CareerAssistant } from "@/components/career-assistant";
 import { authClient } from "@/lib/auth-client";
 import type { WorkspaceUser } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const CareerAssistant = dynamic(
+  () => import("@/components/career-assistant").then((module) => module.CareerAssistant),
+  { ssr: false },
+);
 
 export type WorkspacePageId =
   | "home"

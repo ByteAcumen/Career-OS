@@ -30,6 +30,12 @@ type ChatStreamResult = {
   model: string;
 };
 
+const aiDashboardOptions = {
+  includeGithubActivity: false,
+  includeIntegrations: false,
+  includePreviousDay: false,
+};
+
 export type AiErrorCode =
   | "NO_KEY"
   | "INVALID_KEY"
@@ -165,7 +171,7 @@ const COACH_JSON_PROMPT =
   "Return only a JSON object with these exact string fields: summary, biggestRisk, focusTheme, morningPlan, nightPlan, applyPlan, oneCut, weekendMission.";
 
 export async function generateMotivationQuotes(userId: string) {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = buildMotivationPayload(dashboard);
   const response = await runStructuredTask({
     userId,
@@ -189,7 +195,7 @@ export async function generateInsight(
   title: string,
   context: string,
 ) {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = compactObject({
     type,
     title: clipText(title, 120),
@@ -216,7 +222,7 @@ export async function generateInsight(
 }
 
 export async function generateWeaknessCurriculum(userId: string) {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = compactObject({
     targetRole: dashboard.settings.targetRole,
     targetCompanies: dashboard.settings.targetCompanies,
@@ -250,7 +256,7 @@ export async function predictApplicationMatch(
   company: string,
   role: string,
 ) {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = compactObject({
     company: clipText(company, 120),
     role: clipText(role, 160),
@@ -283,7 +289,7 @@ export async function predictApplicationMatch(
 }
 
 export async function generateCoachResponse(userId: string) {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = buildCoachPayload(dashboard);
 
   return runStructuredTask({
@@ -299,7 +305,7 @@ export async function generateCoachResponse(userId: string) {
 }
 
 export async function generateStudentStrategy(userId: string): Promise<StudentStrategy> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = buildStrategyPayload(dashboard);
 
   return runStructuredTask({
@@ -319,7 +325,7 @@ export async function generateStudentStrategy(userId: string): Promise<StudentSt
 export async function generatePlannerSuggestionPack(
   userId: string,
 ): Promise<PlannerSuggestionPack> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, aiDashboardOptions);
   const payload = buildPlannerPayload(dashboard);
 
   return runStructuredTask({

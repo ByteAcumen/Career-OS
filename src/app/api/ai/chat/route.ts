@@ -37,7 +37,11 @@ export async function POST(request: Request) {
       return new Response("Bad Request: messages array is required", { status: 400 });
     }
 
-    const dashboard = await getDashboardData(session.user.id);
+    const dashboard = await getDashboardData(session.user.id, undefined, {
+      includeGithubActivity: false,
+      includeIntegrations: false,
+      includePreviousDay: false,
+    });
     const contextStr = buildChatContext(dashboard);
     const result = await streamChat(
       session.user.id,

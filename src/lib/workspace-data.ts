@@ -72,7 +72,13 @@ export type SettingsPageData = {
 };
 
 export async function getHomePageData(userId: string): Promise<HomePageData> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, {
+    includeGithubActivity: false,
+    includeIntegrations: false,
+    includePlannerTasks: true,
+    includeRecentEntries: true,
+    includePreviousDay: false,
+  });
 
   return {
     settings: dashboard.settings,
@@ -86,7 +92,13 @@ export async function getHomePageData(userId: string): Promise<HomePageData> {
 }
 
 export async function getPlannerPageData(userId: string): Promise<PlannerPageData> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, {
+    includeGithubActivity: false,
+    includeIntegrations: true,
+    includePlannerTasks: true,
+    includeRecentEntries: false,
+    includePreviousDay: false,
+  });
 
   return {
     settings: dashboard.settings,
@@ -99,7 +111,13 @@ export async function getPlannerPageData(userId: string): Promise<PlannerPageDat
 }
 
 export async function getLoggerPageData(userId: string): Promise<LoggerPageData> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, {
+    includeGithubActivity: false,
+    includeIntegrations: false,
+    includePlannerTasks: false,
+    includeRecentEntries: true,
+    includePreviousDay: false,
+  });
 
   return {
     settings: dashboard.settings,
@@ -113,7 +131,13 @@ export async function getLoggerPageData(userId: string): Promise<LoggerPageData>
 }
 
 export async function getProgressPageData(userId: string): Promise<ProgressPageData> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, {
+    includeGithubActivity: true,
+    includeIntegrations: false,
+    includePlannerTasks: false,
+    includeRecentEntries: true,
+    includePreviousDay: false,
+  });
 
   return {
     metrics: dashboard.metrics,
@@ -126,7 +150,13 @@ export async function getProgressPageData(userId: string): Promise<ProgressPageD
 }
 
 export async function getStrategyPageData(userId: string): Promise<StrategyPageData> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, {
+    includeGithubActivity: false,
+    includeIntegrations: true,
+    includePlannerTasks: true,
+    includeRecentEntries: true,
+    includePreviousDay: false,
+  });
 
   return {
     settings: dashboard.settings,
@@ -142,7 +172,13 @@ export async function getStrategyPageData(userId: string): Promise<StrategyPageD
 }
 
 export async function getSettingsPageData(userId: string): Promise<SettingsPageData> {
-  const dashboard = await getDashboardData(userId);
+  const dashboard = await getDashboardData(userId, undefined, {
+    includeGithubActivity: false,
+    includeIntegrations: true,
+    includePlannerTasks: true,
+    includeRecentEntries: false,
+    includePreviousDay: false,
+  });
 
   return {
     settings: dashboard.settings,
