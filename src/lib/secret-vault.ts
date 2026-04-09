@@ -1,7 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+﻿import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+
+import { getEnvValue } from "@/lib/env";
 
 function getVaultKey() {
-  const secret = process.env.BETTER_AUTH_SECRET;
+  const secret = getEnvValue("BETTER_AUTH_SECRET");
   if (!secret) {
     throw new Error("BETTER_AUTH_SECRET is required to protect stored secrets.");
   }

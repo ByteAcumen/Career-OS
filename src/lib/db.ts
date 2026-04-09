@@ -1,16 +1,71 @@
-import { createClient } from "@libsql/client";
+﻿import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
+
+import { getEnvValue } from "@/lib/env";
 import * as schema from "./schema";
+
+type RequestLike = {
+  url: string | URL;
+  method?: string;
+  headers?: HeadersInit;
+  body?: BodyInit | null;
+};
+
+type DuplexRequestInit = RequestInit & {
+  duplex?: "half";
+};
+
+function isRequestLike(input: unknown): input is RequestLike {
+  return typeof input === "object" && input !== null && "url" in input;
+}
+
+const customFetch: typeof fetch = async (input, init) => {
+  let requestUrl: string | URL = input instanceof URL ? input : String(input);
+  let requestInit: DuplexRequestInit | undefined = init
+    ? { ...init }
+    : undefined;
+
+  if (isRequestLike(input)) {
+    const body = input.body ?? init?.body;
+    requestUrl = input.url;
+    requestInit = {
+      ...init,
+      method: input.method ?? init?.method,
+      headers: input.headers ?? init?.headers,
+      body,
+    };
+
+    if (body) {
+      requestInit.duplex = "half";
+    }
+  }
+
+  const response = await fetch(
+    requestUrl instanceof URL ? requestUrl.toString() : requestUrl,
+    requestInit,
+  );
+
+  const bodyStream = response.body as (ReadableStream<Uint8Array> & {
+    cancel?: () => Promise<void>;
+  }) | null;
+
+  if (bodyStream && typeof bodyStream.cancel !== "function") {
+    bodyStream.cancel = async () => Promise.resolve();
+  }
+
+  return response;
+};
 
 // We provide a dummy URL for the build phase to prevent 'URL_INVALID' from libsql.
 // The actual queries will fail gracefully if the real URL is missing at runtime.
-const url = process.env.TURSO_DATABASE_URL || "libsql://build-placeholder.turso.io";
-const authToken = process.env.TURSO_AUTH_TOKEN;
+const url = getEnvValue("TURSO_DATABASE_URL") || "libsql://build-placeholder.turso.io";
+const authToken = getEnvValue("TURSO_AUTH_TOKEN");
 const isBuildPlaceholder = url.includes("build-placeholder");
 
 export const client = createClient({
-  url: url,
+  url,
   authToken,
+  fetch: customFetch,
 });
 
 export const db = drizzle(client, { schema });
@@ -33,21 +88,16 @@ export async function initializeSchema() {
     return;
   }
 
-  // Since we're using a serverless DB, we want to ensure tables exist.
-  // In a full production app, you'd use 'drizzle-kit push' or 'migrate'.
-  // For this migration, we'll run the creation logic once.
-  
   try {
     console.log("Initializing Turso schema...");
-    
-    // We can use client.execute() for raw DDL
+
     await client.batch([
-      // Better Auth tables - must be created before auth can function
       `CREATE TABLE IF NOT EXISTS user (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         emailVerified INTEGER NOT NULL DEFAULT 0,
+        twoFactorEnabled INTEGER NOT NULL DEFAULT 0,
         image TEXT,
         createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
         updatedAt INTEGER NOT NULL DEFAULT (unixepoch())
@@ -85,7 +135,14 @@ export async function initializeSchema() {
         createdAt INTEGER DEFAULT (unixepoch()),
         updatedAt INTEGER DEFAULT (unixepoch())
       );`,
-      // App-specific tables
+      `CREATE TABLE IF NOT EXISTS twoFactor (
+        id TEXT PRIMARY KEY,
+        secret TEXT NOT NULL,
+        backupCodes TEXT NOT NULL,
+        userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+        createdAt INTEGER NOT NULL DEFAULT (unixepoch()),
+        updatedAt INTEGER NOT NULL DEFAULT (unixepoch())
+      );`,
       `CREATE TABLE IF NOT EXISTS app_settings (
         userId TEXT PRIMARY KEY,
         sheetUrl TEXT,
@@ -204,6 +261,17 @@ export async function initializeSchema() {
         updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (userId, provider)
       );`,
+      `CREATE TABLE IF NOT EXISTS ai_artifacts (
+        userId TEXT NOT NULL,
+        feature TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        provider TEXT,
+        model TEXT,
+        payload TEXT NOT NULL,
+        createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (userId, feature, fingerprint)
+      );`,
       `CREATE INDEX IF NOT EXISTS idx_daily_snapshots_user_date
        ON daily_snapshots (userId, dateKey);`,
       `CREATE INDEX IF NOT EXISTS idx_dsa_entries_user_date
@@ -217,10 +285,38 @@ export async function initializeSchema() {
       `CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_status
        ON planner_tasks (userId, status);`,
       `CREATE INDEX IF NOT EXISTS idx_planner_tasks_user_scope
-       ON planner_tasks (userId, scope);`
+       ON planner_tasks (userId, scope);`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_artifacts_user_feature_updated
+       ON ai_artifacts (userId, feature, updatedAt);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_two_factor_user_id
+       ON twoFactor (userId);`,
+      `CREATE INDEX IF NOT EXISTS idx_two_factor_secret
+       ON twoFactor (secret);`,
     ], "write");
+
+    const additiveStatements = [
+      `ALTER TABLE user ADD COLUMN twoFactorEnabled INTEGER NOT NULL DEFAULT 0;`,
+    ];
+
+    for (const statement of additiveStatements) {
+      try {
+        await client.execute(statement);
+      } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+        if (
+          message.includes("duplicate column name") ||
+          message.includes("already exists")
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
     console.log("Turso schema initialized successfully.");
   } catch (err) {
     console.error("Failed to initialize Turso schema:", err);
   }
 }
+

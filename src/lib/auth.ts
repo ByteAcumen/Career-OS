@@ -1,50 +1,72 @@
-import { betterAuth } from "better-auth";
-import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
+import { betterAuth } from "better-auth";
+import { twoFactor } from "better-auth/plugins";
 
 import { getConfiguredAppBaseUrl, normalizeOrigin } from "@/lib/app-url";
 import { db, initializeSchema } from "@/lib/db";
-import { sendPasswordResetEmail } from "@/lib/email";
+import { getEnvValue, getEnvValues, sanitizeEnvValue } from "@/lib/env";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email";
 import * as schema from "@/lib/schema";
 
 const authBaseUrl = getConfiguredAppBaseUrl();
-const configuredOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
+const configuredOrigins = getEnvValues("BETTER_AUTH_TRUSTED_ORIGINS");
+const googleClientId = getEnvValue("GOOGLE_CLIENT_ID");
+const googleClientSecret = getEnvValue("GOOGLE_CLIENT_SECRET");
+const betterAuthSecret = getEnvValue("BETTER_AUTH_SECRET");
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const trustedOriginCandidates = [
+  authBaseUrl,
+  getEnvValue("APP_BASE_URL"),
+  getEnvValue("NEXT_PUBLIC_APP_URL"),
+  getEnvValue("VERCEL_PROJECT_PRODUCTION_URL"),
+  getEnvValue("VERCEL_BRANCH_URL"),
+  getEnvValue("VERCEL_URL"),
+  ...configuredOrigins,
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
+function toAllowedHost(value?: string | null) {
+  const trimmed = sanitizeEnvValue(value);
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.includes("*") || trimmed.includes("?")) {
+    return trimmed.replace(/^https?:\/\//i, "").split("/")[0].toLowerCase();
+  }
+
+  const origin = normalizeOrigin(trimmed);
+  if (!origin) {
+    return null;
+  }
+
+  try {
+    return new URL(origin).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
 
 const trustedOrigins = Array.from(
   new Set(
-    [
-      authBaseUrl,
-      process.env.APP_BASE_URL,
-      process.env.NEXT_PUBLIC_APP_URL,
-      process.env.VERCEL_PROJECT_PRODUCTION_URL,
-      process.env.VERCEL_URL,
-      ...configuredOrigins,
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-    ]
+    trustedOriginCandidates
       .map((origin) => normalizeOrigin(origin))
       .filter((origin): origin is string => Boolean(origin)),
   ),
 );
 
+const allowedHostCandidates = [
+  ...trustedOriginCandidates,
+  ...(getEnvValue("VERCEL") ? ["*.vercel.app"] : []),
+];
+
 const allowedHosts = Array.from(
   new Set(
-    trustedOrigins
-      .map((origin) => {
-        try {
-          return new URL(origin).host;
-        } catch {
-          return null;
-        }
-      })
-      .filter((host): host is string => Boolean(host))
-      .concat(["localhost:*", "127.0.0.1:*"]),
+    allowedHostCandidates
+      .map((origin) => toAllowedHost(origin))
+      .filter((origin): origin is string => Boolean(origin)),
   ),
 );
 
@@ -53,11 +75,13 @@ export const auth = betterAuth({
   baseURL: {
     allowedHosts,
     fallback: authBaseUrl,
-    protocol: authBaseUrl.startsWith("https://") ? "https" : "http",
   },
   basePath: "/api/auth",
+  logger: {
+    level: process.env.NODE_ENV === "development" ? "debug" : "error",
+  },
   trustedOrigins,
-  secret: process.env.BETTER_AUTH_SECRET,
+  secret: betterAuthSecret,
   database: drizzleAdapter(db, {
     provider: "sqlite",
     schema,
@@ -66,10 +90,28 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 12,
     maxPasswordLength: 128,
+    requireEmailVerification: true,
     resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await sendPasswordResetEmail(user.email, url);
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    sendOnSignIn: true,
+    autoSignInAfterVerification: true,
+    expiresIn: 60 * 60,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendVerificationEmail(user.email, url);
+    },
+  },
+  account: {
+    updateAccountOnSignIn: true,
+    accountLinking: {
+      enabled: true,
+      allowDifferentEmails: false,
+      allowUnlinkingAll: false,
     },
   },
   socialProviders:
@@ -79,7 +121,6 @@ export const auth = betterAuth({
             clientId: googleClientId,
             clientSecret: googleClientSecret,
             scope: ["openid", "email", "profile"],
-            redirectURI: `${authBaseUrl}/api/auth/callback/google`,
           },
         }
       : {},
@@ -106,7 +147,12 @@ export const auth = betterAuth({
       path: "/",
     },
   },
-  plugins: [nextCookies()],
+  plugins: [
+    twoFactor({
+      issuer: "Career OS",
+    }),
+    nextCookies(),
+  ],
 });
 
 let authMigrationPromise: Promise<void> | null = null;
@@ -114,13 +160,10 @@ let authMigrationPromise: Promise<void> | null = null;
 export function ensureAuthTables() {
   if (!authMigrationPromise) {
     authMigrationPromise = Promise.resolve().then(async () => {
-      // Ensure app tables are created in Turso
       await initializeSchema();
-      
-      // Note: Better Auth tables are managed via the drizzleAdapter during usage,
-      // but we ensure the app schema is ready here.
     });
   }
 
   return authMigrationPromise;
 }
+

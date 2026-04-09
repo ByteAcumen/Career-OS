@@ -7,6 +7,7 @@ export const user = sqliteTable("user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: integer("emailVerified", { mode: "boolean" }).notNull().default(false),
+  twoFactorEnabled: integer("twoFactorEnabled", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -50,6 +51,17 @@ export const verification = sqliteTable("verification", {
   expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
   createdAt: integer("createdAt", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const twoFactor = sqliteTable("twoFactor", {
+  id: text("id").primaryKey(),
+  secret: text("secret").notNull(),
+  backupCodes: text("backupCodes").notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // App Specific Tables
@@ -180,4 +192,17 @@ export const userAiCredentials = sqliteTable("user_ai_credentials", {
   updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => ({
   pk: primaryKey({ columns: [table.userId, table.provider] }),
+}));
+
+export const aiArtifacts = sqliteTable("ai_artifacts", {
+  userId: text("userId").notNull().references(() => user.id, { onDelete: "cascade" }),
+  feature: text("feature").notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  provider: text("provider"),
+  model: text("model"),
+  payload: text("payload").notNull(),
+  createdAt: text("createdAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updatedAt").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.feature, table.fingerprint] }),
 }));

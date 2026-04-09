@@ -1,31 +1,48 @@
-import { Resend } from "resend";
+﻿import { Resend } from "resend";
 
-const resendApiKey = process.env.RESEND_API_KEY?.trim();
+import { getEnvValue } from "@/lib/env";
+
+const resendApiKey = getEnvValue("RESEND_API_KEY");
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
-const FROM_ADDRESS =
-  process.env.RESEND_FROM_EMAIL?.trim() ||
-  process.env.EMAIL_FROM?.trim() ||
-  (process.env.NODE_ENV === "production"
-    ? ""
-    : "Career OS <onboarding@resend.dev>");
+const configuredFromAddress =
+  getEnvValue("RESEND_FROM_EMAIL") ||
+  getEnvValue("EMAIL_FROM");
+const SANDBOX_FROM_ADDRESS = "Career OS <onboarding@resend.dev>";
+const FROM_ADDRESS = configuredFromAddress || SANDBOX_FROM_ADDRESS;
 
 function getResendClient() {
   if (!resend) {
     throw new Error("Missing RESEND_API_KEY. Password reset email cannot be sent.");
   }
 
-  if (!FROM_ADDRESS) {
-    throw new Error(
-      "Missing RESEND_FROM_EMAIL. Set a verified sender address for password reset email.",
+  if (!configuredFromAddress && process.env.NODE_ENV === "production") {
+    console.warn(
+      "[email] RESEND_FROM_EMAIL is missing. Falling back to the Resend sandbox sender. Configure a verified sender for real-user email delivery.",
     );
   }
 
   return resend;
 }
 
-/**
- * Send a password-reset email with a secure link.
- */
+function normalizeEmailError(error: unknown, action: string) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("testing emails") || normalized.includes("sandbox")) {
+    return new Error(
+      `Career OS is still using the Resend sandbox sender. Set RESEND_FROM_EMAIL to a verified sender so ${action} emails can reach real users.`,
+    );
+  }
+
+  if (normalized.includes("verify a domain") || normalized.includes("domain is not verified")) {
+    return new Error(
+      `The configured sender domain is not verified in Resend. Verify the sender behind RESEND_FROM_EMAIL before ${action} emails can be delivered.`,
+    );
+  }
+
+  return error instanceof Error ? error : new Error(message);
+}
+
 export async function sendPasswordResetEmail(
   email: string,
   resetUrl: string,
@@ -62,14 +79,12 @@ export async function sendPasswordResetEmail(
     });
     console.log(`[email] Password reset email sent to ${email}`);
   } catch (error) {
-    console.error("[email] Failed to send password reset email:", error);
-    throw error;
+    const normalizedError = normalizeEmailError(error, "password reset");
+    console.error("[email] Failed to send password reset email:", normalizedError);
+    throw normalizedError;
   }
 }
 
-/**
- * Send an email verification link.
- */
 export async function sendVerificationEmail(
   email: string,
   verificationUrl: string,
@@ -106,7 +121,8 @@ export async function sendVerificationEmail(
     });
     console.log(`[email] Verification email sent to ${email}`);
   } catch (error) {
-    console.error("[email] Failed to send verification email:", error);
-    throw error;
+    const normalizedError = normalizeEmailError(error, "email verification");
+    console.error("[email] Failed to send verification email:", normalizedError);
+    throw normalizedError;
   }
 }
