@@ -10,7 +10,7 @@ export const sectionStagger: Variants = {
   hidden: {},
   show: {
     transition: {
-      staggerChildren: 0.06,
+      staggerChildren: 0.05,
     },
   },
 };
@@ -20,7 +20,7 @@ export const riseIn: Variants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.22, ease: "easeOut" },
+    transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -36,28 +36,30 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
       <div className="max-w-3xl">
         <div className="page-pill">{eyebrow}</div>
-        <h1 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-[2.7rem] sm:leading-[1.02]">
+        <h1 className="mt-4 max-w-[14ch] text-[2.2rem] font-semibold tracking-[-0.05em] text-white sm:text-[2.8rem] sm:leading-[1.02] lg:text-[3.25rem]">
           {title}
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-[0.95rem]">
           {description}
         </p>
       </div>
-      {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap gap-3 xl:justify-end">{actions}</div> : null}
     </div>
   );
 }
 
 export function SectionCard({
+  eyebrow,
   title,
   description,
   action,
   children,
   className,
 }: {
+  eyebrow?: string;
   title: string;
   description?: string;
   action?: React.ReactNode;
@@ -67,13 +69,15 @@ export function SectionCard({
   return (
     <motion.section
       variants={riseIn}
-      className={cn("glass-card rounded-[28px] p-5 sm:p-6", className)}
+      className={cn("glass-card section-panel rounded-[28px] p-5 sm:p-6", className)}
     >
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-            Section
-          </div>
+          {eyebrow ? (
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              {eyebrow}
+            </div>
+          ) : null}
           <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">{title}</h2>
           {description ? (
             <p className="max-w-2xl text-sm leading-7 text-[var(--muted)]">{description}</p>
@@ -96,11 +100,11 @@ export function StatCard({
   detail: string;
 }) {
   return (
-    <div className="metric-panel">
+    <div className="metric-panel min-h-[152px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
         {label}
       </div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-white">{value}</div>
+      <div className="mt-4 text-[2rem] font-semibold tracking-[-0.04em] text-white">{value}</div>
       <div className="mt-2 text-sm leading-6 text-[var(--muted)]">{detail}</div>
     </div>
   );
@@ -110,13 +114,15 @@ export function InfoCard({
   label,
   value,
   muted = false,
+  className,
 }: {
   label: string;
   value: string;
   muted?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="soft-card">
+    <div className={cn("soft-card", className)}>
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
         {label}
       </div>

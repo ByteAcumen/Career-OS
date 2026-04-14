@@ -143,7 +143,7 @@ export function WorkspaceShell({
 
   function renderNav(compact: boolean) {
     return navGroups.map((group) => (
-      <div key={group.label} className="space-y-2">
+      <div key={group.label} className="space-y-2.5">
         {!compact ? (
           <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
             {group.label}
@@ -159,16 +159,26 @@ export function WorkspaceShell({
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-[18px] px-3 py-3 text-sm font-medium transition",
+                  "group relative flex items-center gap-3 rounded-[18px] border px-3 py-3 text-sm font-medium transition",
                   active
-                    ? "bg-white text-black"
-                    : "text-[var(--muted)] hover:bg-white/[0.05] hover:text-white",
-                  compact && "justify-center px-0",
+                    ? "border-white bg-white text-black shadow-[0_22px_42px_-28px_rgba(255,255,255,0.45)]"
+                    : "border-transparent text-[var(--muted)] hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white",
+                  compact && "justify-center px-0 py-0 size-[52px]",
                 )}
                 aria-current={active ? "page" : undefined}
                 title={compact ? item.label : undefined}
               >
-                <item.icon className={cn("size-4.5 shrink-0", active ? "text-black" : "text-white")} />
+                <span
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-[14px] border transition",
+                    active
+                      ? "border-black/10 bg-black/6 text-black"
+                      : "border-white/[0.08] bg-white/[0.04] text-white group-hover:border-white/[0.12] group-hover:bg-white/[0.08]",
+                    compact && "size-10 border-transparent bg-transparent",
+                  )}
+                >
+                  <item.icon className={cn("size-4.5 shrink-0", active ? "text-black" : "text-white")} />
+                </span>
                 {!compact ? <span>{item.label}</span> : null}
               </Link>
             );
@@ -184,18 +194,18 @@ export function WorkspaceShell({
         <aside
           className={cn(
             "fixed inset-y-0 left-0 z-40 hidden border-r border-white/[0.08] bg-[rgba(6,6,6,0.92)] px-3 py-4 backdrop-blur lg:flex lg:flex-col",
-            collapsed ? "w-[84px]" : "w-[272px]",
+            collapsed ? "w-[92px]" : "w-[280px]",
           )}
         >
-          <div className="flex items-center justify-between gap-3 px-2">
+          <div className="flex items-start justify-between gap-3 px-2">
             <Link href="/home" className="flex min-w-0 items-center gap-3 rounded-[18px] px-2 py-2">
-              <div className="flex size-10 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.04]">
+              <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.04]">
                 <Target className="size-4 text-white" />
               </div>
               {!collapsed ? (
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-white">Career OS</div>
-                  <div className="truncate text-xs text-[var(--muted)]">Private student workspace</div>
+                  <div className="truncate text-xs text-[var(--muted)]">Focused student workspace</div>
                 </div>
               ) : null}
             </Link>
@@ -209,12 +219,17 @@ export function WorkspaceShell({
             </button>
           </div>
 
-          <div className="mt-8 flex-1 space-y-6 overflow-y-auto px-1 custom-scrollbar">
+          <div className="mt-6 flex-1 space-y-6 overflow-y-auto px-1 custom-scrollbar">
             {renderNav(collapsed)}
           </div>
 
           <div className="mt-4 border-t border-white/[0.08] px-2 pt-4">
-            <div className={cn("rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3", collapsed && "px-2")}>
+            <div
+              className={cn(
+                "rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3",
+                collapsed && "flex flex-col items-center gap-3 px-2",
+              )}
+            >
               <div className="flex items-center gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.05] text-sm font-semibold text-white">
                   {currentUser.name.slice(0, 1).toUpperCase()}
@@ -222,6 +237,9 @@ export function WorkspaceShell({
                 {!collapsed ? (
                   <>
                     <div className="min-w-0 flex-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                        Signed in
+                      </div>
                       <div className="truncate text-sm font-medium text-white">{currentUser.name}</div>
                       <div className="truncate text-xs text-[var(--muted)]">{currentUser.email}</div>
                     </div>
@@ -236,6 +254,19 @@ export function WorkspaceShell({
                   </>
                 ) : null}
               </div>
+
+              {collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  disabled={signingOut}
+                  className="inline-flex size-10 items-center justify-center rounded-[14px] border border-[var(--line)] bg-white/[0.04] text-[var(--muted)] transition hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              ) : null}
             </div>
           </div>
         </aside>
@@ -256,16 +287,16 @@ export function WorkspaceShell({
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -24, opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="fixed inset-y-0 left-0 z-50 flex w-[290px] flex-col border-r border-white/[0.08] bg-[rgba(6,6,6,0.98)] px-4 py-4 lg:hidden"
+                className="fixed inset-y-0 left-0 z-50 flex w-[min(90vw,320px)] flex-col border-r border-white/[0.08] bg-[rgba(6,6,6,0.98)] px-4 py-4 lg:hidden"
               >
                 <div className="flex items-center justify-between gap-3">
                   <Link href="/home" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
-                    <div className="flex size-10 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.04]">
+                    <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.04]">
                       <Target className="size-4 text-white" />
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-white">Career OS</div>
-                      <div className="text-xs text-[var(--muted)]">Private student workspace</div>
+                      <div className="text-xs text-[var(--muted)]">Focused student workspace</div>
                     </div>
                   </Link>
                   <button
@@ -276,7 +307,14 @@ export function WorkspaceShell({
                     <X className="size-4" />
                   </button>
                 </div>
-                <div className="mt-8 flex-1 space-y-6 overflow-y-auto custom-scrollbar">{renderNav(false)}</div>
+                <div className="mt-6 flex-1 space-y-6 overflow-y-auto custom-scrollbar">{renderNav(false)}</div>
+                <div className="mb-3 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                    Signed in
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-white">{currentUser.name}</div>
+                  <div className="truncate text-xs text-[var(--muted)]">{currentUser.email}</div>
+                </div>
                 <button
                   type="button"
                   onClick={() => void handleSignOut()}
@@ -291,10 +329,10 @@ export function WorkspaceShell({
           ) : null}
         </AnimatePresence>
 
-        <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "lg:pl-[84px]" : "lg:pl-[272px]")}>
+        <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]")}>
           <header className="page-topbar sticky top-0 z-30">
             <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <button
                   type="button"
                   onClick={() => setMobileOpen(true)}
@@ -303,14 +341,19 @@ export function WorkspaceShell({
                   <Menu className="size-4" />
                 </button>
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                     {pageCopy[page].title}
                   </div>
-                  <div className="truncate text-sm text-white">{pageCopy[page].description}</div>
+                  <div className="mt-1 text-base font-medium text-white sm:text-lg">
+                    {pageCopy[page].description}
+                  </div>
                 </div>
               </div>
 
-              <div className="hidden items-center gap-3 sm:flex">
+              <div className="hidden items-center gap-3 md:flex">
+                <div className="rounded-full border border-[var(--line)] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white">
+                  {currentUser.name}
+                </div>
                 <div className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-xs font-medium text-[var(--muted)]">
                   Protected workspace
                 </div>

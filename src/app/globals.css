@@ -95,9 +95,9 @@ select {
 
 .page-topbar {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(7, 7, 7, 0.82);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: rgba(7, 7, 7, 0.84);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .page-pill {
@@ -106,8 +106,8 @@ select {
   gap: 0.5rem;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.42rem 0.82rem;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -173,8 +173,8 @@ select {
 .metric-panel {
   border-radius: 24px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
-  padding: 1.15rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.018));
+  padding: 1.2rem;
   box-shadow: var(--shadow-surface);
 }
 
@@ -195,11 +195,11 @@ select {
 }
 
 .glass-card {
-  background: linear-gradient(180deg, rgba(15, 15, 15, 0.96), rgba(9, 9, 9, 0.94));
+  background: linear-gradient(180deg, rgba(15, 15, 15, 0.96), rgba(8, 8, 8, 0.94));
   border: 1px solid var(--line);
   box-shadow: var(--shadow-surface);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .glass-card:hover {
@@ -209,12 +209,13 @@ select {
 .soft-card {
   border-radius: 22px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.02));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.016));
   padding: 18px;
 }
 
 .soft-card:hover {
   border-color: var(--line-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.022));
 }
 
 .section-panel {
