@@ -269,19 +269,19 @@ export function WorkspacePlannerPage({
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Planner"
-          title="Keep planning separate from logging so the next task stays obvious."
-          description="Planner now owns task lanes, schedule blocks, review, and focus tools. Logging lives on its own page so planning stays calm and actionable."
+          title="Plan the work clearly before you execute it."
+          description="Planner owns task lanes, schedule rhythm, review, and focus support. Keep this page about deciding and sequencing the work, not logging everything at once."
         />
       </motion.div>
 
       <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Active tasks" value={data.planner.summary.active} detail="Open tasks across all planning lanes." />
-        <StatCard label="Today open" value={data.planner.summary.todayOpen} detail="Daily tasks still needing attention today." />
+        <StatCard label="Active tasks" value={data.planner.summary.active} detail="Open tasks across all planner lanes." />
+        <StatCard label="Today open" value={data.planner.summary.todayOpen} detail="Tasks that still compete for attention today." />
         <StatCard label="Target rhythm" value={`${data.settings.weekdayTaskTarget}/${data.settings.weekendTaskTarget}`} detail="Weekday and weekend task targets." />
-        <StatCard label="Review handoff" value={reviewForm.tomorrowTask ? "Ready" : "Missing"} detail={reviewForm.tomorrowTask ? "Tomorrow task is already written." : "Save tomorrow's first task before ending the day."} />
+        <StatCard label="Review handoff" value={reviewForm.tomorrowTask ? "Ready" : "Missing"} detail={reviewForm.tomorrowTask ? "Tomorrow task is already written." : "Write tomorrow's first task before you stop."} />
       </motion.div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_0.8fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.18fr)_0.82fr]">
         <TaskBoard
           tasks={data.planner.tasks}
           summary={data.planner.summary}
@@ -300,6 +300,7 @@ export function WorkspacePlannerPage({
 
         <div className="grid gap-6">
           <SectionCard
+            eyebrow="Rhythm"
             title="Today rhythm"
             description="Use schedule blocks and the timer as lightweight execution support, not as another dashboard."
           >
@@ -322,6 +323,7 @@ export function WorkspacePlannerPage({
           </SectionCard>
 
           <SectionCard
+            eyebrow="Review"
             title="Daily review"
             description="Close the day with clear check-ins and a clean handoff for tomorrow."
             action={
@@ -399,6 +401,7 @@ export function WorkspacePlannerPage({
           </SectionCard>
 
           <SectionCard
+            eyebrow="Utility"
             title="Focus timer"
             description="The timer is available here as a utility so it supports planning without taking over the workspace."
           >

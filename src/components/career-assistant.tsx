@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, LoaderCircle, Maximize2, Minimize2, Send, X } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  LoaderCircle,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  Send,
+  X,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,6 +25,13 @@ type Message = {
 
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_MESSAGE_CHARS = 1400;
+const MAX_STORED_MESSAGES = 24;
+const WELCOME_MESSAGE: Message = {
+  id: "assistant-welcome",
+  role: "assistant",
+  content:
+    "Ask for a review, a study plan, or a direct workspace update. I can add tasks, save review notes, and log work when you ask clearly.",
+};
 
 function buildRequestMessages(messages: Message[], nextUserMessage: Message) {
   return [...messages, nextUserMessage]
@@ -60,24 +77,42 @@ async function readAssistantError(response: Response) {
   return text || "The assistant could not complete that request.";
 }
 
-export function CareerAssistant() {
+function getStorageKey(userId: string) {
+  return `career-os:assistant:${userId}`;
+}
+
+function sanitizeStoredMessages(messages: Message[]) {
+  const cleaned = messages
+    .filter(
+      (message) =>
+        message &&
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string" &&
+        typeof message.id === "string",
+    )
+    .slice(-MAX_STORED_MESSAGES);
+
+  return cleaned.length ? cleaned : [WELCOME_MESSAGE];
+}
+
+export function CareerAssistant({ userId }: { userId: string }) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "assistant-welcome",
-      role: "assistant",
-      content:
-        "Ask for a quick review, a study plan, or help deciding what to do next based on your saved data.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [workspaceUpdated, setWorkspaceUpdated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const quickPrompts = useMemo(
-    () => ["Review my week", "What should I build next?", "How should I plan tomorrow?"],
+    () => [
+      "Review my week",
+      "Add a daily task for resume tailoring tonight",
+      "Log a build entry for today's project work",
+      "How should I plan tomorrow?",
+    ],
     [],
   );
 
@@ -86,8 +121,57 @@ export function CareerAssistant() {
   }, []);
 
   useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(getStorageKey(userId));
+      if (!raw) {
+        setMessages([WELCOME_MESSAGE]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Message[];
+      setMessages(sanitizeStoredMessages(parsed));
+    } catch {
+      setMessages([WELCOME_MESSAGE]);
+    }
+  }, [mounted, userId]);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        getStorageKey(userId),
+        JSON.stringify(sanitizeStoredMessages(messages)),
+      );
+    } catch {
+      // Ignore storage failures and keep the in-memory conversation alive.
+    }
+  }, [messages, mounted, userId]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
+
+  function clearConversation() {
+    setMessages([WELCOME_MESSAGE]);
+    setWorkspaceUpdated(false);
+
+    if (!mounted) {
+      return;
+    }
+
+    try {
+      window.localStorage.removeItem(getStorageKey(userId));
+    } catch {
+      // Ignore storage failures.
+    }
+  }
 
   async function sendCurrentMessage() {
     if (!input.trim() || streaming) {
@@ -108,6 +192,7 @@ export function CareerAssistant() {
     ]);
     setInput("");
     setStreaming(true);
+    setWorkspaceUpdated(false);
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -126,6 +211,7 @@ export function CareerAssistant() {
         throw new Error("The assistant did not return a response stream.");
       }
 
+      const actionsApplied = response.headers.get("x-ai-actions-applied") === "true";
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let currentText = "";
@@ -144,6 +230,11 @@ export function CareerAssistant() {
               : message,
           ),
         );
+      }
+
+      if (actionsApplied) {
+        setWorkspaceUpdated(true);
+        router.refresh();
       }
     } catch (error) {
       setMessages((current) =>
@@ -208,11 +299,20 @@ export function CareerAssistant() {
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-white">Career AI Assistant</div>
-                  <div className="text-xs text-[var(--muted)]">Context-aware and user-scoped</div>
+                  <div className="text-xs text-[var(--muted)]">Context-aware, user-scoped, and action-capable</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={clearConversation}
+                  className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
+                  aria-label="Clear conversation"
+                  title="Clear conversation"
+                >
+                  <RotateCcw className="size-4" />
+                </button>
                 <button
                   type="button"
                   onClick={() => setExpanded((value) => !value)}
@@ -232,6 +332,13 @@ export function CareerAssistant() {
 
             <div className="flex-1 overflow-y-auto px-5 py-5 custom-scrollbar">
               <div className="grid gap-4">
+                {workspaceUpdated ? (
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.06] px-3 py-2 text-xs font-medium text-white">
+                    <CheckCircle2 className="size-3.5" />
+                    Workspace updated from the conversation
+                  </div>
+                ) : null}
+
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -284,32 +391,38 @@ export function CareerAssistant() {
                   event.preventDefault();
                   void sendCurrentMessage();
                 }}
-                className="flex items-end gap-3"
+                className="grid gap-3"
               >
-                <textarea
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void sendCurrentMessage();
-                    }
-                  }}
-                  className="field-area min-h-[52px] max-h-[150px] flex-1 resize-none"
-                  placeholder="Ask about your plan, progress, or next move..."
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || streaming}
-                  className={cn(
-                    "inline-flex size-12 items-center justify-center rounded-[18px] transition",
-                    input.trim() && !streaming
-                      ? "bg-white text-black hover:bg-neutral-200"
-                      : "cursor-not-allowed bg-white/[0.04] text-[var(--muted)]",
-                  )}
-                >
-                  <Send className="size-4" />
-                </button>
+                <div className="flex items-end gap-3">
+                  <textarea
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendCurrentMessage();
+                      }
+                    }}
+                    className="field-area min-h-[52px] max-h-[150px] flex-1 resize-none"
+                    placeholder="Ask about your plan, progress, or tell me to add tasks, save reviews, or log work..."
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || streaming}
+                    className={cn(
+                      "inline-flex size-12 items-center justify-center rounded-[18px] transition",
+                      input.trim() && !streaming
+                        ? "bg-white text-black hover:bg-neutral-200"
+                        : "cursor-not-allowed bg-white/[0.04] text-[var(--muted)]",
+                    )}
+                  >
+                    <Send className="size-4" />
+                  </button>
+                </div>
+
+                <div className="text-[11px] leading-5 text-[var(--muted)]">
+                  Conversation is saved on this device for your account. Ask explicitly if you want the assistant to change tasks, reviews, settings, or logs.
+                </div>
               </form>
             </div>
           </motion.div>

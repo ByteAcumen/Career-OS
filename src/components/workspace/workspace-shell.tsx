@@ -387,7 +387,7 @@ export function WorkspaceShell({
           ) : null}
         </AnimatePresence>
 
-        <CareerAssistant />
+        <CareerAssistant userId={currentUser.id} />
       </div>
     </WorkspaceUiContext.Provider>
   );

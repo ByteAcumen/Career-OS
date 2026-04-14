@@ -15,7 +15,16 @@ import {
 
 import { getWeaknessCurriculumAction, predictMatchAction } from "@/app/actions";
 import { useWorkspaceUi } from "@/components/workspace/workspace-shell";
-import { riseIn, sectionStagger, EmptyPanel, InfoCard, PageHeader, SectionCard, StatCard } from "@/components/workspace/workspace-primitives";
+import {
+  ActionLink,
+  EmptyPanel,
+  InfoCard,
+  PageHeader,
+  SectionCard,
+  StatCard,
+  riseIn,
+  sectionStagger,
+} from "@/components/workspace/workspace-primitives";
 import { postJson } from "@/lib/client-request";
 import type { LoggerPageData } from "@/lib/workspace-data";
 import type { DashboardData } from "@/lib/types";
@@ -35,7 +44,13 @@ const dsaPatterns = [
 ];
 
 const buildAreas = ["React", "NestJS", "TypeScript", "AI", "System Design"] as const;
-const applicationStatuses = ["Applied", "Referral asked", "OA scheduled", "Interview", "Rejected"] as const;
+const applicationStatuses = [
+  "Applied",
+  "Referral asked",
+  "OA scheduled",
+  "Interview",
+  "Rejected",
+] as const;
 
 export function WorkspaceLoggerPage({
   data: initialData,
@@ -68,7 +83,10 @@ export function WorkspaceLoggerPage({
   const [busy, startTransition] = useTransition();
   const [curriculum, setCurriculum] = useState("");
   const [curriculumPending, startCurriculumTransition] = useTransition();
-  const [matchPreview, setMatchPreview] = useState<{ score: number; analysis: string } | null>(null);
+  const [matchPreview, setMatchPreview] = useState<{
+    score: number;
+    analysis: string;
+  } | null>(null);
   const [matchPending, startMatchTransition] = useTransition();
 
   async function saveDsa() {
@@ -94,7 +112,8 @@ export function WorkspaceLoggerPage({
             ...entry,
             insight: (entry.insight ?? dsaForm.insight) || null,
             repositoryUrl: (entry.repositoryUrl ?? dsaForm.repositoryUrl) || null,
-            createdAt: "createdAt" in entry ? entry.createdAt : new Date().toISOString(),
+            createdAt:
+              "createdAt" in entry ? entry.createdAt : new Date().toISOString(),
           },
           ...current.recentDsa,
         ].slice(0, 6),
@@ -136,7 +155,8 @@ export function WorkspaceLoggerPage({
             proof: (entry.proof ?? buildForm.proof) || null,
             impact: (entry.impact ?? buildForm.impact) || null,
             repositoryUrl: (entry.repositoryUrl ?? buildForm.repositoryUrl) || null,
-            createdAt: "createdAt" in entry ? entry.createdAt : new Date().toISOString(),
+            createdAt:
+              "createdAt" in entry ? entry.createdAt : new Date().toISOString(),
           },
           ...current.recentBuilds,
         ].slice(0, 6),
@@ -161,10 +181,13 @@ export function WorkspaceLoggerPage({
     }
 
     try {
-      const entry = await postJson<DashboardData["recentApplications"][number]>("/api/applications", {
-        dateKey: data.today.dateKey,
-        ...applicationForm,
-      });
+      const entry = await postJson<DashboardData["recentApplications"][number]>(
+        "/api/applications",
+        {
+          dateKey: data.today.dateKey,
+          ...applicationForm,
+        },
+      );
 
       setData((current) => ({
         ...current,
@@ -178,7 +201,8 @@ export function WorkspaceLoggerPage({
             note: (entry.note ?? applicationForm.note) || null,
             roleUrl: (entry.roleUrl ?? applicationForm.roleUrl) || null,
             syncedToSheet: "syncedToSheet" in entry ? entry.syncedToSheet : false,
-            createdAt: "createdAt" in entry ? entry.createdAt : new Date().toISOString(),
+            createdAt:
+              "createdAt" in entry ? entry.createdAt : new Date().toISOString(),
           },
           ...current.recentApplications,
         ].slice(0, 8),
@@ -209,7 +233,11 @@ export function WorkspaceLoggerPage({
           setToast("AI weakness focus generated.");
         })
         .catch((error) => {
-          setToast(error instanceof Error ? error.message : "Could not generate the weakness focus.");
+          setToast(
+            error instanceof Error
+              ? error.message
+              : "Could not generate the weakness focus.",
+          );
         });
     });
   }
@@ -231,7 +259,11 @@ export function WorkspaceLoggerPage({
           setToast("AI fit preview ready.");
         })
         .catch((error) => {
-          setToast(error instanceof Error ? error.message : "Could not generate the fit preview.");
+          setToast(
+            error instanceof Error
+              ? error.message
+              : "Could not generate the fit preview.",
+          );
         });
     });
   }
@@ -241,282 +273,427 @@ export function WorkspaceLoggerPage({
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Logger"
-          title="Capture work cleanly without turning planning into data entry."
-          description="Logger is now a dedicated workflow for DSA solves, build progress, and applications. The forms stay here, the recent proof stays visible, and the AI helpers stay contextual."
+          title="Capture finished work without turning planning into form-filling."
+          description="Logger is a dedicated workflow for DSA solves, build progress, and applications. Keep the entries specific here so Planner stays focused on sequencing the work."
+          actions={
+            <>
+              <ActionLink href="/planner" label="Back to planner" />
+              <ActionLink href="/strategy" label="Open strategy" />
+            </>
+          }
         />
       </motion.div>
 
       <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="This week · DSA" value={data.metrics.weekDsa} detail="Problems logged in the current week." />
-        <StatCard label="This week · Builds" value={data.metrics.weekBuilds} detail="Build outputs captured this week." />
-        <StatCard label="This week · Apps" value={data.metrics.weekApplications} detail="Applications stored this week." />
-        <StatCard label="Target role" value={data.settings.targetRole || "Unset"} detail="Used by AI when generating fit and strategy signals." />
+        <StatCard
+          label="Week DSA"
+          value={data.metrics.weekDsa}
+          detail="Problems logged in the current week."
+        />
+        <StatCard
+          label="Week builds"
+          value={data.metrics.weekBuilds}
+          detail="Build outputs captured this week."
+        />
+        <StatCard
+          label="Week applications"
+          value={data.metrics.weekApplications}
+          detail="Applications stored this week."
+        />
+        <StatCard
+          label="Target role"
+          value={data.settings.targetRole || "Unset"}
+          detail="Used by AI when generating fit and strategy signals."
+        />
       </motion.div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <SectionCard
-          title="Log DSA work"
-          description="Capture the problem, the pattern, and one useful insight while the learning is fresh."
-          action={
-            <button
-              type="button"
-              onClick={() => startTransition(() => void saveDsa())}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
-            >
-              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              Save
-            </button>
-          }
-        >
-          <div className="grid gap-3">
-            <input
-              value={dsaForm.title}
-              onChange={(event) => setDsaForm((current) => ({ ...current, title: event.target.value }))}
-              className="field"
-              placeholder="Problem title"
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <select
-                value={dsaForm.difficulty}
-                onChange={(event) => setDsaForm((current) => ({ ...current, difficulty: event.target.value }))}
-                className="field"
-              >
-                {["Easy", "Medium", "Hard"].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={dsaForm.pattern}
-                onChange={(event) => setDsaForm((current) => ({ ...current, pattern: event.target.value }))}
-                className="field"
-              >
-                {dsaPatterns.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <textarea
-              value={dsaForm.insight}
-              onChange={(event) => setDsaForm((current) => ({ ...current, insight: event.target.value }))}
-              className="field-area min-h-[110px]"
-              placeholder="What pattern, mistake, or insight is worth remembering?"
-            />
-            <input
-              value={dsaForm.repositoryUrl}
-              onChange={(event) => setDsaForm((current) => ({ ...current, repositoryUrl: event.target.value }))}
-              className="field"
-              placeholder="Optional proof link"
-            />
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Log build work"
-          description="Track shipped proof, impact, and the technical area so Progress can stay meaningful."
-          action={
-            <button
-              type="button"
-              onClick={() => startTransition(() => void saveBuild())}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
-            >
-              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              Save
-            </button>
-          }
-        >
-          <div className="grid gap-3">
-            <input
-              value={buildForm.title}
-              onChange={(event) => setBuildForm((current) => ({ ...current, title: event.target.value }))}
-              className="field"
-              placeholder="Feature or project title"
-            />
-            <select
-              value={buildForm.area}
-              onChange={(event) => setBuildForm((current) => ({ ...current, area: event.target.value }))}
-              className="field"
-            >
-              {buildAreas.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={buildForm.proof}
-              onChange={(event) => setBuildForm((current) => ({ ...current, proof: event.target.value }))}
-              className="field-area min-h-[90px]"
-              placeholder="What exactly shipped, changed, or became visible?"
-            />
-            <textarea
-              value={buildForm.impact}
-              onChange={(event) => setBuildForm((current) => ({ ...current, impact: event.target.value }))}
-              className="field-area min-h-[90px]"
-              placeholder="Why does this matter? What capability does it prove?"
-            />
-            <input
-              value={buildForm.repositoryUrl}
-              onChange={(event) => setBuildForm((current) => ({ ...current, repositoryUrl: event.target.value }))}
-              className="field"
-              placeholder="Optional repo / deploy link"
-            />
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Log applications"
-          description="Store roles and statuses here so the Planner never has to carry job-tracking forms."
-          action={
-            <button
-              type="button"
-              onClick={() => startTransition(() => void saveApplication())}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
-            >
-              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              Save
-            </button>
-          }
-        >
-          <div className="grid gap-3">
-            <input
-              value={applicationForm.company}
-              onChange={(event) =>
-                setApplicationForm((current) => ({ ...current, company: event.target.value }))
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.08fr)_0.92fr]">
+        <div className="grid gap-6">
+          <div className="grid gap-6 xl:grid-cols-2">
+            <SectionCard
+              eyebrow="DSA"
+              title="Log DSA work"
+              description="Capture the problem, the pattern, and one useful learning while the solve is still fresh."
+              action={
+                <button
+                  type="button"
+                  onClick={() => startTransition(() => void saveDsa())}
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
+                >
+                  {busy ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="size-4" />
+                  )}
+                  Save
+                </button>
               }
-              className="field"
-              placeholder="Company"
-            />
-            <input
-              value={applicationForm.role}
-              onChange={(event) => setApplicationForm((current) => ({ ...current, role: event.target.value }))}
-              className="field"
-              placeholder="Role"
-            />
-            <select
-              value={applicationForm.status}
-              onChange={(event) =>
-                setApplicationForm((current) => ({ ...current, status: event.target.value }))
-              }
-              className="field"
             >
-              {applicationStatuses.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={applicationForm.note}
-              onChange={(event) => setApplicationForm((current) => ({ ...current, note: event.target.value }))}
-              className="field-area min-h-[90px]"
-              placeholder="Optional note, referral context, or follow-up reminder"
-            />
-            <input
-              value={applicationForm.roleUrl}
-              onChange={(event) =>
-                setApplicationForm((current) => ({ ...current, roleUrl: event.target.value }))
-              }
-              className="field"
-              placeholder="Job post link"
-            />
-            <button
-              type="button"
-              onClick={runMatchPreview}
-              disabled={matchPending}
-              className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-[var(--line)] bg-white/[0.04] px-4 py-3 text-sm font-medium text-white hover:bg-white/[0.08] disabled:opacity-50"
-            >
-              {matchPending ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              Preview fit with AI
-            </button>
-            {matchPreview ? (
-              <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.03] px-4 py-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                  Match preview
+              <div className="grid gap-3">
+                <input
+                  value={dsaForm.title}
+                  onChange={(event) =>
+                    setDsaForm((current) => ({ ...current, title: event.target.value }))
+                  }
+                  className="field"
+                  placeholder="Problem title"
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <select
+                    value={dsaForm.difficulty}
+                    onChange={(event) =>
+                      setDsaForm((current) => ({
+                        ...current,
+                        difficulty: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  >
+                    {["Easy", "Medium", "Hard"].map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={dsaForm.pattern}
+                    onChange={(event) =>
+                      setDsaForm((current) => ({
+                        ...current,
+                        pattern: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  >
+                    {dsaPatterns.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight text-white">
-                  {matchPreview.score}/100
-                </div>
-                <div className="mt-2 text-sm leading-7 text-[var(--muted)]">{matchPreview.analysis}</div>
+                <textarea
+                  value={dsaForm.insight}
+                  onChange={(event) =>
+                    setDsaForm((current) => ({ ...current, insight: event.target.value }))
+                  }
+                  className="field-area min-h-[120px]"
+                  placeholder="What pattern, mistake, or insight is worth remembering?"
+                />
+                <input
+                  value={dsaForm.repositoryUrl}
+                  onChange={(event) =>
+                    setDsaForm((current) => ({
+                      ...current,
+                      repositoryUrl: event.target.value,
+                    }))
+                  }
+                  className="field"
+                  placeholder="Optional proof link"
+                />
               </div>
-            ) : null}
-          </div>
-        </SectionCard>
-      </div>
+            </SectionCard>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <SectionCard
-          title="AI helper"
-          description="AI stays close to the work you are logging instead of taking over the page."
-          action={
-            <button
-              type="button"
-              onClick={runCurriculum}
-              disabled={curriculumPending}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+            <SectionCard
+              eyebrow="Build"
+              title="Log build work"
+              description="Track visible proof and the impact so Progress stays meaningful."
+              action={
+                <button
+                  type="button"
+                  onClick={() => startTransition(() => void saveBuild())}
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
+                >
+                  {busy ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="size-4" />
+                  )}
+                  Save
+                </button>
+              }
             >
-              {curriculumPending ? <LoaderCircle className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />}
-              Weakest topic next
-            </button>
-          }
-        >
-          <div className="grid gap-3">
-            <InfoCard label="Current role target" value={data.settings.targetRole || "Add a target role in Settings for more precise AI guidance."} />
-            <InfoCard label="Current weekly theme" value={data.settings.weeklyTheme || "No weekly theme set yet."} />
-            {curriculum ? (
-              <InfoCard label="Weakness focus" value={curriculum} />
-            ) : (
-              <EmptyPanel
-                title="No weakness focus generated yet"
-                description="Use the button above after logging a few DSA problems and AI will suggest the highest-value topic cluster to attack next."
-              />
-            )}
+              <div className="grid gap-3">
+                <input
+                  value={buildForm.title}
+                  onChange={(event) =>
+                    setBuildForm((current) => ({ ...current, title: event.target.value }))
+                  }
+                  className="field"
+                  placeholder="Feature or project title"
+                />
+                <select
+                  value={buildForm.area}
+                  onChange={(event) =>
+                    setBuildForm((current) => ({ ...current, area: event.target.value }))
+                  }
+                  className="field"
+                >
+                  {buildAreas.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  value={buildForm.proof}
+                  onChange={(event) =>
+                    setBuildForm((current) => ({ ...current, proof: event.target.value }))
+                  }
+                  className="field-area min-h-[96px]"
+                  placeholder="What exactly shipped, changed, or became visible?"
+                />
+                <textarea
+                  value={buildForm.impact}
+                  onChange={(event) =>
+                    setBuildForm((current) => ({ ...current, impact: event.target.value }))
+                  }
+                  className="field-area min-h-[96px]"
+                  placeholder="Why does this matter? What capability does it prove?"
+                />
+                <input
+                  value={buildForm.repositoryUrl}
+                  onChange={(event) =>
+                    setBuildForm((current) => ({
+                      ...current,
+                      repositoryUrl: event.target.value,
+                    }))
+                  }
+                  className="field"
+                  placeholder="Optional repo or deploy link"
+                />
+              </div>
+            </SectionCard>
           </div>
-        </SectionCard>
 
-        <div className="grid gap-6 xl:grid-cols-3">
-          <RecentLogColumn
-            title="Recent DSA"
-            icon={Code2}
-            emptyText="Your latest problem solves will appear here."
-            items={data.recentDsa.map((item) => ({
-              id: item.id,
-              title: item.title,
-              subtitle: `${item.difficulty} · ${item.pattern}`,
-              body: item.insight || "No insight saved yet.",
-              href: item.repositoryUrl ?? undefined,
-              createdAt: item.createdAt,
-            }))}
-          />
-          <RecentLogColumn
-            title="Recent builds"
-            icon={Rocket}
-            emptyText="Your latest shipped build work will appear here."
-            items={data.recentBuilds.map((item) => ({
-              id: item.id,
-              title: item.title,
-              subtitle: item.area,
-              body: item.impact || item.proof || "No build proof saved yet.",
-              href: item.repositoryUrl ?? undefined,
-              createdAt: item.createdAt,
-            }))}
-          />
-          <RecentLogColumn
-            title="Recent applications"
-            icon={Briefcase}
-            emptyText="Stored roles and statuses will appear here."
-            items={data.recentApplications.map((item) => ({
-              id: item.id,
-              title: `${item.role} at ${item.company}`,
-              subtitle: item.status,
-              body: item.note || "No note saved.",
-              href: item.roleUrl ?? undefined,
-              createdAt: item.createdAt,
-            }))}
-          />
+          <SectionCard
+            eyebrow="Recent"
+            title="Recent proof of work"
+            description="The newest DSA, build, and application evidence stays visible so logging has immediate value."
+          >
+            <div className="grid gap-6 xl:grid-cols-3">
+              <RecentLogColumn
+                title="Recent DSA"
+                icon={Code2}
+                emptyText="Your latest problem solves will appear here."
+                items={data.recentDsa.map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  subtitle: `${item.difficulty} - ${item.pattern}`,
+                  body: item.insight || "No insight saved yet.",
+                  href: item.repositoryUrl ?? undefined,
+                  createdAt: item.createdAt,
+                }))}
+              />
+              <RecentLogColumn
+                title="Recent builds"
+                icon={Rocket}
+                emptyText="Your latest shipped build work will appear here."
+                items={data.recentBuilds.map((item) => ({
+                  id: item.id,
+                  title: item.title,
+                  subtitle: item.area,
+                  body: item.impact || item.proof || "No build proof saved yet.",
+                  href: item.repositoryUrl ?? undefined,
+                  createdAt: item.createdAt,
+                }))}
+              />
+              <RecentLogColumn
+                title="Recent applications"
+                icon={Briefcase}
+                emptyText="Stored roles and statuses will appear here."
+                items={data.recentApplications.map((item) => ({
+                  id: item.id,
+                  title: `${item.role} at ${item.company}`,
+                  subtitle: item.status,
+                  body: item.note || "No note saved.",
+                  href: item.roleUrl ?? undefined,
+                  createdAt: item.createdAt,
+                }))}
+              />
+            </div>
+          </SectionCard>
+        </div>
+
+        <div className="grid gap-6">
+          <SectionCard
+            eyebrow="Applications"
+            title="Log applications"
+            description="Store roles, status, and follow-up context here so Planner never has to carry job-tracking forms."
+            action={
+              <button
+                type="button"
+                onClick={() => startTransition(() => void saveApplication())}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
+              >
+                {busy ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Save
+              </button>
+            }
+          >
+            <div className="grid gap-3">
+              <input
+                value={applicationForm.company}
+                onChange={(event) =>
+                  setApplicationForm((current) => ({
+                    ...current,
+                    company: event.target.value,
+                  }))
+                }
+                className="field"
+                placeholder="Company"
+              />
+              <input
+                value={applicationForm.role}
+                onChange={(event) =>
+                  setApplicationForm((current) => ({
+                    ...current,
+                    role: event.target.value,
+                  }))
+                }
+                className="field"
+                placeholder="Role"
+              />
+              <select
+                value={applicationForm.status}
+                onChange={(event) =>
+                  setApplicationForm((current) => ({
+                    ...current,
+                    status: event.target.value,
+                  }))
+                }
+                className="field"
+              >
+                {applicationStatuses.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                value={applicationForm.note}
+                onChange={(event) =>
+                  setApplicationForm((current) => ({ ...current, note: event.target.value }))
+                }
+                className="field-area min-h-[100px]"
+                placeholder="Optional note, referral context, or follow-up reminder"
+              />
+              <input
+                value={applicationForm.roleUrl}
+                onChange={(event) =>
+                  setApplicationForm((current) => ({
+                    ...current,
+                    roleUrl: event.target.value,
+                  }))
+                }
+                className="field"
+                placeholder="Job post link"
+              />
+              <button
+                type="button"
+                onClick={runMatchPreview}
+                disabled={matchPending}
+                className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-[var(--line)] bg-white/[0.04] px-4 py-3 text-sm font-medium text-white hover:bg-white/[0.08] disabled:opacity-50"
+              >
+                {matchPending ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
+                Preview fit with AI
+              </button>
+              {matchPreview ? (
+                <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.03] px-4 py-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                    Match preview
+                  </div>
+                  <div className="mt-3 text-2xl font-semibold tracking-tight text-white">
+                    {matchPreview.score}/100
+                  </div>
+                  <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                    {matchPreview.analysis}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Assistant"
+            title="AI helper"
+            description="AI stays close to the work you are logging instead of taking over the page."
+            action={
+              <button
+                type="button"
+                onClick={runCurriculum}
+                disabled={curriculumPending}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+              >
+                {curriculumPending ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <BrainCircuit className="size-4" />
+                )}
+                Weakest topic next
+              </button>
+            }
+          >
+            <div className="grid gap-3">
+              <InfoCard
+                label="Current role target"
+                value={
+                  data.settings.targetRole ||
+                  "Add a target role in Settings for more precise AI guidance."
+                }
+              />
+              <InfoCard
+                label="Current weekly theme"
+                value={data.settings.weeklyTheme || "No weekly theme set yet."}
+              />
+              <InfoCard
+                label="Why Logger exists"
+                value="Keep capture fast here so Home can stay summary-first and Planner can stay focused on sequencing work."
+                muted
+              />
+              {curriculum ? (
+                <InfoCard label="Weakness focus" value={curriculum} />
+              ) : (
+                <EmptyPanel
+                  title="No weakness focus generated yet"
+                  description="Use the button above after logging a few DSA problems and AI will suggest the highest-value topic cluster to attack next."
+                />
+              )}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Quality"
+            title="What good logging looks like"
+            description="The cleaner the inputs, the better your Progress page, AI coach, and weekly review become."
+          >
+            <div className="grid gap-3">
+              <InfoCard
+                label="DSA entries"
+                value="Save the problem name, pattern, and one repeatable insight. That gives the strategy layer something concrete to work with."
+              />
+              <InfoCard
+                label="Build entries"
+                value="Log visible outputs and why they matter. Avoid vague notes that do not prove capability."
+              />
+              <InfoCard
+                label="Applications"
+                value="Store role, company, and the current status so follow-up pressure stays visible."
+              />
+              <InfoCard
+                label="Proof links"
+                value="When you have a repo, deployment, or posting link, attach it here so the evidence stays connected."
+              />
+            </div>
+          </SectionCard>
         </div>
       </div>
     </motion.div>
@@ -542,7 +719,16 @@ function RecentLogColumn({
   emptyText: string;
 }) {
   return (
-    <SectionCard title={title} description="The latest evidence stays visible so logging has immediate value.">
+    <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.02] p-4 sm:p-5">
+      <div className="mb-4">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+          {title}
+        </div>
+        <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
+          The latest evidence stays visible so logging has immediate value.
+        </div>
+      </div>
+
       {items.length ? (
         <div className="grid gap-3">
           {items.map((item) => (
@@ -552,7 +738,9 @@ function RecentLogColumn({
                 {format(parseISO(item.createdAt), "MMM d")}
               </div>
               <div className="mt-3 text-sm font-medium text-white">{item.title}</div>
-              <div className="mt-2 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">{item.subtitle}</div>
+              <div className="mt-2 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+                {item.subtitle}
+              </div>
               <div className="mt-3 text-sm leading-7 text-[var(--muted)]">{item.body}</div>
               {item.href ? (
                 <a
@@ -570,6 +758,6 @@ function RecentLogColumn({
       ) : (
         <EmptyPanel title="Nothing logged yet" description={emptyText} />
       )}
-    </SectionCard>
+    </div>
   );
 }

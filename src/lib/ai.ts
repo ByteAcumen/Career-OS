@@ -171,7 +171,84 @@ const PlannerSuggestionPackSchema = z.object({
   weekend: z.array(PlannerSuggestionItemSchema).min(1).max(8),
 });
 
+const AssistantSettingsUpdateSchema = z
+  .object({
+    primaryGoal: z.string().max(260).optional(),
+    targetRole: z.string().max(120).optional(),
+    weeklyTheme: z.string().max(120).optional(),
+    planStyle: z.string().max(220).optional(),
+    weekdayTaskTarget: z.number().int().min(1).max(12).optional(),
+    weekendTaskTarget: z.number().int().min(1).max(16).optional(),
+    weeklyDsaTarget: z.number().int().min(1).max(50).optional(),
+    weeklyApplicationTarget: z.number().int().min(1).max(50).optional(),
+    weeklyBuildTarget: z.number().int().min(1).max(20).optional(),
+    timerFocusMinutes: z.number().int().min(15).max(180).optional(),
+    timerBreakMinutes: z.number().int().min(5).max(60).optional(),
+  })
+  .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
+    message: "At least one setting must be present.",
+  });
+
+const AssistantActionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("create_task"),
+    title: z.string().min(3).max(140),
+    details: z.string().max(500).optional(),
+    scope: z.enum(["daily", "weekly", "weekend"]),
+    category: z.enum(["revision", "dsa", "build", "application", "interview", "custom"]),
+    priority: z.enum(["high", "medium", "low"]),
+    estimateMinutes: z.number().int().min(15).max(480),
+    targetDateKey: z.string().optional().nullable(),
+  }),
+  z.object({
+    type: z.literal("save_review"),
+    note: z.string().max(900).optional(),
+    tomorrowTask: z.string().max(220).optional(),
+  }).refine((value) => value.note || value.tomorrowTask, {
+    message: "Review update needs a note or tomorrow task.",
+  }),
+  z.object({
+    type: z.literal("update_settings"),
+    settings: AssistantSettingsUpdateSchema,
+  }),
+  z.object({
+    type: z.literal("log_dsa"),
+    title: z.string().min(3).max(160),
+    difficulty: z.enum(["Easy", "Medium", "Hard"]),
+    pattern: z.string().min(2).max(120),
+    insight: z.string().max(500).optional(),
+    repositoryUrl: z.string().url().optional(),
+    dateKey: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("log_build"),
+    title: z.string().min(3).max(160),
+    area: z.string().min(2).max(120),
+    proof: z.string().max(500).optional(),
+    impact: z.string().max(500).optional(),
+    repositoryUrl: z.string().url().optional(),
+    dateKey: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("log_application"),
+    company: z.string().min(2).max(120),
+    role: z.string().min(2).max(160),
+    status: z.string().min(2).max(120),
+    note: z.string().max(500).optional(),
+    roleUrl: z.string().url().optional(),
+    dateKey: z.string().optional(),
+  }),
+]);
+
+const AssistantActionPlanSchema = z.object({
+  shouldAct: z.boolean(),
+  actionReason: z.string(),
+  actions: z.array(AssistantActionSchema).max(3),
+});
+
 export type CoachResponse = z.infer<typeof CoachResponseSchema>;
+export type AssistantAction = z.infer<typeof AssistantActionSchema>;
+export type AssistantActionPlan = z.infer<typeof AssistantActionPlanSchema>;
 
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
@@ -790,6 +867,53 @@ async function tryOpenRouterStream(
   });
 }
 
+export async function planAssistantActions(options: {
+  userId: string;
+  dashboard: DashboardData;
+  messages: ChatMessage[];
+  preferredProvider: AiProvider;
+  configuredModel: string;
+}): Promise<AssistantActionPlan> {
+  const boundedMessages = normalizeChatMessages(options.messages).slice(-6);
+  const payload = compactObject({
+    latestUserMessage: boundedMessages.filter((message) => message.role === "user").at(-1)?.content,
+    recentMessages: boundedMessages,
+    dateKey: options.dashboard.today.dateKey,
+    settings: {
+      primaryGoal: options.dashboard.settings.primaryGoal,
+      targetRole: options.dashboard.settings.targetRole,
+      weeklyTheme: options.dashboard.settings.weeklyTheme,
+      planStyle: options.dashboard.settings.planStyle,
+      weekdayTaskTarget: options.dashboard.settings.weekdayTaskTarget,
+      weekendTaskTarget: options.dashboard.settings.weekendTaskTarget,
+      weeklyDsaTarget: options.dashboard.settings.weeklyDsaTarget,
+      weeklyApplicationTarget: options.dashboard.settings.weeklyApplicationTarget,
+      weeklyBuildTarget: options.dashboard.settings.weeklyBuildTarget,
+      timerFocusMinutes: options.dashboard.settings.timerFocusMinutes,
+      timerBreakMinutes: options.dashboard.settings.timerBreakMinutes,
+    },
+    plannerSummary: options.dashboard.planner.summary,
+    today: {
+      tomorrowTask: options.dashboard.today.tomorrowTask,
+      note: clipText(options.dashboard.today.note, 220),
+    },
+  });
+
+  const { data } = await dispatchWithFallback({
+    payload,
+    preferredProvider: options.preferredProvider,
+    configuredModel: options.configuredModel,
+    schema: AssistantActionPlanSchema,
+    userId: options.userId,
+    systemPrompt:
+      "You are a safe workspace operator inside Career OS. Convert an explicit user request into zero or more non-destructive workspace actions. Only create actions when the user clearly asks to save, add, log, set, update, or plan something in the app. Never invent missing details, never delete data, never clear history, never remove tasks, and never make broad settings changes unless the user explicitly asked. If the request is advisory, ambiguous, or just conversational, return shouldAct false with no actions.",
+    jsonPrompt:
+      "Return only JSON with shouldAct, actionReason, and actions. Use at most 3 actions. Allowed actions are create_task, save_review, update_settings, log_dsa, log_build, and log_application.",
+  });
+
+  return data;
+}
+
 async function streamGemini(
   apiKey: string,
   model: string,
@@ -1381,7 +1505,7 @@ function clipText(value: string | null | undefined, maxLength: number) {
   if (normalized.length <= maxLength) {
     return normalized;
   }
-  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
 }
 
 function parseJsonWithSchema<T extends z.ZodTypeAny>(text: string, schema: T): z.infer<T> {

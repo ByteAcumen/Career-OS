@@ -13,7 +13,16 @@ import {
 } from "lucide-react";
 
 import { ActivityBarChart } from "@/components/activity-bar-chart";
-import { EmptyPanel, PageHeader, SectionCard, StatCard, riseIn, sectionStagger } from "@/components/workspace/workspace-primitives";
+import {
+  ActionLink,
+  EmptyPanel,
+  InfoCard,
+  PageHeader,
+  SectionCard,
+  StatCard,
+  riseIn,
+  sectionStagger,
+} from "@/components/workspace/workspace-primitives";
 import { postJson } from "@/lib/client-request";
 import type { ProgressPageData } from "@/lib/workspace-data";
 import { cn } from "@/lib/utils";
@@ -62,48 +71,119 @@ export function WorkspaceProgressPage({
       dsa: data.history.reduce((sum, item) => sum + item.dsaCount, 0),
       builds: data.history.reduce((sum, item) => sum + item.buildCount, 0),
       applications: data.history.reduce((sum, item) => sum + item.appCount, 0),
+      outputs14: data.history
+        .slice(-14)
+        .reduce(
+          (sum, item) => sum + item.dsaCount + item.buildCount + item.appCount,
+          0,
+        ),
     }),
     [data.history],
   );
+
+  const latestTimeline = data.history.slice(-12).reverse();
 
   return (
     <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Progress"
-          title="Keep analytics clean, focused, and separate from execution."
-          description="Progress now owns charts, streaks, historical detail, and proof-of-work trends so you can review without being distracted by planner inputs or settings."
+          title="Review momentum without mixing analytics with execution."
+          description="Progress owns streaks, charts, historical detail, and proof-of-work trends so you can assess the week clearly without planner forms or settings noise."
+          actions={
+            <>
+              <ActionLink href="/logger" label="Log more work" />
+              <ActionLink href="/strategy" label="Open strategy" />
+            </>
+          }
         />
       </motion.div>
 
       <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Current streak" value={`${data.metrics.currentStreak} days`} detail="Current visible consistency run." />
-        <StatCard label="Max streak" value={`${data.metrics.maxStreak} days`} detail="Longest recorded run of consistent work." />
-        <StatCard label="Total XP" value={data.metrics.totalXP} detail="Accumulated score from work and check-ins." />
-        <StatCard label="90-day DSA" value={totals.dsa} detail="Problems logged across the current history window." />
-        <StatCard label="90-day builds/apps" value={`${totals.builds}/${totals.applications}`} detail="Shipped build evidence and stored applications." />
+        <StatCard
+          label="Current streak"
+          value={`${data.metrics.currentStreak} days`}
+          detail="Current visible consistency run."
+        />
+        <StatCard
+          label="Max streak"
+          value={`${data.metrics.maxStreak} days`}
+          detail="Longest recorded run of consistent work."
+        />
+        <StatCard
+          label="Total XP"
+          value={data.metrics.totalXP}
+          detail="Accumulated score from work and check-ins."
+        />
+        <StatCard
+          label="90-day DSA"
+          value={totals.dsa}
+          detail="Problems logged across the current history window."
+        />
+        <StatCard
+          label="Builds / apps"
+          value={`${totals.builds}/${totals.applications}`}
+          detail="Visible build proof and stored applications."
+        />
       </motion.div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_0.85fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.16fr)_0.84fr]">
         <SectionCard
+          eyebrow="Trend"
           title="Execution graph"
-          description="A compressed view of the last 90 days. Use it to spot consistency patterns and drill into a single day when needed."
+          description="Use the heatmap for quick pattern recognition, then drill into a single day only when you need the detail."
         >
           <div className="grid gap-6">
-            <CalendarHeatmap history={data.history} onSelect={setSelectedDate} />
-            <ActivityBarChart data={data.history.slice(-21)} />
+            <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.02] p-4 sm:p-5">
+              <CalendarHeatmap history={data.history} onSelect={setSelectedDate} />
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--muted)]">
+                <span className="rounded-full border border-[var(--line)] bg-white/[0.04] px-3 py-1">
+                  Light day
+                </span>
+                <span className="rounded-full bg-white px-3 py-1 text-black">Heavy day</span>
+                <span>Click any day to inspect what was actually completed.</span>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.02] p-4 sm:p-5">
+              <ActivityBarChart data={data.history.slice(-21)} />
+            </div>
           </div>
         </SectionCard>
 
-        <SectionCard
-          title="Recent timeline"
-          description="The newest entries stay visible here, while day-level inspection happens through the heatmap."
-        >
-          <div className="grid gap-3">
-            {data.history
-              .slice(-14)
-              .reverse()
-              .map((item) => (
+        <div className="grid gap-6">
+          <SectionCard
+            eyebrow="Snapshot"
+            title="Review snapshot"
+            description="A narrow summary of the signals that matter before you zoom into the timeline."
+          >
+            <div className="grid gap-3">
+              <InfoCard
+                label="14-day output"
+                value={`${totals.outputs14} visible outputs across the last 14 days.`}
+              />
+              <InfoCard
+                label="Today score"
+                value={`${data.metrics.todayScore} points from work, check-ins, and momentum.`}
+              />
+              <InfoCard
+                label="Applications synced"
+                value={`${data.metrics.syncedApplications} synced and ${data.metrics.pendingApplications} still pending sync.`}
+              />
+              <InfoCard
+                label="Target pace"
+                value={`DSA ${data.metrics.targetProgress.dsa}% | Applications ${data.metrics.targetProgress.applications}% | Builds ${data.metrics.targetProgress.builds}%`}
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            eyebrow="Timeline"
+            title="Recent timeline"
+            description="The latest days stay visible here, while deeper inspection happens through the detail drawer."
+          >
+            <div className="grid gap-3">
+              {latestTimeline.map((item) => (
                 <button
                   key={item.dateKey}
                   type="button"
@@ -115,8 +195,9 @@ export function WorkspaceProgressPage({
                       <div className="text-sm font-medium text-white">
                         {format(parseISO(`${item.dateKey}T00:00:00`), "MMM d, yyyy")}
                       </div>
-                      <div className="mt-2 text-sm text-[var(--muted)]">
-                        {item.completedCount}/5 habit blocks · {item.dsaCount} DSA · {item.buildCount} builds · {item.appCount} applications
+                      <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                        {item.completedCount}/5 habit blocks | {item.dsaCount} DSA |{" "}
+                        {item.buildCount} builds | {item.appCount} applications
                       </div>
                     </div>
                     <div className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs font-semibold text-white">
@@ -125,23 +206,25 @@ export function WorkspaceProgressPage({
                   </div>
                 </button>
               ))}
-          </div>
-        </SectionCard>
+            </div>
+          </SectionCard>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_0.92fr]">
         <SectionCard
+          eyebrow="Evidence"
           title="Recent proof of work"
-          description="The latest DSA, build, and application evidence stays compact and easy to scan."
+          description="Keep the latest DSA, build, and application signals compact and easy to scan."
         >
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-3">
             <CompactList
               title="DSA"
               icon={BrainCircuit}
               items={data.recentDsa.map((item) => ({
                 id: item.id,
                 title: item.title,
-                subtitle: `${item.difficulty} · ${item.pattern}`,
+                subtitle: `${item.difficulty} - ${item.pattern}`,
                 href: item.repositoryUrl ?? undefined,
               }))}
               emptyText="No DSA entries yet."
@@ -172,8 +255,9 @@ export function WorkspaceProgressPage({
         </SectionCard>
 
         <SectionCard
-          title="GitHub activity"
-          description="Public GitHub activity is useful as supporting proof, but it stays secondary to the work you log directly."
+          eyebrow="GitHub"
+          title="Public GitHub activity"
+          description="GitHub stays as supporting proof, not as the primary measure of progress."
         >
           {data.githubActivity.length ? (
             <div className="grid gap-3">
@@ -221,7 +305,9 @@ function CalendarHeatmap({
       const date = subDays(today, 89 - index);
       const dateKey = format(date, "yyyy-MM-dd");
       const entry = map.get(dateKey);
-      const score = entry ? entry.completedCount + entry.dsaCount + entry.buildCount + entry.appCount : 0;
+      const score = entry
+        ? entry.completedCount + entry.dsaCount + entry.buildCount + entry.appCount
+        : 0;
       const tone =
         score >= 10
           ? "bg-white"
@@ -246,7 +332,10 @@ function CalendarHeatmap({
             type="button"
             onClick={() => onSelect(day.dateKey)}
             title={day.dateKey}
-            className={cn("size-3.5 rounded-[4px] transition hover:scale-125 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)]", day.tone)}
+            className={cn(
+              "size-3.5 rounded-[4px] transition hover:scale-125 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)]",
+              day.tone,
+            )}
           />
         ))}
       </div>
@@ -266,7 +355,7 @@ function CompactList({
   emptyText: string;
 }) {
   return (
-    <div className="soft-card">
+    <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.02] p-4 sm:p-5">
       <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
         <Icon className="size-3.5 text-white" />
         {title}
@@ -274,7 +363,10 @@ function CompactList({
       <div className="mt-4 grid gap-3">
         {items.length ? (
           items.map((item) => (
-            <div key={item.id} className="rounded-[18px] border border-[var(--line)] bg-white/[0.02] px-3 py-3">
+            <div
+              key={item.id}
+              className="rounded-[18px] border border-[var(--line)] bg-white/[0.02] px-3 py-3"
+            >
               <div className="text-sm font-medium text-white">{item.title}</div>
               <div className="mt-1 text-sm text-[var(--muted)]">{item.subtitle}</div>
               {item.href ? (
@@ -363,8 +455,13 @@ function DailyDetailModal({
         </div>
 
         {loading ? (
-          <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.03] px-4 py-10 text-center text-sm text-[var(--muted)]">
-            Loading daily detail...
+          <div className="grid gap-3">
+            <div className="skeleton-block h-24 rounded-[22px]" />
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="skeleton-block h-32 rounded-[22px]" />
+              <div className="skeleton-block h-32 rounded-[22px]" />
+            </div>
+            <div className="skeleton-block h-28 rounded-[22px]" />
           </div>
         ) : !detail ? (
           <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.03] px-4 py-10 text-center text-sm text-[var(--muted)]">
@@ -391,11 +488,15 @@ function DailyDetailModal({
                     .filter(([, value]) => value)
                     .map(([label]) => (
                       <div key={label} className="text-sm text-white">
-                        {label.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase())}
+                        {label
+                          .replace(/([A-Z])/g, " $1")
+                          .replace(/^./, (value) => value.toUpperCase())}
                       </div>
                     ))}
                   {!Object.values(detail.checkins).some(Boolean) ? (
-                    <div className="text-sm text-[var(--muted)]">No blocks were completed that day.</div>
+                    <div className="text-sm text-[var(--muted)]">
+                      No blocks were completed that day.
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -416,27 +517,39 @@ function DailyDetailModal({
               </div>
             </div>
 
-            <DetailList title="DSA" icon={BrainCircuit} items={detail.dsa.map((item) => ({
-              id: item.id,
-              title: item.title,
-              subtitle: `${item.difficulty} · ${item.pattern}`,
-              body: item.insight || "No insight saved.",
-              href: item.repositoryUrl ?? undefined,
-            }))} />
-            <DetailList title="Builds" icon={Rocket} items={detail.builds.map((item) => ({
-              id: item.id,
-              title: item.title,
-              subtitle: item.area,
-              body: item.impact || item.proof || "No build note saved.",
-              href: item.repositoryUrl ?? undefined,
-            }))} />
-            <DetailList title="Applications" icon={Briefcase} items={detail.applications.map((item) => ({
-              id: item.id,
-              title: `${item.role} at ${item.company}`,
-              subtitle: item.status,
-              body: item.note || "No application note saved.",
-              href: item.roleUrl ?? undefined,
-            }))} />
+            <DetailList
+              title="DSA"
+              icon={BrainCircuit}
+              items={detail.dsa.map((item) => ({
+                id: item.id,
+                title: item.title,
+                subtitle: `${item.difficulty} - ${item.pattern}`,
+                body: item.insight || "No insight saved.",
+                href: item.repositoryUrl ?? undefined,
+              }))}
+            />
+            <DetailList
+              title="Builds"
+              icon={Rocket}
+              items={detail.builds.map((item) => ({
+                id: item.id,
+                title: item.title,
+                subtitle: item.area,
+                body: item.impact || item.proof || "No build note saved.",
+                href: item.repositoryUrl ?? undefined,
+              }))}
+            />
+            <DetailList
+              title="Applications"
+              icon={Briefcase}
+              items={detail.applications.map((item) => ({
+                id: item.id,
+                title: `${item.role} at ${item.company}`,
+                subtitle: item.status,
+                body: item.note || "No application note saved.",
+                href: item.roleUrl ?? undefined,
+              }))}
+            />
           </div>
         )}
       </motion.div>
@@ -467,7 +580,9 @@ function DetailList({
         {items.map((item) => (
           <div key={item.id} className="soft-card">
             <div className="text-sm font-medium text-white">{item.title}</div>
-            <div className="mt-2 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">{item.subtitle}</div>
+            <div className="mt-2 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+              {item.subtitle}
+            </div>
             <div className="mt-3 text-sm leading-7 text-[var(--muted)]">{item.body}</div>
             {item.href ? (
               <a

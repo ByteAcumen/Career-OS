@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   Link2,
@@ -11,79 +11,66 @@ import {
   User,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import type { AiProvider, WorkspaceSettings } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-/* ------------------------------------------------------------------ */
-/*  Collapsible accordion section                                      */
-/* ------------------------------------------------------------------ */
-function AccordionSection({
+function SettingsSection({
   icon,
   title,
   subtitle,
   defaultOpen = false,
   children,
-  accentColor = "var(--teal)",
 }: {
   icon: ReactNode;
   title: string;
   subtitle: string;
   defaultOpen?: boolean;
   children: ReactNode;
-  accentColor?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="glass-card section-panel group overflow-hidden rounded-[28px] border border-[var(--line)] transition-all duration-200 hover:border-[var(--line-strong)]">
+    <div className="glass-card section-panel overflow-hidden rounded-[28px] border border-[var(--line)]">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.03]"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-4 px-6 py-5 text-left transition hover:bg-white/[0.03]"
       >
-        <div
-          className="flex size-11 shrink-0 items-center justify-center rounded-[18px] shadow-sm ring-1 ring-white/10 transition-transform group-hover:scale-[1.03]"
-          style={{ 
-            background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} 20%, transparent), color-mix(in srgb, ${accentColor} 5%, transparent))`,
-          }}
-        >
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-[18px] border border-[var(--line)] bg-white/[0.04] text-white">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold text-[var(--ink)] tracking-tight">{title}</div>
-          <div className="mt-0.5 text-xs text-[var(--muted)] line-clamp-1">{subtitle}</div>
+          <div className="text-[15px] font-semibold tracking-tight text-white">{title}</div>
+          <div className="mt-1 text-xs text-[var(--muted)]">{subtitle}</div>
         </div>
         <motion.div
           animate={{ rotate: open ? 180 : 0 }}
-          transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          className="shrink-0 rounded-full bg-white/7 p-1.5 text-[var(--muted)]"
+          transition={{ duration: 0.18 }}
+          className="rounded-full border border-[var(--line)] bg-white/[0.04] p-1.5 text-[var(--muted)]"
         >
           <ChevronDown className="size-4" />
         </motion.div>
       </button>
 
       <AnimatePresence initial={false}>
-        {open && (
+        {open ? (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
             <div className="border-t border-[var(--line)] bg-white/[0.02] px-6 pb-6 pt-5">
               {children}
             </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Reusable field helpers                                             */
-/* ------------------------------------------------------------------ */
 function FieldInput({
   label,
   value,
@@ -98,58 +85,54 @@ function FieldInput({
   type?: string;
 }) {
   return (
-    <div className="group/field space-y-2">
-      <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-[var(--teal)]">
+    <label className="grid gap-2">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
         {label}
-      </label>
+      </span>
       <input
         type={type}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="field h-11 w-full bg-[var(--card)] text-[14px] transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-[var(--teal-soft)]"
+        onChange={(event) => onChange(event.target.value)}
+        className="field"
         placeholder={placeholder}
       />
-    </div>
+    </label>
   );
 }
 
 function FieldTextarea({
   label,
-  description,
   value,
   onChange,
   placeholder,
+  description,
 }: {
   label: string;
-  description?: string;
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
+  description?: string;
 }) {
   return (
-    <div className="group/field space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] transition-colors group-focus-within/field:text-[var(--teal)]">
+    <label className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
           {label}
-        </label>
-        {description && (
-          <span className="text-[10px] text-[var(--muted)]/60 italic">{description}</span>
-        )}
+        </span>
+        {description ? (
+          <span className="text-[11px] text-[var(--muted)]">{description}</span>
+        ) : null}
       </div>
       <textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="field-area min-h-[90px] w-full bg-[var(--card)] text-[14px] leading-relaxed transition-all hover:border-[var(--muted)] focus:ring-1 focus:ring-[var(--teal-soft)]"
+        onChange={(event) => onChange(event.target.value)}
+        className="field-area min-h-[96px]"
         placeholder={placeholder}
-        rows={3}
       />
-    </div>
+    </label>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main Settings Panel                                                */
-/* ------------------------------------------------------------------ */
 interface SettingsPanelProps {
   settings: WorkspaceSettings;
   setSettings: React.Dispatch<React.SetStateAction<WorkspaceSettings>>;
@@ -172,12 +155,14 @@ export function SettingsPanel({
       <div className="glass-card section-panel rounded-[30px] px-6 py-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--teal)]">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white">
               <Sparkles className="size-3.5" />
               Workspace tuning
             </span>
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Account Settings</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-white">
+                Account settings
+              </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
                 Shape how Career OS plans your week, interprets your progress, and
                 presents your student profile across the app.
@@ -187,19 +172,28 @@ export function SettingsPanel({
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="soft-card rounded-[22px] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Targets</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                Targets
+              </p>
               <p className="mt-2 text-sm font-semibold text-white">
-                {settings.weeklyDsaTarget + settings.weeklyApplicationTarget + settings.weeklyBuildTarget} weekly checkpoints
+                {settings.weeklyDsaTarget +
+                  settings.weeklyApplicationTarget +
+                  settings.weeklyBuildTarget}{" "}
+                weekly checkpoints
               </p>
             </div>
             <div className="soft-card rounded-[22px] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Planner rhythm</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                Planner rhythm
+              </p>
               <p className="mt-2 text-sm font-semibold text-white">
-                {settings.weekdayTaskTarget} weekday / {settings.weekendTaskTarget} weekend tasks
+                {settings.weekdayTaskTarget} weekday / {settings.weekendTaskTarget} weekend
               </p>
             </div>
             <div className="soft-card rounded-[22px] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Focus timer</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                Focus timer
+              </p>
               <p className="mt-2 text-sm font-semibold text-white">
                 {settings.timerFocusMinutes}m focus + {settings.timerBreakMinutes}m break
               </p>
@@ -209,333 +203,332 @@ export function SettingsPanel({
       </div>
 
       <div className="grid gap-4">
-        {/* Section 1: Profile */}
-        <AccordionSection
-          icon={<User className="size-5" style={{ color: "var(--teal)" }} />}
-          title="Profile & Identity"
+        <SettingsSection
+          icon={<User className="size-5" />}
+          title="Profile & identity"
           subtitle="Role, education, and career targets"
-          defaultOpen={true}
-          accentColor="var(--teal)"
+          defaultOpen
         >
-        <div className="grid gap-4">
-          <FieldTextarea
-            label="Primary Goal"
-            description="The overarching mission that drives your application matching and AI coaching."
-            value={settings.primaryGoal}
-            onChange={(v) => update("primaryGoal", v)}
-            placeholder="e.g., Land a Software Engineer role at a top product startup"
-          />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="Target Role"
-              value={settings.targetRole}
-              onChange={(v) => update("targetRole", v)}
-              placeholder="Software Engineer"
+          <div className="grid gap-4">
+            <FieldTextarea
+              label="Primary goal"
+              description="Used by planning and AI guidance"
+              value={settings.primaryGoal}
+              onChange={(value) => update("primaryGoal", value)}
+              placeholder="Land a strong software engineering role through consistent prep and visible proof of work."
             />
-            <FieldInput
-              label="Graduation Year"
-              value={settings.graduationYear}
-              onChange={(v) => update("graduationYear", v)}
-              placeholder="2026"
-            />
-          </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="University"
-              value={settings.university}
-              onChange={(v) => update("university", v)}
-              placeholder="University / college"
-            />
-            <FieldInput
-              label="Degree / Program"
-              value={settings.degree}
-              onChange={(v) => update("degree", v)}
-              placeholder="B.Tech CSE"
-            />
-          </div>
-
-          <FieldTextarea
-            label="Target Companies / Tracks"
-            value={settings.targetCompanies}
-            onChange={(v) => update("targetCompanies", v)}
-            placeholder="Product startups, MAANG-style roles, backend-heavy teams..."
-          />
-        </div>
-      </AccordionSection>
-
-      {/* Section 2: AI & Strategy */}
-      <AccordionSection
-        icon={<Sparkles className="size-4" style={{ color: "var(--teal)" }} />}
-        title="AI & Strategy"
-        subtitle="Provider, model, coaching style, and weekly theme"
-        accentColor="var(--teal)"
-      >
-        <div className="grid gap-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-[var(--ink)]">AI Provider</label>
-              <select
-                value={settings.aiProvider}
-                onChange={(e) => {
-                  const provider = e.target.value as AiProvider;
-                  const modelMap: Record<AiProvider, string> = {
-                    openai: "gpt-4o-mini",
-                    gemini: "gemini-2.5-flash",
-                    openrouter: "openai/gpt-4o-mini",
-                  };
-                  update("aiProvider", provider);
-                  update("openAiModel", modelMap[provider]);
-                }}
-                className="field text-sm"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Gemini</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="Target role"
+                value={settings.targetRole}
+                onChange={(value) => update("targetRole", value)}
+                placeholder="Software Engineer"
+              />
+              <FieldInput
+                label="Graduation year"
+                value={settings.graduationYear}
+                onChange={(value) => update("graduationYear", value)}
+                placeholder="2026"
+              />
             </div>
-            <FieldInput
-              label="AI Model String"
-              value={settings.openAiModel}
-              onChange={(v) => update("openAiModel", v)}
-              placeholder="gpt-4o-mini"
-            />
-          </div>
 
-          <FieldTextarea
-            label="Planning Style"
-            value={settings.planStyle}
-            onChange={(v) => update("planStyle", v)}
-            placeholder="Strict weekday routine, balanced weekends, DSA first..."
-          />
-
-          <FieldInput
-            label="Weekly Theme"
-            value={settings.weeklyTheme}
-            onChange={(v) => update("weeklyTheme", v)}
-            placeholder="Graphs and backend systems, OA sprint, resume polish week"
-          />
-
-          <FieldTextarea
-            label="Custom AI Instructions"
-            value={settings.customAiInstructions}
-            onChange={(v) => update("customAiInstructions", v)}
-            placeholder="Tell the coach about weak topics, constraints, or feedback preferences"
-          />
-
-          {/* API keys card */}
-          <div className="mt-2 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-inner">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="size-4 text-emerald-400" />
-              <div className="text-xs font-bold uppercase tracking-widest text-[var(--ink)]">Per-user API keys</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="University"
+                value={settings.university}
+                onChange={(value) => update("university", value)}
+                placeholder="University or college"
+              />
+              <FieldInput
+                label="Degree or program"
+                value={settings.degree}
+                onChange={(value) => update("degree", value)}
+                placeholder="B.Tech CSE"
+              />
             </div>
-            <p className="mb-4 text-[11px] leading-5 text-[var(--muted)]">
-              Keys are encrypted before storage and never returned to the browser. Only your workspace uses them.
-            </p>
-            {aiKeyManager}
-          </div>
-        </div>
-      </AccordionSection>
 
-      {/* Section 3: Links */}
-      <AccordionSection
-        icon={<Link2 className="size-4" style={{ color: "var(--teal)" }} />}
-        title="Links & Trackers"
-        subtitle="GitHub, LeetCode, LinkedIn, portfolio, and other profiles"
-        accentColor="var(--teal)"
-      >
-        <div className="grid gap-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="Application Sheet URL"
-              value={settings.sheetUrl}
-              onChange={(v) => update("sheetUrl", v)}
-              placeholder="Google Sheet / Airtable URL"
-            />
-            <FieldInput
-              label="Google Apps Script URL"
-              value={settings.googleAppsScriptUrl}
-              onChange={(v) => update("googleAppsScriptUrl", v)}
-              placeholder="Apps Script Endpoint"
+            <FieldTextarea
+              label="Target companies or tracks"
+              value={settings.targetCompanies}
+              onChange={(value) => update("targetCompanies", value)}
+              placeholder="Product startups, backend-heavy roles, campus placements..."
             />
           </div>
+        </SettingsSection>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <FieldInput
-              label="Resume URL"
-              value={settings.resumeUrl}
-              onChange={(v) => update("resumeUrl", v)}
-              placeholder="Drive / PDF link"
+        <SettingsSection
+          icon={<Sparkles className="size-4" />}
+          title="AI & strategy"
+          subtitle="Provider, model, coaching style, and weekly direction"
+        >
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                  AI provider
+                </span>
+                <select
+                  value={settings.aiProvider}
+                  onChange={(event) => {
+                    const provider = event.target.value as AiProvider;
+                    const modelMap: Record<AiProvider, string> = {
+                      openai: "gpt-4o-mini",
+                      gemini: "gemini-2.5-flash",
+                      openrouter: "openrouter/auto",
+                    };
+                    update("aiProvider", provider);
+                    update("openAiModel", modelMap[provider]);
+                  }}
+                  className="field"
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="openrouter">OpenRouter</option>
+                </select>
+              </label>
+
+              <FieldInput
+                label="AI model string"
+                value={settings.openAiModel}
+                onChange={(value) => update("openAiModel", value)}
+                placeholder="gpt-4o-mini"
+              />
+            </div>
+
+            <FieldTextarea
+              label="Planning style"
+              value={settings.planStyle}
+              onChange={(value) => update("planStyle", value)}
+              placeholder="Strict weekday routine, balanced weekends, DSA first..."
             />
+
             <FieldInput
-              label="GitHub"
-              value={settings.githubUrl}
-              onChange={(v) => update("githubUrl", v)}
-              placeholder="GitHub profile"
+              label="Weekly theme"
+              value={settings.weeklyTheme}
+              onChange={(value) => update("weeklyTheme", value)}
+              placeholder="Graphs and backend systems"
             />
-            <FieldInput
-              label="LeetCode"
-              value={settings.leetcodeUrl}
-              onChange={(v) => update("leetcodeUrl", v)}
-              placeholder="LeetCode profile"
+
+            <FieldTextarea
+              label="Custom AI instructions"
+              value={settings.customAiInstructions}
+              onChange={(value) => update("customAiInstructions", value)}
+              placeholder="Tell the coach about weak topics, constraints, or feedback preferences."
             />
+
+            <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.03] p-5">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+                <ShieldCheck className="size-4" />
+                Per-user API keys
+              </div>
+              <p className="mb-4 text-[11px] leading-5 text-[var(--muted)]">
+                Keys are encrypted before storage and never returned to the browser.
+                Only your workspace uses them.
+              </p>
+              {aiKeyManager}
+            </div>
           </div>
+        </SettingsSection>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <FieldInput
-              label="LinkedIn"
-              value={settings.linkedinUrl}
-              onChange={(v) => update("linkedinUrl", v)}
-              placeholder="LinkedIn profile"
-            />
-            <FieldInput
-              label="Portfolio"
-              value={settings.portfolioUrl}
-              onChange={(v) => update("portfolioUrl", v)}
-              placeholder="Portfolio / personal site"
-            />
-            <FieldInput
-              label="Job Tracker Board"
-              value={settings.jobTrackerUrl}
-              onChange={(v) => update("jobTrackerUrl", v)}
-              placeholder="Notion / dashboard"
-            />
+        <SettingsSection
+          icon={<Link2 className="size-4" />}
+          title="Links & trackers"
+          subtitle="Profiles, portfolio, sheets, and supporting systems"
+        >
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="Application sheet URL"
+                value={settings.sheetUrl}
+                onChange={(value) => update("sheetUrl", value)}
+                placeholder="Google Sheet or Airtable URL"
+              />
+              <FieldInput
+                label="Google Apps Script URL"
+                value={settings.googleAppsScriptUrl}
+                onChange={(value) => update("googleAppsScriptUrl", value)}
+                placeholder="Apps Script endpoint"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FieldInput
+                label="Resume URL"
+                value={settings.resumeUrl}
+                onChange={(value) => update("resumeUrl", value)}
+                placeholder="Drive or PDF link"
+              />
+              <FieldInput
+                label="GitHub"
+                value={settings.githubUrl}
+                onChange={(value) => update("githubUrl", value)}
+                placeholder="GitHub profile"
+              />
+              <FieldInput
+                label="LeetCode"
+                value={settings.leetcodeUrl}
+                onChange={(value) => update("leetcodeUrl", value)}
+                placeholder="LeetCode profile"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FieldInput
+                label="LinkedIn"
+                value={settings.linkedinUrl}
+                onChange={(value) => update("linkedinUrl", value)}
+                placeholder="LinkedIn profile"
+              />
+              <FieldInput
+                label="Portfolio"
+                value={settings.portfolioUrl}
+                onChange={(value) => update("portfolioUrl", value)}
+                placeholder="Portfolio or personal site"
+              />
+              <FieldInput
+                label="Job tracker board"
+                value={settings.jobTrackerUrl}
+                onChange={(value) => update("jobTrackerUrl", value)}
+                placeholder="Notion or dashboard"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FieldInput
+                label="Codeforces"
+                value={settings.codeforcesUrl}
+                onChange={(value) => update("codeforcesUrl", value)}
+                placeholder="Codeforces profile"
+              />
+              <FieldInput
+                label="CodeChef"
+                value={settings.codechefUrl}
+                onChange={(value) => update("codechefUrl", value)}
+                placeholder="CodeChef profile"
+              />
+              <FieldInput
+                label="HackerRank"
+                value={settings.hackerrankUrl}
+                onChange={(value) => update("hackerrankUrl", value)}
+                placeholder="HackerRank profile"
+              />
+            </div>
           </div>
+        </SettingsSection>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <FieldInput
-              label="Codeforces"
-              value={settings.codeforcesUrl}
-              onChange={(v) => update("codeforcesUrl", v)}
-              placeholder="Codeforces profile"
-            />
-            <FieldInput
-              label="CodeChef"
-              value={settings.codechefUrl}
-              onChange={(v) => update("codechefUrl", v)}
-              placeholder="CodeChef profile"
-            />
-            <FieldInput
-              label="HackerRank"
-              value={settings.hackerrankUrl}
-              onChange={(v) => update("hackerrankUrl", v)}
-              placeholder="HackerRank profile"
-            />
+        <SettingsSection
+          icon={<Target className="size-4" />}
+          title="Targets & schedule"
+          subtitle="Weekly goals, block lengths, and focus timer defaults"
+        >
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FieldInput
+                label="Weekly DSA target"
+                type="number"
+                value={settings.weeklyDsaTarget}
+                onChange={(value) => update("weeklyDsaTarget", Number(value))}
+              />
+              <FieldInput
+                label="Weekly apps target"
+                type="number"
+                value={settings.weeklyApplicationTarget}
+                onChange={(value) =>
+                  update("weeklyApplicationTarget", Number(value))
+                }
+              />
+              <FieldInput
+                label="Weekly build target"
+                type="number"
+                value={settings.weeklyBuildTarget}
+                onChange={(value) => update("weeklyBuildTarget", Number(value))}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="Weekday task target"
+                type="number"
+                value={settings.weekdayTaskTarget}
+                onChange={(value) => update("weekdayTaskTarget", Number(value))}
+              />
+              <FieldInput
+                label="Weekend task target"
+                type="number"
+                value={settings.weekendTaskTarget}
+                onChange={(value) => update("weekendTaskTarget", Number(value))}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="Weekend DSA minutes"
+                type="number"
+                value={settings.weekendDsaMinutes}
+                onChange={(value) => update("weekendDsaMinutes", Number(value))}
+              />
+              <FieldInput
+                label="Weekend build minutes"
+                type="number"
+                value={settings.weekendBuildMinutes}
+                onChange={(value) => update("weekendBuildMinutes", Number(value))}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="Weekday deep work minutes"
+                type="number"
+                value={settings.weekdayDeepWorkMinutes}
+                onChange={(value) =>
+                  update("weekdayDeepWorkMinutes", Number(value))
+                }
+              />
+              <FieldInput
+                label="Weekday support minutes"
+                type="number"
+                value={settings.weekdaySupportMinutes}
+                onChange={(value) => update("weekdaySupportMinutes", Number(value))}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FieldInput
+                label="Focus timer"
+                type="number"
+                value={settings.timerFocusMinutes}
+                onChange={(value) => update("timerFocusMinutes", Number(value))}
+              />
+              <FieldInput
+                label="Break timer"
+                type="number"
+                value={settings.timerBreakMinutes}
+                onChange={(value) => update("timerBreakMinutes", Number(value))}
+              />
+            </div>
+
+            <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] px-4 py-3 text-xs text-[var(--muted)]">
+              Weekend template reserves{" "}
+              <strong className="text-white">
+                {settings.weekendDsaMinutes + settings.weekendBuildMinutes}
+              </strong>{" "}
+              focused minutes across DSA and project work.
+            </div>
           </div>
-        </div>
-      </AccordionSection>
+        </SettingsSection>
 
-      {/* Section 4: Schedule & Targets */}
-      <AccordionSection
-        icon={<Target className="size-4" style={{ color: "var(--teal)" }} />}
-        title="Targets & Schedule"
-        subtitle="Weekly goals, time blocks, and focus timer config"
-        accentColor="var(--teal)"
-      >
-        <div className="grid gap-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <FieldInput
-              label="Weekly DSA Target"
-              type="number"
-              value={settings.weeklyDsaTarget}
-              onChange={(v) => update("weeklyDsaTarget", Number(v))}
-            />
-            <FieldInput
-              label="Weekly Apps Target"
-              type="number"
-              value={settings.weeklyApplicationTarget}
-              onChange={(v) => update("weeklyApplicationTarget", Number(v))}
-            />
-            <FieldInput
-              label="Weekly Build Target"
-              type="number"
-              value={settings.weeklyBuildTarget}
-              onChange={(v) => update("weeklyBuildTarget", Number(v))}
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="Weekday Task Target"
-              type="number"
-              value={settings.weekdayTaskTarget}
-              onChange={(v) => update("weekdayTaskTarget", Number(v))}
-            />
-            <FieldInput
-              label="Weekend Task Target"
-              type="number"
-              value={settings.weekendTaskTarget}
-              onChange={(v) => update("weekendTaskTarget", Number(v))}
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="Weekend DSA Minutes"
-              type="number"
-              value={settings.weekendDsaMinutes}
-              onChange={(v) => update("weekendDsaMinutes", Number(v))}
-            />
-            <FieldInput
-              label="Weekend Build Minutes"
-              type="number"
-              value={settings.weekendBuildMinutes}
-              onChange={(v) => update("weekendBuildMinutes", Number(v))}
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="Weekday Deep Work Minutes"
-              type="number"
-              value={settings.weekdayDeepWorkMinutes}
-              onChange={(v) => update("weekdayDeepWorkMinutes", Number(v))}
-            />
-            <FieldInput
-              label="Weekday Support Block Minutes"
-              type="number"
-              value={settings.weekdaySupportMinutes}
-              onChange={(v) => update("weekdaySupportMinutes", Number(v))}
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldInput
-              label="Focus Timer (min)"
-              type="number"
-              value={settings.timerFocusMinutes}
-              onChange={(v) => update("timerFocusMinutes", Number(v))}
-            />
-            <FieldInput
-              label="Break Timer (min)"
-              type="number"
-              value={settings.timerBreakMinutes}
-              onChange={(v) => update("timerBreakMinutes", Number(v))}
-            />
-          </div>
-
-          <div className="rounded-xl border border-[var(--line)] bg-white/[0.03] px-4 py-3 text-xs text-[var(--muted)]">
-            Weekend template reserves{" "}
-            <strong className="text-[var(--ink)]">{settings.weekendDsaMinutes + settings.weekendBuildMinutes}</strong>{" "}
-            focused minutes across DSA and project work.
-          </div>
-        </div>
-      </AccordionSection>
-
-      {/* Save Button */}
-      <button
-        onClick={onSave}
-        className={cn(
-          "w-full rounded-[24px] px-5 py-4 text-sm font-semibold transition-all",
-          "bg-white text-black",
-          "hover:shadow-[0_0_30px_rgba(45,212,191,0.3)] hover:-translate-y-0.5 active:scale-[0.99]",
-          "shadow-[0_0_20px_rgba(45,212,191,0.2)]",
-        )}
-      >
-        Save all settings
-      </button>
+        <button
+          type="button"
+          onClick={onSave}
+          className={cn(
+            "w-full rounded-[24px] bg-white px-5 py-4 text-sm font-semibold text-black transition-all",
+            "hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]",
+          )}
+        >
+          Save all settings
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
 }
