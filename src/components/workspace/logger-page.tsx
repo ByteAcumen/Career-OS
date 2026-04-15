@@ -269,7 +269,7 @@ export function WorkspaceLoggerPage({
   }
 
   return (
-    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
+    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-5">
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Logger"
@@ -284,7 +284,7 @@ export function WorkspaceLoggerPage({
         />
       </motion.div>
 
-      <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <motion.div variants={riseIn} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Week DSA"
           value={data.metrics.weekDsa}
@@ -307,9 +307,9 @@ export function WorkspaceLoggerPage({
         />
       </motion.div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.08fr)_0.92fr]">
-        <div className="grid gap-6">
-          <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid gap-5">
+          <div className="grid gap-5 2xl:grid-cols-2">
             <SectionCard
               eyebrow="DSA"
               title="Log DSA work"
@@ -471,7 +471,7 @@ export function WorkspaceLoggerPage({
             title="Recent proof of work"
             description="The newest DSA, build, and application evidence stays visible so logging has immediate value."
           >
-            <div className="grid gap-6 xl:grid-cols-3">
+            <div className="grid gap-4 xl:grid-cols-3">
               <RecentLogColumn
                 title="Recent DSA"
                 icon={Code2}
@@ -515,7 +515,7 @@ export function WorkspaceLoggerPage({
           </SectionCard>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5">
           <SectionCard
             eyebrow="Applications"
             title="Log applications"

@@ -40,11 +40,11 @@ export function ActivityBarChart({
   }, []);
 
   return (
-    <div ref={containerRef} className="h-[248px] w-full">
+    <div ref={containerRef} className="h-[220px] w-full">
       {width > 24 ? (
         <BarChart
           width={width}
-          height={248}
+          height={220}
           data={data}
           margin={{ top: 10, right: 0, left: -26, bottom: 0 }}
         >

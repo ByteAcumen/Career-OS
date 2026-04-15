@@ -84,7 +84,7 @@ export function WorkspaceStrategyPage({
     : "No recent application statuses yet.";
 
   return (
-    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
+    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-5">
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Strategy"
@@ -99,7 +99,7 @@ export function WorkspaceStrategyPage({
         />
       </motion.div>
 
-      <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <motion.div variants={riseIn} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Weekly DSA"
           value={data.metrics.weekDsa}
@@ -122,7 +122,7 @@ export function WorkspaceStrategyPage({
         />
       </motion.div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.08fr)_0.92fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <SectionCard
           eyebrow="Generate"
           title="AI strategy"
@@ -136,7 +136,7 @@ export function WorkspaceStrategyPage({
           />
         </SectionCard>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5">
           <SectionCard
             eyebrow="Context"
             title="Current operating context"
@@ -200,7 +200,7 @@ export function WorkspaceStrategyPage({
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <SectionCard
           eyebrow="Weakness"
           title="Weakness focus"

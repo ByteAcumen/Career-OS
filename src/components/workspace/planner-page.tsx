@@ -265,7 +265,7 @@ export function WorkspacePlannerPage({
   }
 
   return (
-    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
+    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-5">
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Planner"
@@ -274,14 +274,14 @@ export function WorkspacePlannerPage({
         />
       </motion.div>
 
-      <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <motion.div variants={riseIn} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Active tasks" value={data.planner.summary.active} detail="Open tasks across all planner lanes." />
         <StatCard label="Today open" value={data.planner.summary.todayOpen} detail="Tasks that still compete for attention today." />
         <StatCard label="Target rhythm" value={`${data.settings.weekdayTaskTarget}/${data.settings.weekendTaskTarget}`} detail="Weekday and weekend task targets." />
         <StatCard label="Review handoff" value={reviewForm.tomorrowTask ? "Ready" : "Missing"} detail={reviewForm.tomorrowTask ? "Tomorrow task is already written." : "Write tomorrow's first task before you stop."} />
       </motion.div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.18fr)_0.82fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
         <TaskBoard
           tasks={data.planner.tasks}
           summary={data.planner.summary}
@@ -298,7 +298,7 @@ export function WorkspacePlannerPage({
           onImportSuggestion={(suggestion) => void importSuggestion(suggestion)}
         />
 
-        <div className="grid gap-6">
+        <div className="grid gap-5">
           <SectionCard
             eyebrow="Rhythm"
             title="Today rhythm"

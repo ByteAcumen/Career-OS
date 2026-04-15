@@ -20,10 +20,10 @@ export function StudentStrategyPanel({
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
             Personalized AI Strategy
           </div>
-          <div className="mt-2 text-lg font-semibold text-[var(--ink)]">
+          <div className="mt-2 text-base font-semibold text-[var(--ink)]">
             Student-specific direction from your real data
           </div>
         </div>
@@ -53,16 +53,16 @@ export function StudentStrategyPanel({
             ["Mock interview", strategy.mockInterviewTask],
             ["Reality check", strategy.realityCheck],
           ].map(([label, value]) => (
-            <div key={label} className="soft-card">
-              <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+            <div key={label} className="rounded-[20px] border border-[var(--line)] bg-white/[0.025] p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
                 {label}
               </div>
-              <div className="mt-3 text-sm leading-7 text-[var(--ink)]">{value}</div>
+              <div className="mt-3 text-sm leading-6 text-[var(--ink)]">{value}</div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="soft-card text-sm leading-7 text-[var(--muted)]">
+        <div className="rounded-[20px] border border-[var(--line)] bg-white/[0.025] p-4 text-sm leading-7 text-[var(--muted)]">
           <div className="inline-flex items-center gap-2 font-medium text-[var(--ink)]">
             <BrainCircuit className="size-4 text-[var(--teal)]" />
             What this gives you

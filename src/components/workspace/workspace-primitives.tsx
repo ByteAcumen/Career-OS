@@ -36,17 +36,19 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-      <div className="max-w-3xl">
+    <div className="glass-card rounded-[30px] p-5 sm:p-6">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="max-w-3xl">
         <div className="page-pill">{eyebrow}</div>
-        <h1 className="mt-4 max-w-[18ch] text-[1.95rem] font-semibold leading-[1.08] tracking-[-0.045em] text-white sm:text-[2.45rem] lg:text-[2.85rem]">
+        <h1 className="mt-4 max-w-[22ch] text-3xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-4xl">
           {title}
         </h1>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)] sm:text-[0.95rem]">
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
           {description}
         </p>
+        </div>
+        {actions ? <div className="flex flex-wrap gap-3 xl:justify-end">{actions}</div> : null}
       </div>
-      {actions ? <div className="flex flex-wrap gap-3 xl:justify-end">{actions}</div> : null}
     </div>
   );
 }
@@ -100,11 +102,11 @@ export function StatCard({
   detail: string;
 }) {
   return (
-    <div className="metric-panel min-h-[136px]">
+    <div className="metric-panel min-h-[118px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
         {label}
       </div>
-      <div className="mt-3 text-[1.85rem] font-semibold tracking-[-0.04em] text-white">{value}</div>
+      <div className="mt-2 text-[1.7rem] font-semibold tracking-[-0.04em] text-white">{value}</div>
       <div className="mt-2 text-sm leading-6 text-[var(--muted)]">{detail}</div>
     </div>
   );

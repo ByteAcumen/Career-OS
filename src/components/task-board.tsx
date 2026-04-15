@@ -129,13 +129,13 @@ export function TaskBoard({
   ];
 
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-6">
+    <div className="grid gap-5">
+      <div className="grid gap-5">
         <motion.section
           variants={itemVariants}
           initial="hidden"
           animate="show"
-          className="glass-card section-panel rounded-[30px] p-5 sm:p-6"
+          className="glass-card rounded-[28px] p-5"
         >
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -144,7 +144,7 @@ export function TaskBoard({
                   <ClipboardList className="size-3.5" />
                   Plan builder
                 </div>
-                <h2 className="mt-4 text-xl font-semibold tracking-tight text-white sm:text-[1.45rem]">
+                <h2 className="mt-4 text-xl font-semibold tracking-tight text-white">
                   Add the next task without overloading the page
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
@@ -158,9 +158,9 @@ export function TaskBoard({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               {summaryCards.map((card) => (
-                <div key={card.label} className="soft-card min-h-[136px]">
+                <div key={card.label} className="soft-card min-h-[112px]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
                     {card.label}
                   </div>
@@ -301,7 +301,7 @@ export function TaskBoard({
           variants={itemVariants}
           initial="hidden"
           animate="show"
-          className="glass-card section-panel rounded-[30px] p-5 sm:p-6"
+          className="glass-card rounded-[28px] p-5"
         >
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -419,7 +419,7 @@ export function TaskBoard({
         variants={itemVariants}
         initial="hidden"
         animate="show"
-        className="glass-card section-panel rounded-[30px] p-5 sm:p-6"
+        className="glass-card rounded-[28px] p-5"
       >
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div>

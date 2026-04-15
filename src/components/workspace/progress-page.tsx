@@ -84,7 +84,7 @@ export function WorkspaceProgressPage({
   const latestTimeline = data.history.slice(-12).reverse();
 
   return (
-    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
+    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-5">
       <motion.div variants={riseIn}>
         <PageHeader
           eyebrow="Progress"
@@ -99,7 +99,7 @@ export function WorkspaceProgressPage({
         />
       </motion.div>
 
-      <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <motion.div variants={riseIn} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <StatCard
           label="Current streak"
           value={`${data.metrics.currentStreak} days`}
@@ -127,13 +127,13 @@ export function WorkspaceProgressPage({
         />
       </motion.div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.16fr)_0.84fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
         <SectionCard
           eyebrow="Trend"
           title="Execution graph"
           description="Use the heatmap for quick pattern recognition, then drill into a single day only when you need the detail."
         >
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.02] p-4 sm:p-5">
               <CalendarHeatmap history={data.history} onSelect={setSelectedDate} />
               <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--muted)]">
@@ -151,7 +151,7 @@ export function WorkspaceProgressPage({
           </div>
         </SectionCard>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5">
           <SectionCard
             eyebrow="Snapshot"
             title="Review snapshot"
@@ -211,13 +211,13 @@ export function WorkspaceProgressPage({
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_0.92fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
         <SectionCard
           eyebrow="Evidence"
           title="Recent proof of work"
           description="Keep the latest DSA, build, and application signals compact and easy to scan."
         >
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3">
             <CompactList
               title="DSA"
               icon={BrainCircuit}
