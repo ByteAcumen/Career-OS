@@ -340,7 +340,7 @@ export function WorkspaceRouteLoading({ page }: { page: WorkspaceLoadingPage }) 
       </aside>
 
       <div className="min-h-screen lg:pl-[280px]">
-        <header className="page-topbar sticky top-0 z-30">
+        <header className="page-topbar">
           <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
             <div className="min-w-0">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">

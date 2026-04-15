@@ -260,7 +260,7 @@ export function CareerAssistant({ userId }: { userId: string }) {
   }
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[75] flex items-end justify-end p-4 sm:p-6">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[75] sm:bottom-6 sm:right-6">
       <AnimatePresence>
         {!open ? (
           <motion.button
@@ -269,12 +269,12 @@ export function CareerAssistant({ userId }: { userId: string }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.96 }}
             onClick={() => setOpen(true)}
-            className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(10,10,10,0.94)] px-4 py-3 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.95)] backdrop-blur"
+            className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(10,10,10,0.94)] px-3 py-3 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.95)] backdrop-blur sm:px-4"
           >
             <div className="flex size-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/6">
               <Bot className="size-4 text-white" />
             </div>
-            <span>AI assistant</span>
+            <span className="hidden sm:inline">AI assistant</span>
           </motion.button>
         ) : null}
       </AnimatePresence>

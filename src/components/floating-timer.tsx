@@ -133,7 +133,7 @@ export function FloatingTimer({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.96 }}
             onClick={() => setOpen(true)}
-            className="fixed bottom-5 right-5 z-[65] inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(10,10,10,0.94)] px-3 py-2 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.95)] backdrop-blur sm:bottom-6 sm:right-6"
+            className="fixed bottom-20 right-4 z-[65] inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(10,10,10,0.94)] px-3 py-2 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.95)] backdrop-blur sm:bottom-24 sm:right-6"
           >
             <div className="flex size-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/6">
               {mode === "focus" ? <AlarmClock className="size-4 text-white" /> : <Coffee className="size-4 text-white" />}
@@ -149,7 +149,7 @@ export function FloatingTimer({
             initial={{ opacity: 0, y: 18, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.97 }}
-            className="fixed bottom-5 right-5 z-[65] w-[min(92vw,340px)] rounded-[28px] border border-white/[0.08] bg-[rgba(10,10,10,0.96)] p-5 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.98)] backdrop-blur sm:bottom-6 sm:right-6"
+            className="fixed bottom-20 right-4 z-[65] w-[min(92vw,340px)] rounded-[28px] border border-white/[0.08] bg-[rgba(10,10,10,0.96)] p-5 shadow-[0_30px_80px_-36px_rgba(0,0,0,0.98)] backdrop-blur sm:bottom-24 sm:right-6"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="inline-flex rounded-full border border-[var(--line)] bg-white/6 p-1 text-sm">

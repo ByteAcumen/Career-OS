@@ -130,7 +130,7 @@ export function TaskBoard({
 
   return (
     <div className="grid gap-6">
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.08fr)_0.92fr]">
+      <div className="grid gap-6">
         <motion.section
           variants={itemVariants}
           initial="hidden"
@@ -158,7 +158,7 @@ export function TaskBoard({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
               {summaryCards.map((card) => (
                 <div key={card.label} className="soft-card min-h-[136px]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
@@ -211,7 +211,7 @@ export function TaskBoard({
                   placeholder="Optional detail, exit criteria, or the exact deliverable."
                 />
 
-                <div className="grid gap-3 lg:grid-cols-[1fr_1fr_0.9fr_0.9fr]">
+                <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
                   <select
                     value={form.scope}
                     onChange={(event) =>
@@ -477,7 +477,6 @@ export function TaskBoard({
                     >
                       {scopedTasks.map((task) => (
                         <motion.div
-                          layout
                           key={task.id}
                           variants={itemVariants}
                           exit={{ opacity: 0, y: 10, transition: { duration: 0.18 } }}

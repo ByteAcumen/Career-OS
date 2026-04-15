@@ -218,11 +218,6 @@ select {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.022));
 }
 
-.section-panel {
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 520px;
-}
-
 .heading-font {
   font-family: var(--font-heading), var(--font-body), serif;
 }

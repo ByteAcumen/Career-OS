@@ -504,7 +504,7 @@ export function AccountSecurityPanel() {
 
   return (
     <div className="glass-card overflow-hidden rounded-[30px] border border-[var(--line)]">
-      <div className="flex items-center justify-between border-b border-[var(--line)] px-6 py-5">
+      <div className="flex flex-col gap-4 border-b border-[var(--line)] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-4">
           <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.04]">
             <ShieldCheck className="size-5 text-white" />
@@ -530,7 +530,7 @@ export function AccountSecurityPanel() {
         </button>
       </div>
 
-      <div className="space-y-6 px-6 py-6">
+      <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
         {banner ? (
           <div
             className={cn(
@@ -565,7 +565,7 @@ export function AccountSecurityPanel() {
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="grid gap-6">
           <Section
             title="Email verification"
             subtitle="Require inbox proof before password sign-in is allowed."
@@ -642,7 +642,7 @@ export function AccountSecurityPanel() {
           </Section>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <div className="grid gap-6">
           <Section
             title="Password protection"
             subtitle="Minimum 12 characters. Changing your password revokes other sessions automatically."
@@ -718,13 +718,13 @@ export function AccountSecurityPanel() {
                 />
               </Field>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)]">
                 {!twoFactorEnabled ? (
                   <button
                     type="button"
                     onClick={() => void enableTwoFactor()}
                     disabled={twoFactorBusy !== null}
-                    className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-300"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-[18px] bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-300"
                   >
                     {twoFactorBusy === "enable" ? (
                       <LoaderCircle className="size-4 animate-spin" />
@@ -738,7 +738,7 @@ export function AccountSecurityPanel() {
                     type="button"
                     onClick={() => void regenerateBackupCodes()}
                     disabled={twoFactorBusy !== null}
-                    className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-[var(--line)] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-[18px] border border-[var(--line)] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {twoFactorBusy === "regenerate" ? (
                       <LoaderCircle className="size-4 animate-spin" />
@@ -754,7 +754,7 @@ export function AccountSecurityPanel() {
                     type="button"
                     onClick={() => void disableTwoFactor()}
                     disabled={twoFactorBusy !== null}
-                    className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-[var(--line)] bg-white/[0.02] px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-[18px] border border-[var(--line)] bg-white/[0.02] px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {twoFactorBusy === "disable" ? (
                       <LoaderCircle className="size-4 animate-spin" />

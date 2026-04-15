@@ -170,35 +170,13 @@ export function SettingsPanel({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="soft-card rounded-[22px] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-                Targets
-              </p>
-              <p className="mt-2 text-sm font-semibold text-white">
-                {settings.weeklyDsaTarget +
-                  settings.weeklyApplicationTarget +
-                  settings.weeklyBuildTarget}{" "}
-                weekly checkpoints
-              </p>
-            </div>
-            <div className="soft-card rounded-[22px] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-                Planner rhythm
-              </p>
-              <p className="mt-2 text-sm font-semibold text-white">
-                {settings.weekdayTaskTarget} weekday / {settings.weekendTaskTarget} weekend
-              </p>
-            </div>
-            <div className="soft-card rounded-[22px] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-                Focus timer
-              </p>
-              <p className="mt-2 text-sm font-semibold text-white">
-                {settings.timerFocusMinutes}m focus + {settings.timerBreakMinutes}m break
-              </p>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={onSave}
+            className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]"
+          >
+            Save changes
+          </button>
         </div>
       </div>
 
@@ -518,16 +496,18 @@ export function SettingsPanel({
           </div>
         </SettingsSection>
 
-        <button
-          type="button"
-          onClick={onSave}
-          className={cn(
-            "w-full rounded-[24px] bg-white px-5 py-4 text-sm font-semibold text-black transition-all",
-            "hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]",
-          )}
-        >
-          Save all settings
-        </button>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onSave}
+            className={cn(
+              "inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-all",
+              "hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]",
+            )}
+          >
+            Save all settings
+          </button>
+        </div>
       </div>
     </div>
   );

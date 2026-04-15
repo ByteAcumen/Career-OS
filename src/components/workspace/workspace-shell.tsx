@@ -161,7 +161,7 @@ export function WorkspaceShell({
                 className={cn(
                   "group relative flex items-center gap-3 rounded-[18px] border px-3 py-3 text-sm font-medium transition",
                   active
-                    ? "border-white bg-white text-black shadow-[0_22px_42px_-28px_rgba(255,255,255,0.45)]"
+                    ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_22px_42px_-30px_rgba(255,255,255,0.28)]"
                     : "border-transparent text-[var(--muted)] hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white",
                   compact && "justify-center px-0 py-0 size-[52px]",
                 )}
@@ -172,7 +172,7 @@ export function WorkspaceShell({
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-[14px] border transition",
                     active
-                      ? "border-black/10 bg-black/6 text-black"
+                      ? "border-white bg-white text-black"
                       : "border-white/[0.08] bg-white/[0.04] text-white group-hover:border-white/[0.12] group-hover:bg-white/[0.08]",
                     compact && "size-10 border-transparent bg-transparent",
                   )}
@@ -330,7 +330,7 @@ export function WorkspaceShell({
         </AnimatePresence>
 
         <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]")}>
-          <header className="page-topbar sticky top-0 z-30">
+          <header className="page-topbar">
             <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-start gap-3">
                 <button
