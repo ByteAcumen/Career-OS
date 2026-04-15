@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ChevronDown,
   Link2,
@@ -30,13 +30,13 @@ function SettingsSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="glass-card section-panel overflow-hidden rounded-[28px] border border-[var(--line)]">
+    <div className="glass-card overflow-hidden rounded-[24px] border border-[var(--line)]">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-4 px-6 py-5 text-left transition hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-white/[0.03]"
       >
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-[18px] border border-[var(--line)] bg-white/[0.04] text-white">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-[16px] border border-[var(--line)] bg-white/[0.04] text-white">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
@@ -52,21 +52,11 @@ function SettingsSection({
         </motion.div>
       </button>
 
-      <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-[var(--line)] bg-white/[0.02] px-6 pb-6 pt-5">
-              {children}
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {open ? (
+        <div className="border-t border-[var(--line)] bg-white/[0.02] px-5 pb-5 pt-4">
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -151,36 +141,7 @@ export function SettingsPanel({
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="glass-card section-panel rounded-[30px] px-6 py-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white">
-              <Sparkles className="size-3.5" />
-              Workspace tuning
-            </span>
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">
-                Account settings
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-                Shape how Career OS plans your week, interprets your progress, and
-                presents your student profile across the app.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onSave}
-            className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]"
-          >
-            Save changes
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-4">
+    <div className="grid gap-4">
         <SettingsSection
           icon={<User className="size-5" />}
           title="Profile & identity"
@@ -501,14 +462,13 @@ export function SettingsPanel({
             type="button"
             onClick={onSave}
             className={cn(
-              "inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-all",
+              "inline-flex min-w-[148px] items-center justify-center whitespace-nowrap rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-all",
               "hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]",
             )}
           >
             Save all settings
           </button>
         </div>
-      </div>
     </div>
   );
 }

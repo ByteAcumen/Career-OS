@@ -503,7 +503,7 @@ export function AccountSecurityPanel() {
   }
 
   return (
-    <div className="glass-card overflow-hidden rounded-[30px] border border-[var(--line)]">
+    <div className="glass-card overflow-hidden rounded-[28px] border border-[var(--line)]">
       <div className="flex flex-col gap-4 border-b border-[var(--line)] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-4">
           <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.04]">
@@ -530,7 +530,7 @@ export function AccountSecurityPanel() {
         </button>
       </div>
 
-      <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+      <div className="space-y-5 px-5 py-5 sm:px-6">
         {banner ? (
           <div
             className={cn(
@@ -544,7 +544,7 @@ export function AccountSecurityPanel() {
           </div>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3">
           <SecurityStat
             icon={emailVerified ? MailCheck : ShieldAlert}
             label="Email status"
@@ -565,7 +565,7 @@ export function AccountSecurityPanel() {
           />
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5 xl:grid-cols-2">
           <Section
             title="Email verification"
             subtitle="Require inbox proof before password sign-in is allowed."
@@ -642,7 +642,7 @@ export function AccountSecurityPanel() {
           </Section>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5 xl:grid-cols-2">
           <Section
             title="Password protection"
             subtitle="Minimum 12 characters. Changing your password revokes other sessions automatically."
@@ -854,7 +854,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="soft-card rounded-[26px] border border-[var(--line)] p-5">
+    <section className="soft-card rounded-[24px] border border-[var(--line)] p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-base font-semibold tracking-tight text-[var(--ink)]">{title}</div>
@@ -899,7 +899,7 @@ function SecurityStat({
   detail: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.03] p-4">
+    <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.03] p-4">
       <div className="flex items-center gap-3">
         <div className="flex size-10 items-center justify-center rounded-[16px] border border-white/10 bg-white/[0.04]">
           <Icon className="size-4.5 text-white" />

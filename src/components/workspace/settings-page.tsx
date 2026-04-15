@@ -9,10 +9,6 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { useWorkspaceUi } from "@/components/workspace/workspace-shell";
 import {
   ActionLink,
-  InfoCard,
-  PageHeader,
-  SectionCard,
-  StatCard,
   riseIn,
   sectionStagger,
 } from "@/components/workspace/workspace-primitives";
@@ -72,134 +68,97 @@ export function WorkspaceSettingsPage({
   }
 
   return (
-    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
-      <motion.div variants={riseIn}>
-        <PageHeader
-          eyebrow="Settings"
-          title="Keep customization, AI configuration, and security in one disciplined place."
-          description="Settings owns profile details, links, planner defaults, AI integrations, and account protection so the rest of the workspace can stay focused."
-          actions={
-            <>
-              <ActionLink href="/planner" label="Open planner" />
-              <ActionLink href="/strategy" label="Open strategy" />
-            </>
-          }
-        />
-      </motion.div>
+    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-5">
+      <motion.section variants={riseIn} className="glass-card rounded-[30px] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="page-pill">Settings</div>
+            <h1 className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-white sm:text-4xl">
+              Workspace preferences
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
+              Keep profile data, links, planner defaults, AI keys, and account protection in one
+              clean place without mixing them into the daily workspace.
+            </p>
+          </div>
 
-      <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Planner targets"
-          value={`${settings.weekdayTaskTarget}/${settings.weekendTaskTarget}`}
-          detail="Weekday and weekend task defaults."
-        />
-        <StatCard
-          label="Weekly goals"
-          value={
-            settings.weeklyDsaTarget +
-            settings.weeklyApplicationTarget +
-            settings.weeklyBuildTarget
-          }
-          detail="Combined target checkpoints across DSA, apps, and builds."
-        />
-        <StatCard
-          label="AI provider"
-          value={settings.aiProvider}
-          detail="Current active provider preference for AI features."
-        />
-        <StatCard
-          label="Saved keys"
-          value={Object.values(integrations.savedApiKeys).filter(Boolean).length}
-          detail="Encrypted per-user AI credentials currently stored."
-        />
-      </motion.div>
+          <div className="flex flex-wrap gap-3">
+            <ActionLink href="/planner" label="Open planner" />
+            <ActionLink href="/strategy" label="Open strategy" />
+            <button
+              type="button"
+              onClick={() => startTransition(() => void saveSettings())}
+              className="inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:bg-neutral-200 active:scale-[0.99]"
+            >
+              Save settings
+            </button>
+          </div>
+        </div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.06fr)_0.94fr]">
-        <motion.div variants={riseIn} className="grid gap-6">
-          <SettingsPanel
-            settings={settings}
-            setSettings={setSettings}
-            onSave={() => startTransition(() => void saveSettings())}
-            aiKeyManager={
-              <AiKeyManager
-                integrations={integrations}
-                onSaveKey={saveAiKey}
-                onDeleteKey={removeAiKey}
-              />
-            }
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <OverviewItem
+            label="Planner rhythm"
+            value={`${settings.weekdayTaskTarget}/${settings.weekendTaskTarget}`}
+            detail="Weekday / weekend task targets"
           />
-        </motion.div>
+          <OverviewItem
+            label="Weekly goals"
+            value={settings.weeklyDsaTarget + settings.weeklyApplicationTarget + settings.weeklyBuildTarget}
+            detail="DSA, applications, and builds"
+          />
+          <OverviewItem
+            label="AI provider"
+            value={settings.aiProvider}
+            detail={initialData.integrations.aiReady ? "Provider ready" : "Needs a valid key"}
+          />
+          <OverviewItem
+            label="Saved keys"
+            value={Object.values(integrations.savedApiKeys).filter(Boolean).length}
+            detail="Encrypted per-user credentials"
+          />
+        </div>
+      </motion.section>
 
-        <motion.div variants={riseIn} className="grid gap-6">
-          <SectionCard
-            eyebrow="Snapshot"
-            title="Workspace snapshot"
-            description="A compact summary of the settings that matter most to the rest of the product."
-          >
-            <div className="grid gap-3">
-              <InfoCard
-                label="Primary goal"
-                value={settings.primaryGoal || "No primary goal saved yet."}
-              />
-              <InfoCard
-                label="Weekly theme"
-                value={settings.weeklyTheme || "No weekly theme saved yet."}
-              />
-              <InfoCard
-                label="Plan style"
-                value={settings.planStyle || "No planning style saved yet."}
-              />
-              <InfoCard
-                label="Profile completeness"
-                value={
-                  settings.onboardingCompleted
-                    ? "Core onboarding is complete."
-                    : "Finish onboarding fields to improve personalization quality."
-                }
-              />
-              <InfoCard
-                label="Task rhythm"
-                value={`${settings.weekdayTaskTarget} weekday tasks and ${settings.weekendTaskTarget} weekend tasks.`}
-              />
-              <InfoCard
-                label="Planner load"
-                value={`${initialData.plannerSummary.active} active tasks currently depend on these defaults.`}
-              />
-            </div>
-          </SectionCard>
+      <motion.div variants={riseIn}>
+        <SettingsPanel
+          settings={settings}
+          setSettings={setSettings}
+          onSave={() => startTransition(() => void saveSettings())}
+          aiKeyManager={
+            <AiKeyManager
+              integrations={integrations}
+              onSaveKey={saveAiKey}
+              onDeleteKey={removeAiKey}
+            />
+          }
+        />
+      </motion.div>
 
-          <SectionCard
-            eyebrow="Safety"
-            title="AI and account posture"
-            description="Keep the account secure and the AI setup intentional."
-          >
-            <div className="grid gap-3">
-              <InfoCard
-                label="AI readiness"
-                value={
-                  initialData.integrations.aiReady
-                    ? "At least one provider is configured and ready."
-                    : "No active provider is ready yet. Add or fix a key to unlock AI features."
-                }
-              />
-              <InfoCard
-                label="Credential ownership"
-                value="Stored AI keys are encrypted per user and stay scoped to this workspace."
-              />
-              <InfoCard
-                label="Google Sheets"
-                value={
-                  initialData.integrations.googleSheetsReady
-                    ? "Google Sheets sync is configured."
-                    : "Google Sheets sync is not configured yet."
-                }
-              />
-            </div>
-          </SectionCard>
-
-          <AccountSecurityPanel />
-        </motion.div>
-      </div>
+      <motion.div variants={riseIn}>
+        <AccountSecurityPanel />
+      </motion.div>
     </motion.div>
+  );
+}
+
+function OverviewItem({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.025] px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-2 truncate text-2xl font-semibold tracking-[-0.04em] text-white">
+        {value}
+      </div>
+      <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</div>
+    </div>
   );
 }
