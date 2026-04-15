@@ -3,20 +3,34 @@
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ListTodo, Sparkles } from "lucide-react";
+import {
+  ArrowUpRight,
+  BriefcaseBusiness,
+  CalendarClock,
+  CheckCircle2,
+  Code2,
+  ExternalLink,
+  Link2,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
 
 import { ActivityBarChart } from "@/components/activity-bar-chart";
 import {
   EmptyPanel,
   InfoCard,
-  PageHeader,
   ProgressMeter,
   SectionCard,
-  StatCard,
   riseIn,
   sectionStagger,
 } from "@/components/workspace/workspace-primitives";
 import type { HomePageData } from "@/lib/workspace-data";
+
+type SavedLink = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
 
 export function WorkspaceHomePage({
   data,
@@ -36,6 +50,7 @@ export function WorkspaceHomePage({
   );
   const nextBlock = data.scheduleBlocks[0];
   const nextTwoBlocks = data.scheduleBlocks.slice(0, 2);
+  const savedLinks = getSavedLinks(data.settings);
   const coachSnapshot = data.today.ai ?? {
     summary: focusTasks[0]?.title
       ? `Start with "${focusTasks[0].title}" before lower-value cleanup or browsing.`
@@ -58,59 +73,87 @@ export function WorkspaceHomePage({
   };
 
   return (
-    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-6">
-      <motion.div variants={riseIn}>
-        <PageHeader
-          eyebrow="Home"
-          title="See the work that matters now."
-          description="Home stays work-focused: your next tasks, the next planned block, weekly pace, recent proof of work, and one compact AI read on what to protect."
-          actions={
-            <>
+    <motion.div variants={sectionStagger} initial="hidden" animate="show" className="grid gap-5">
+      <motion.section variants={riseIn} className="glass-card rounded-[30px] p-5 sm:p-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
+          <div>
+            <div className="page-pill">Home</div>
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-4xl">
+              Focus on the next useful move.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
+              Home is a compact command center: next tasks, weekly pace, saved links,
+              recent proof, and one AI read. Deeper work stays inside Planner, Logger,
+              Progress, and Strategy.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 href="/planner"
-                className="inline-flex min-w-[148px] items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
+                className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-neutral-200"
               >
                 Open planner
               </Link>
               <Link
                 href="/logger"
-                className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10"
+                className="inline-flex min-w-[118px] items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10"
               >
                 Log work
               </Link>
-            </>
-          }
-        />
-      </motion.div>
+              <Link
+                href="/strategy"
+                className="inline-flex min-w-[124px] items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Strategy
+              </Link>
+            </div>
+          </div>
 
-      <motion.div variants={riseIn} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Current streak"
-          value={`${data.metrics.currentStreak} days`}
-          detail="Consecutive days with visible work."
-        />
-        <StatCard
-          label="Open today"
-          value={data.planner.summary.todayOpen}
-          detail="Tasks that still need attention today."
-        />
-        <StatCard
-          label="Weekly outputs"
-          value={weeklyOutputs}
-          detail="Combined DSA, builds, and applications this week."
-        />
-        <StatCard
-          label="Target hit"
-          value={`${weeklyTargetHit}%`}
-          detail="Average progress against your weekly goals."
-        />
-      </motion.div>
+          <div className="rounded-[24px] border border-[var(--line)] bg-white/[0.025] p-4">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+              <CalendarClock className="size-3.5" />
+              Next block
+            </div>
+            <div className="mt-3 text-base font-semibold text-white">
+              {nextBlock ? nextBlock.label : "No block queued"}
+            </div>
+            <div className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              {nextBlock
+                ? `${nextBlock.timeLabel} - ${nextBlock.description}`
+                : "Open Planner and add one simple anchor block for today."}
+            </div>
+          </div>
+        </div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_0.88fr]">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
+            label="Streak"
+            value={`${data.metrics.currentStreak}d`}
+            detail="Visible work"
+          />
+          <MetricTile
+            label="Open today"
+            value={data.planner.summary.todayOpen}
+            detail="Tasks needing attention"
+          />
+          <MetricTile
+            label="Week output"
+            value={weeklyOutputs}
+            detail="DSA, builds, applications"
+          />
+          <MetricTile
+            label="Target hit"
+            value={`${weeklyTargetHit}%`}
+            detail="Average weekly pace"
+          />
+        </div>
+      </motion.section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_0.85fr]">
         <SectionCard
           eyebrow="Today"
-          title="Today's focus stack"
-          description="Keep Home narrow: pick the next one to three tasks, protect the first work block, and avoid scanning the whole product before you begin."
+          title="Focus stack"
+          description="Pick one to three tasks and keep the first block obvious."
           action={
             <div className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-xs font-medium text-[var(--muted)]">
               {format(parseISO(data.today.dateKey), "EEE, MMM d")}
@@ -120,31 +163,35 @@ export function WorkspaceHomePage({
           {focusTasks.length ? (
             <div className="grid gap-3">
               {focusTasks.map((task, index) => (
-                <div key={task.id} className="soft-card">
+                <div key={task.id} className="rounded-[22px] border border-[var(--line)] bg-white/[0.025] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex size-7 items-center justify-center rounded-full border border-[var(--line)] bg-white/6 text-[11px] font-semibold text-white">
                           {index + 1}
                         </span>
-                        <div className="text-sm font-medium text-white">{task.title}</div>
-                        <span className="rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                          {task.category}
-                        </span>
-                        <span className="rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                          {task.priority}
-                        </span>
+                        <div className="text-sm font-semibold text-white">{task.title}</div>
                       </div>
+
                       {task.details ? (
                         <div className="mt-3 text-sm leading-7 text-[var(--muted)]">
                           {task.details}
                         </div>
                       ) : null}
-                    </div>
 
-                    <div className="rounded-full border border-[var(--line)] bg-white/6 px-3 py-1 text-xs font-medium text-white">
-                      {task.estimateMinutes}m
+                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                        <span className="rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1">
+                          {task.category}
+                        </span>
+                        <span className="rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1">
+                          {task.priority}
+                        </span>
+                        <span className="rounded-full border border-[var(--line)] bg-white/6 px-2.5 py-1">
+                          {task.estimateMinutes}m
+                        </span>
+                      </div>
                     </div>
+                    <CheckCircle2 className="mt-1 size-4 text-[var(--muted)]" />
                   </div>
                 </div>
               ))}
@@ -158,126 +205,72 @@ export function WorkspaceHomePage({
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <InfoCard
-              label="Next planned block"
-              value={
-                nextBlock
-                  ? `${nextBlock.timeLabel} - ${nextBlock.label}`
-                  : "No schedule block is queued. Open Planner and add one anchor block."
-              }
-            />
-            <InfoCard
               label="Tomorrow handoff"
               value={
                 data.today.tomorrowTask ||
                 "Use shutdown review to write tomorrow's first task before you stop."
               }
             />
+            <InfoCard
+              label="Planner load"
+              value={`${data.planner.summary.active} active tasks across daily, weekly, and weekend lanes.`}
+            />
           </div>
         </SectionCard>
 
-        <div className="grid gap-6">
+        <div className="grid gap-5">
           <SectionCard
-            eyebrow="Overview"
-            title="Workboard"
-            description="The home page should help you decide, not make you dig."
+            eyebrow="Links"
+            title="Saved profiles"
+            description="Quick access to the external profiles and trackers you saved in Settings."
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoCard
-                label="Primary goal"
-                value={
-                  data.settings.primaryGoal ||
-                  "Set a primary goal in Settings so the dashboard can stay aligned."
-                }
+            {savedLinks.length ? (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                {savedLinks.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group flex items-center justify-between gap-3 rounded-[18px] border border-[var(--line)] bg-white/[0.025] px-3 py-3 text-sm text-white hover:border-[var(--line-strong)] hover:bg-white/[0.05]"
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-[14px] border border-[var(--line)] bg-white/[0.04]">
+                        <item.icon className="size-4 text-white" />
+                      </span>
+                      <span className="truncate font-medium">{item.label}</span>
+                    </span>
+                    <ExternalLink className="size-3.5 shrink-0 text-[var(--muted)] transition group-hover:text-white" />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <EmptyPanel
+                title="No saved links yet"
+                description="Add GitHub, LeetCode, LinkedIn, portfolio, resume, or tracker links in Settings."
               />
-              <InfoCard
-                label="Weekly theme"
-                value={
-                  data.settings.weeklyTheme ||
-                  "No weekly theme yet. Add one to keep your planning more intentional."
-                }
-              />
-              <InfoCard
-                label="Planner load"
-                value={`${data.planner.summary.active} active tasks across daily, weekly, and weekend lanes.`}
-              />
-              <InfoCard
-                label="Next move"
-                value={
-                  focusTasks[0]?.title
-                    ? `Start with "${focusTasks[0].title}" before opening anything else.`
-                    : "Open Planner and define one concrete task for today."
-                }
-              />
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <Link
-                href="/planner"
-                className="soft-card block hover:border-[var(--line-strong)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-white">Plan the day</div>
-                    <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                      Adjust daily, weekly, and weekend lanes.
-                    </div>
-                  </div>
-                  <ListTodo className="mt-1 size-4 text-[var(--muted)]" />
-                </div>
-              </Link>
-
-              <Link
-                href="/logger"
-                className="soft-card block hover:border-[var(--line-strong)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-white">Log finished work</div>
-                    <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                      Capture DSA, builds, and applications fast.
-                    </div>
-                  </div>
-                  <ArrowUpRight className="mt-1 size-4 text-[var(--muted)]" />
-                </div>
-              </Link>
-
-              <Link
-                href="/strategy"
-                className="soft-card block hover:border-[var(--line-strong)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-white">Check strategy</div>
-                    <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                      Review AI guidance when the week needs correction.
-                    </div>
-                  </div>
-                  <Sparkles className="mt-1 size-4 text-[var(--muted)]" />
-                </div>
-              </Link>
-            </div>
+            )}
           </SectionCard>
 
           <SectionCard
             eyebrow="Coach"
             title="AI snapshot"
-            description="One useful read on theme, risk, and next block is enough here."
+            description="One compact read so AI supports the day without taking over the page."
           >
             <div className="grid gap-3">
               <InfoCard label="Summary" value={coachSnapshot.summary} />
               <InfoCard label="Focus theme" value={coachSnapshot.focusTheme} />
-              <InfoCard label="Biggest risk" value={coachSnapshot.biggestRisk} />
-              <InfoCard label="Next block" value={coachSnapshot.morningPlan} />
+              <InfoCard label="Risk" value={coachSnapshot.biggestRisk} />
             </div>
           </SectionCard>
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
         <SectionCard
-          eyebrow="This week"
-          title="Weekly pace"
-          description="Targets stay here so Home can show pace without turning into a second planner."
+          eyebrow="Pace"
+          title="Weekly progress"
+          description="A simple target view belongs on Home. Deeper analytics stay on Progress."
         >
           <div className="grid gap-3">
             <ProgressMeter
@@ -297,11 +290,7 @@ export function WorkspaceHomePage({
             />
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <InfoCard
-              label="Planner completion"
-              value={`${data.planner.summary.completed}/${data.planner.summary.total} tasks completed so far.`}
-            />
+          <div className="mt-4 grid gap-3">
             <InfoCard
               label="Upcoming rhythm"
               value={
@@ -317,23 +306,23 @@ export function WorkspaceHomePage({
 
         <SectionCard
           eyebrow="Recent"
-          title="Recent proof of work"
-          description="A compact feed of what you actually shipped, solved, or applied for."
+          title="Proof of work"
+          description="A compact feed of what you shipped, solved, or applied for."
           action={
             <Link
               href="/progress"
               className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/6 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
             >
-              Open progress
+              Progress
             </Link>
           }
         >
           {data.recentActivity.length ? (
             <div className="grid gap-3">
-              {data.recentActivity.slice(0, 6).map((item) => (
+              {data.recentActivity.slice(0, 5).map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-wrap items-start justify-between gap-4 rounded-[22px] border border-[var(--line)] bg-white/[0.02] px-4 py-4"
+                  className="flex flex-wrap items-start justify-between gap-4 rounded-[20px] border border-[var(--line)] bg-white/[0.02] px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -345,12 +334,9 @@ export function WorkspaceHomePage({
                       </span>
                     </div>
 
-                    <div className="mt-3 text-sm font-medium text-white">{item.title}</div>
-                    <div className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                    <div className="mt-2 text-sm font-medium text-white">{item.title}</div>
+                    <div className="mt-1 text-sm leading-6 text-[var(--muted)]">
                       {item.detail}
-                    </div>
-                    <div className="mt-3 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
-                      {item.meta}
                     </div>
                   </div>
 
@@ -380,25 +366,19 @@ export function WorkspaceHomePage({
       <SectionCard
         eyebrow="Trend"
         title="Momentum"
-        description="A small trend view is enough on Home. Deeper analysis stays on Progress."
+        description="A small trend view is enough here. Full analytics stay on Progress."
       >
-        <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <ActivityBarChart data={data.history.slice(-14)} />
 
           <div className="grid gap-3">
             <InfoCard
-              label="Best use of Home"
-              value="Use this page to decide the next move, then switch into Planner, Logger, or Progress for deeper work."
-              muted
-            />
-            <InfoCard
               label="Current constraint"
               value={
                 data.planner.summary.todayOpen > 4
-                  ? "Your open task count is still a little high. Reduce it so the day feels lighter."
+                  ? "Your open task count is high. Reduce it so the day feels lighter."
                   : "The workspace is light enough. Protect the first block and keep the next task obvious."
               }
-              className="border-white/[0.1]"
             />
             <InfoCard
               label="Weekend loadout"
@@ -410,4 +390,38 @@ export function WorkspaceHomePage({
       </SectionCard>
     </motion.div>
   );
+}
+
+function MetricTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-[var(--line)] bg-white/[0.025] px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">{value}</div>
+      <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{detail}</div>
+    </div>
+  );
+}
+
+function getSavedLinks(settings: HomePageData["settings"]): SavedLink[] {
+  return [
+    { label: "GitHub", href: settings.githubUrl, icon: Code2 },
+    { label: "LeetCode", href: settings.leetcodeUrl, icon: Code2 },
+    { label: "LinkedIn", href: settings.linkedinUrl, icon: Link2 },
+    { label: "Portfolio", href: settings.portfolioUrl, icon: Link2 },
+    { label: "Resume", href: settings.resumeUrl, icon: Target },
+    { label: "Job tracker", href: settings.jobTrackerUrl, icon: BriefcaseBusiness },
+    { label: "Codeforces", href: settings.codeforcesUrl, icon: Code2 },
+    { label: "CodeChef", href: settings.codechefUrl, icon: Code2 },
+    { label: "HackerRank", href: settings.hackerrankUrl, icon: Code2 },
+  ].filter((item) => item.href.trim());
 }

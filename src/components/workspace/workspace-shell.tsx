@@ -143,9 +143,9 @@ export function WorkspaceShell({
 
   function renderNav(compact: boolean) {
     return navGroups.map((group) => (
-      <div key={group.label} className="space-y-2.5">
+      <div key={group.label} className="space-y-2">
         {!compact ? (
-          <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+          <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
             {group.label}
           </div>
         ) : null}
@@ -159,25 +159,25 @@ export function WorkspaceShell({
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "group relative flex items-center gap-3 rounded-[18px] border px-3 py-3 text-sm font-medium transition",
+                  "group relative flex items-center gap-3 rounded-[16px] border px-3 py-2.5 text-[13px] font-medium transition",
                   active
                     ? "border-white/[0.16] bg-white/[0.08] text-white shadow-[0_22px_42px_-30px_rgba(255,255,255,0.28)]"
                     : "border-transparent text-[var(--muted)] hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white",
-                  compact && "justify-center px-0 py-0 size-[52px]",
+                  compact && "justify-center px-0 py-0 size-[48px]",
                 )}
                 aria-current={active ? "page" : undefined}
                 title={compact ? item.label : undefined}
               >
                 <span
                   className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-[14px] border transition",
+                    "flex size-8 shrink-0 items-center justify-center rounded-[13px] border transition",
                     active
                       ? "border-white bg-white text-black"
                       : "border-white/[0.08] bg-white/[0.04] text-white group-hover:border-white/[0.12] group-hover:bg-white/[0.08]",
-                    compact && "size-10 border-transparent bg-transparent",
+                    compact && "size-9 border-transparent bg-transparent",
                   )}
                 >
-                  <item.icon className={cn("size-4.5 shrink-0", active ? "text-black" : "text-white")} />
+                  <item.icon className={cn("size-4 shrink-0", active ? "text-black" : "text-white")} />
                 </span>
                 {!compact ? <span>{item.label}</span> : null}
               </Link>
@@ -194,18 +194,18 @@ export function WorkspaceShell({
         <aside
           className={cn(
             "fixed inset-y-0 left-0 z-40 hidden border-r border-white/[0.08] bg-[rgba(6,6,6,0.92)] px-3 py-4 backdrop-blur lg:flex lg:flex-col",
-            collapsed ? "w-[92px]" : "w-[280px]",
+            collapsed ? "w-[84px]" : "w-[256px]",
           )}
         >
           <div className="flex items-start justify-between gap-3 px-2">
-            <Link href="/home" className="flex min-w-0 items-center gap-3 rounded-[18px] px-2 py-2">
-              <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.04]">
+            <Link href="/home" className="flex min-w-0 items-center gap-3 rounded-[16px] px-2 py-1.5">
+              <div className="flex size-10 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.04]">
                 <Target className="size-4 text-white" />
               </div>
               {!collapsed ? (
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-white">Career OS</div>
-                  <div className="truncate text-xs text-[var(--muted)]">Focused student workspace</div>
+                  <div className="truncate text-[13px] font-semibold text-white">Career OS</div>
+                  <div className="truncate text-[11px] text-[var(--muted)]">Focused student workspace</div>
                 </div>
               ) : null}
             </Link>
@@ -219,35 +219,35 @@ export function WorkspaceShell({
             </button>
           </div>
 
-          <div className="mt-6 flex-1 space-y-6 overflow-y-auto px-1 custom-scrollbar">
+          <div className="mt-5 flex-1 space-y-5 overflow-y-auto px-1 custom-scrollbar">
             {renderNav(collapsed)}
           </div>
 
           <div className="mt-4 border-t border-white/[0.08] px-2 pt-4">
             <div
               className={cn(
-                "rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3",
+                "rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-2.5",
                 collapsed && "flex flex-col items-center gap-3 px-2",
               )}
             >
               <div className="flex items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.05] text-sm font-semibold text-white">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.05] text-[13px] font-semibold text-white">
                   {currentUser.name.slice(0, 1).toUpperCase()}
                 </div>
                 {!collapsed ? (
                   <>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                         Signed in
                       </div>
-                      <div className="truncate text-sm font-medium text-white">{currentUser.name}</div>
-                      <div className="truncate text-xs text-[var(--muted)]">{currentUser.email}</div>
+                      <div className="truncate text-[13px] font-medium text-white">{currentUser.name}</div>
+                      <div className="truncate text-[11px] text-[var(--muted)]">{currentUser.email}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => void handleSignOut()}
                       disabled={signingOut}
-                      className="rounded-[14px] border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.08] disabled:opacity-50"
+                      className="rounded-[14px] border border-[var(--line)] bg-white/[0.04] px-2.5 py-2 text-[11px] font-medium text-white transition hover:bg-white/[0.08] disabled:opacity-50"
                     >
                       {signingOut ? "..." : "Sign out"}
                     </button>
@@ -329,9 +329,9 @@ export function WorkspaceShell({
           ) : null}
         </AnimatePresence>
 
-        <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "lg:pl-[92px]" : "lg:pl-[280px]")}>
+        <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "lg:pl-[84px]" : "lg:pl-[256px]")}>
           <header className="page-topbar">
-            <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-7">
               <div className="flex min-w-0 items-start gap-3">
                 <button
                   type="button"
@@ -341,10 +341,10 @@ export function WorkspaceShell({
                   <Menu className="size-4" />
                 </button>
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                     {pageCopy[page].title}
                   </div>
-                  <div className="mt-1 text-base font-medium text-white sm:text-lg">
+                  <div className="mt-1 max-w-3xl truncate text-sm font-medium text-white sm:text-[15px]">
                     {pageCopy[page].description}
                   </div>
                 </div>
@@ -369,7 +369,7 @@ export function WorkspaceShell({
             </div>
           </header>
 
-          <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <main className="mx-auto max-w-[1360px] px-4 py-5 sm:px-6 lg:px-7 lg:py-6">
             {children}
           </main>
         </div>

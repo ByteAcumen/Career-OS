@@ -280,7 +280,7 @@ function PageSkeleton({ page }: { page: WorkspaceLoadingPage }) {
 export function WorkspaceRouteLoading({ page }: { page: WorkspaceLoadingPage }) {
   return (
     <div className="app-shell min-h-screen text-white">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] border-r border-white/[0.08] bg-[rgba(6,6,6,0.92)] px-3 py-4 backdrop-blur lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[256px] border-r border-white/[0.08] bg-[rgba(6,6,6,0.92)] px-3 py-4 backdrop-blur lg:flex lg:flex-col">
         <div className="flex items-center gap-3 rounded-[18px] px-2 py-2">
           <div className="skeleton-block size-10 rounded-[16px]" />
           <div className="min-w-0 flex-1 space-y-2">
@@ -339,9 +339,9 @@ export function WorkspaceRouteLoading({ page }: { page: WorkspaceLoadingPage }) 
         </div>
       </aside>
 
-      <div className="min-h-screen lg:pl-[280px]">
+      <div className="min-h-screen lg:pl-[256px]">
         <header className="page-topbar">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-7">
             <div className="min-w-0">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                 {pageCopy[page].title}
@@ -356,7 +356,7 @@ export function WorkspaceRouteLoading({ page }: { page: WorkspaceLoadingPage }) 
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="mx-auto max-w-[1360px] px-4 py-5 sm:px-6 lg:px-7 lg:py-6">
           <PageSkeleton page={page} />
         </main>
       </div>
