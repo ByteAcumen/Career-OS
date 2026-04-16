@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
-import { buildResumeDraft } from "@/features/resume/build-resume";
+import { buildResumeFileName } from "@/features/resume/file-name";
+import { generateResumeDraftForUser } from "@/features/resume/generate-resume";
+import {
+  readResumeGenerationRequest,
+  ResumeRequestValidationError,
+} from "@/features/resume/read-request";
 import { getRequestSession } from "@/lib/auth-session";
 import { getDashboardData } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
-
-const ResumeRequestSchema = z.object({
-  targetRole: z.string().max(120).optional(),
-  company: z.string().max(120).optional(),
-  jobDescription: z.string().max(6000).optional(),
-  emphasis: z.enum(["balanced", "projects", "dsa"]).optional(),
-});
 
 const dashboardOptions = {
   includeGithubActivity: false,
@@ -21,9 +18,10 @@ const dashboardOptions = {
   includePreviousDay: false,
 };
 
-async function generateResumeForRequest(
+async function buildResumeResponse(
   request: Request,
-  payload: z.infer<typeof ResumeRequestSchema>,
+  input: Parameters<typeof generateResumeDraftForUser>[0]["input"],
+  upload: Parameters<typeof generateResumeDraftForUser>[0]["upload"],
 ) {
   const session = await getRequestSession(request);
   if (!session) {
@@ -47,31 +45,79 @@ async function generateResumeForRequest(
   }
 
   const dashboard = await getDashboardData(session.user.id, undefined, dashboardOptions);
-  const resume = buildResumeDraft(dashboard, {
+  const result = await generateResumeDraftForUser({
+    userId: session.user.id,
+    dashboard,
     user: {
       name: session.user.name,
       email: session.user.email,
     },
-    ...payload,
+    input,
+    upload,
   });
 
-  return NextResponse.json({ ok: true, resume });
+  return NextResponse.json({
+    ok: true,
+    resume: result.resume,
+    optimizedWithAi: result.optimizedWithAi,
+    upload: result.upload
+      ? {
+          fileName: result.upload.fileName,
+          format: result.upload.format,
+          contentType: result.upload.contentType,
+          sizeBytes: result.upload.sizeBytes,
+          extractedCharacterCount: result.upload.extractedCharacterCount,
+          totalPages: result.upload.totalPages,
+          detectedLinks: result.upload.detectedLinks,
+          detectedSections: result.upload.detectedSections,
+          warnings: result.upload.warnings,
+        }
+      : null,
+    downloads: {
+      markdownFileName: buildResumeFileName({
+        userName: result.resume.header.name,
+        company: result.resume.company,
+        targetRole: result.resume.targetRole,
+        extension: "md",
+      }),
+      latexFileName: buildResumeFileName({
+        userName: result.resume.header.name,
+        company: result.resume.company,
+        targetRole: result.resume.targetRole,
+        extension: "tex",
+      }),
+      pdfFileName: buildResumeFileName({
+        userName: result.resume.header.name,
+        company: result.resume.company,
+        targetRole: result.resume.targetRole,
+        extension: "pdf",
+      }),
+    },
+  });
 }
 
 export async function GET(request: Request) {
-  return generateResumeForRequest(request, {});
+  return buildResumeResponse(request, {}, null);
 }
 
 export async function POST(request: Request) {
-  const rawBody = await request.json().catch(() => ({}));
-  const parsed = ResumeRequestSchema.safeParse(rawBody);
+  try {
+    const { input, upload } = await readResumeGenerationRequest(request);
+    return buildResumeResponse(request, input, upload);
+  } catch (error) {
+    if (error instanceof ResumeRequestValidationError) {
+      return NextResponse.json(
+        { ok: false, message: error.message, details: error.flattened },
+        { status: 400 },
+      );
+    }
 
-  if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, message: "Invalid resume request.", details: parsed.error.flatten() },
+      {
+        ok: false,
+        message: error instanceof Error ? error.message : "Unable to process the resume request.",
+      },
       { status: 400 },
     );
   }
-
-  return generateResumeForRequest(request, parsed.data);
 }

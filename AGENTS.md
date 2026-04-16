@@ -62,46 +62,48 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** 2026-04-16T20:15:52+05:30
+**Timestamp:** 2026-04-16T22:05:03+05:30
 **Branch:** `codex/work`
 
 ### What I completed
-- ✅ Switched the repo context onto `codex/work` so branch isolation is real.
-- ✅ Read `AGENTS.md`, `.agents/claims/antigravity.json`, and the hardened coordinator before claiming work.
-- ✅ Claimed Codex-owned Phase 4 surface in `.agents/claims/codex.json`:
-  - `AGENTS.md`
-  - `scripts/coordinator.ts`
-  - `src/lib/ai.ts`
-  - `src/lib/email.ts`
-  - `src/app/api/ai/**`
-  - `src/features/resume/**`
-  - `src/features/digest/**`
-- ✅ Brought the hardened coordinator onto `codex/work`, fixed glob parsing and porcelain path parsing, and validated `npm run agent:sync` on the Codex branch.
-- ✅ Added deterministic resume generation under `src/features/resume/build-resume.ts` with:
-  - markdown output
-  - LaTeX output
-  - job-description keyword biasing
-  - project / DSA evidence built from stored user activity
+- ✅ Extended the resume backend to support upload + improvement workflows:
+  - PDF, DOCX, TXT, MD, and TEX resume uploads
+  - extraction via open-source parsers
+  - optional JD-aware AI optimization using the existing provider fallback stack
+  - clean per-user/company PDF filenames
 - ✅ Added weekly digest generation under `src/features/digest/build-weekly-digest.ts`.
 - ✅ Added new API routes:
   - `src/app/api/ai/resume/route.ts`
+  - `src/app/api/ai/resume/pdf/route.ts`
   - `src/app/api/ai/digest/route.ts`
 - ✅ Updated `src/lib/email.ts`:
   - monochrome email shell for auth emails
   - weekly digest email sender
+- ✅ Added shared resume feature helpers:
+  - `src/features/resume/contracts.ts`
+  - `src/features/resume/generate-resume.ts`
+  - `src/features/resume/parse-uploaded-resume.ts`
+  - `src/features/resume/read-request.ts`
+  - `src/features/resume/render-resume-pdf.ts`
+  - `src/features/resume/file-name.ts`
+- ✅ Improved `src/lib/ai.ts` and `src/app/api/ai/chat/route.ts` so the assistant can handle more direct workspace edits locally before using paid AI calls.
 - ✅ Verification:
   - `npm run lint` passed
   - `npm run build` passed
 
 ### Current work queue
 1. Split `src/lib/ai.ts` into smaller focused modules without breaking the existing AI routes.
-2. Add resume tailoring improvements or export helpers if the UI needs richer output shapes.
+2. Let Antigravity hook the new resume upload/export endpoints into UI-owned screens if desired.
 3. Add scheduled digest sending / cron integration on the Codex-owned backend side.
 4. Keep off Antigravity-owned UI, schema, middleware, and workspace shell files unless coordinated here first.
 
 ### Conflicts / coordination notes
 - No conflicts in the currently claimed Codex scope.
 - `src/lib/assistant.ts`, `src/lib/db.ts`, `src/lib/env.ts`, and `src/lib/types.ts` are treated as Antigravity-owned by the claim map, so I will not edit them in this phase without an explicit request here.
+- The new backend contract is:
+  - `POST /api/ai/resume` accepts JSON or multipart form-data, including uploaded resumes
+  - `POST /api/ai/resume/pdf` returns an attachment-ready PDF with a clean filename
+  - frontend/UI work can consume these routes without any schema change
 
 ---
 
