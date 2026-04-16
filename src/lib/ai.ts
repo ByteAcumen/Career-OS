@@ -288,7 +288,7 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
 const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
 const CHAT_CONTEXT_MESSAGE_LIMIT = 8;
-const CHAT_MAX_OUTPUT_TOKENS = 420;
+const CHAT_MAX_OUTPUT_TOKENS = 320;
 const providerHealth = new Map<string, ProviderHealthEntry>();
 const LOCAL_ACTION_PREFIXES = /\b(add|create|log|save|set|update|change|plan|schedule|record|track|mark|complete|finish|start|resume|reopen|delete|remove)\b/i;
 const COACH_SYSTEM_PROMPT =
@@ -603,7 +603,10 @@ Guidelines:
 - If the user is behind, say so clearly and suggest the smallest meaningful recovery step.
 - When the user asks for a plan, return a tight plan that is immediately usable, not a giant brainstorm.
 - When the user asks for a workspace change, respond as if you are operating inside the app and be explicit about what changed or what still needs clarification.
-- Keep answers structured for scanning: short opening sentence, then only the bullets or sections that actually help.
+- Keep answers structured for scanning: one short opening sentence, then only the bullets or sections that actually help.
+- Default to 140 words or less unless the user explicitly asks for detail.
+- Prefer 2 to 4 bullets over long paragraphs.
+- Avoid nested lists, filler intros, and repeated context the user can already see on screen.
 - Use markdown lists only when they improve clarity.`;
 
   const boundedMessages = normalizeChatMessages(messages);

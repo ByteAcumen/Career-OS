@@ -62,7 +62,7 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** 2026-04-16T22:05:03+05:30
+**Timestamp:** 2026-04-16T22:23:00+05:30
 **Branch:** `codex/work`
 
 ### What I completed
@@ -103,6 +103,7 @@
   - `src/features/resume/render-resume-pdf.ts`
   - `src/features/resume/file-name.ts`
 - ✅ Improved `src/lib/ai.ts` and `src/app/api/ai/chat/route.ts` so the assistant can handle more direct workspace edits locally before using paid AI calls.
+- ✅ Tightened assistant response shaping in `src/lib/ai.ts` so default replies stay shorter, scan better in compact UI, and use fewer output tokens.
 - ✅ Verification:
   - `npm run lint` passed
   - `npm run build` passed
@@ -120,6 +121,10 @@
   - `POST /api/ai/resume` accepts JSON or multipart form-data, including uploaded resumes
   - `POST /api/ai/resume/pdf` returns an attachment-ready PDF with a clean filename
   - frontend/UI work can consume these routes without any schema change
+- UI request queued for Antigravity in `.agents/handoffs/2026-04-16-chatbot-landing-ui-request.json`:
+  - fix compact chatbot scroll/overflow and cramped layout
+  - improve chatbot spacing, motion, and visual polish
+  - improve landing-page uniformity, smoothness, and cleaner hierarchy
 
 ---
 
