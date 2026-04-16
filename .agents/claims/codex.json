@@ -3,6 +3,7 @@
   "claimedAt": "2026-04-16T19:40:10+05:30",
   "files": [
     "AGENTS.md",
+    "scripts/coordinator.ts",
     "src/lib/ai.ts",
     "src/lib/email.ts",
     "src/app/api/ai/**",
