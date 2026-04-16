@@ -1,0 +1,27 @@
+{
+  "agent": "codex",
+  "claimedAt": "",
+  "files": [],
+  "available": [
+    "src/lib/ai.ts",
+    "src/lib/email.ts",
+    "src/lib/github.ts",
+    "src/lib/schedule.ts",
+    "src/lib/google-sheet.ts",
+    "src/lib/secret-vault.ts",
+    "src/lib/ai-cache.ts",
+    "src/lib/ai-credentials.ts",
+    "src/lib/client-request.ts",
+    "src/app/api/ai/**",
+    "src/app/api/applications/**",
+    "src/app/api/builds/**",
+    "src/app/api/dsa/**",
+    "src/app/api/calendar/**",
+    "src/app/api/checkins/**",
+    "src/app/api/cron/**",
+    "src/features/resume/**",
+    "src/features/digest/**",
+    "src/features/kanban/**"
+  ],
+  "note": "Codex: fill claimedAt and files[] when you take ownership of anything above."
+}

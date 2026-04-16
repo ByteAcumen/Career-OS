@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:user": "node --import tsx scripts/seed-user.ts"
+    "seed:user": "node --import tsx scripts/seed-user.ts",
+    "agent:sync": "npx tsx scripts/coordinator.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.5.6",
