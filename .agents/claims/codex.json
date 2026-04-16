@@ -1,10 +1,16 @@
 {
   "agent": "codex",
-  "claimedAt": "",
-  "files": [],
-  "available": [
+  "claimedAt": "2026-04-16T19:40:10+05:30",
+  "files": [
+    "AGENTS.md",
+    "scripts/coordinator.ts",
     "src/lib/ai.ts",
     "src/lib/email.ts",
+    "src/app/api/ai/**",
+    "src/features/resume/**",
+    "src/features/digest/**"
+  ],
+  "available": [
     "src/lib/github.ts",
     "src/lib/schedule.ts",
     "src/lib/google-sheet.ts",
@@ -12,16 +18,13 @@
     "src/lib/ai-cache.ts",
     "src/lib/ai-credentials.ts",
     "src/lib/client-request.ts",
-    "src/app/api/ai/**",
     "src/app/api/applications/**",
     "src/app/api/builds/**",
     "src/app/api/dsa/**",
     "src/app/api/calendar/**",
     "src/app/api/checkins/**",
     "src/app/api/cron/**",
-    "src/features/resume/**",
-    "src/features/digest/**",
     "src/features/kanban/**"
   ],
-  "note": "Codex: fill claimedAt and files[] when you take ownership of anything above."
+  "note": "Codex currently owns AGENTS coordination updates plus Phase 4 AI, resume, and digest work. Remaining available paths can be claimed in a later handoff."
 }
