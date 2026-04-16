@@ -15,9 +15,10 @@ type ClaimSet = {
 function runCommand(command: string) {
   try {
     return execSync(command, { encoding: "utf8", stdio: "pipe" });
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as Error;
     console.error(`Command failed: ${command}`);
-    console.error(error.message);
+    console.error(err.message);
     process.exit(1);
   }
 }

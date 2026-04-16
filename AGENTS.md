@@ -38,25 +38,19 @@
 
 ## 🟣 Antigravity — Last Update
 
-**Timestamp:** 2026-04-16T19:21:00+05:30
-**Branch:** (main — user has not set up branching yet)
+**Timestamp:** 2026-04-16T20:06:00+05:30
+**Branch:** `antigravity/work`
 
-### What I completed (Phase 3):
-- ✅ Landing page fully rewritten — professional responsive design, rotating word fixed, no overflow
-- ✅ Edge middleware with per-route rate limiting (auth, AI routes)
-- ✅ ErrorBoundary wired into workspace-shell — catches crashes on all pages
-- ✅ Page transitions — AnimatePresence fade-up between Home/Planner/Logger/etc.
-- ✅ `buildEntrySchema` expanded to 16 tech areas (was 5)
-- ✅ `applicationEntrySchema` — added Offer, Accepted, Ghosted, Withdrawn
-- ✅ `robots.ts` and `sitemap.ts` created
-- ✅ DB schema confirmed — `assistant_conversations` and `assistant_messages` tables exist
-- ✅ `layout.tsx` — full SEO metadata, OpenGraph, Twitter cards, Plus_Jakarta_Sans font
-- ✅ TypeScript: `exit code: 0` — clean
+### What I completed (Phase 4):
+- ✅ Chatbot UI Overhauled — premium glassmorphism, distinct user/assistant bubbles, and spring-physics animations.
+- ✅ Markdown Integration — `react-markdown` added, the chatbot now perfectly renders lists, bold text, and code snippets.
+- ✅ Token Footprint Optimized — `clipText` limits vastly reduced across dashboard payloads in `assistant.ts`.
+- ✅ Chat Memory Capped — reduced `MAX_CONTEXT_MESSAGES` from 8 down to 4 to ensure high efficiency and low usage.
+- ✅ Confirmed UI fully supports Workspace Edits (the frontend router triggers an immediate refresh when Codex API confirms actions applied).
 
 ### Current known issues (for Codex to pick up if desired):
-- `src/lib/ai.ts` is 1540 lines — could be split into smaller modules
-- Email templates in `email.ts` use teal branding — should match monochrome dark theme
-- `src/components/tracker-dashboard.tsx` is 164 bytes — empty stub, investigate or delete
+- Codex must inject the `Zod` schema/functions for actually logging work into `ai.ts` since it owns the backend layer now.
+- Email templates in `email.ts` use teal branding — should match monochrome dark theme.
 
 ### What's next (Phase 4 — available for Codex):
 1. Resume / LaTeX generation from user's logged work
@@ -68,7 +62,7 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** 2026-04-16T19:40:10+05:30
+**Timestamp:** 2026-04-16T20:15:52+05:30
 **Branch:** `codex/work`
 
 ### What I completed
@@ -76,16 +70,33 @@
 - ✅ Read `AGENTS.md`, `.agents/claims/antigravity.json`, and the hardened coordinator before claiming work.
 - ✅ Claimed Codex-owned Phase 4 surface in `.agents/claims/codex.json`:
   - `AGENTS.md`
+  - `scripts/coordinator.ts`
   - `src/lib/ai.ts`
   - `src/lib/email.ts`
   - `src/app/api/ai/**`
   - `src/features/resume/**`
   - `src/features/digest/**`
+- ✅ Brought the hardened coordinator onto `codex/work`, fixed glob parsing and porcelain path parsing, and validated `npm run agent:sync` on the Codex branch.
+- ✅ Added deterministic resume generation under `src/features/resume/build-resume.ts` with:
+  - markdown output
+  - LaTeX output
+  - job-description keyword biasing
+  - project / DSA evidence built from stored user activity
+- ✅ Added weekly digest generation under `src/features/digest/build-weekly-digest.ts`.
+- ✅ Added new API routes:
+  - `src/app/api/ai/resume/route.ts`
+  - `src/app/api/ai/digest/route.ts`
+- ✅ Updated `src/lib/email.ts`:
+  - monochrome email shell for auth emails
+  - weekly digest email sender
+- ✅ Verification:
+  - `npm run lint` passed
+  - `npm run build` passed
 
 ### Current work queue
 1. Split `src/lib/ai.ts` into smaller focused modules without breaking the existing AI routes.
-2. Add resume generation under `src/features/resume/`.
-3. Add weekly digest generation under `src/features/digest/`.
+2. Add resume tailoring improvements or export helpers if the UI needs richer output shapes.
+3. Add scheduled digest sending / cron integration on the Codex-owned backend side.
 4. Keep off Antigravity-owned UI, schema, middleware, and workspace shell files unless coordinated here first.
 
 ### Conflicts / coordination notes

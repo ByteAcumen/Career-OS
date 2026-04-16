@@ -1,5 +1,6 @@
-﻿import { Resend } from "resend";
+import { Resend } from "resend";
 
+import type { WeeklyDigest } from "@/features/digest/build-weekly-digest";
 import { getEnvValue } from "@/lib/env";
 
 const resendApiKey = getEnvValue("RESEND_API_KEY");
@@ -12,7 +13,7 @@ const FROM_ADDRESS = configuredFromAddress || SANDBOX_FROM_ADDRESS;
 
 function getResendClient() {
   if (!resend) {
-    throw new Error("Missing RESEND_API_KEY. Password reset email cannot be sent.");
+    throw new Error("Missing RESEND_API_KEY. Email delivery is unavailable.");
   }
 
   if (!configuredFromAddress && process.env.NODE_ENV === "production") {
@@ -43,6 +44,56 @@ function normalizeEmailError(error: unknown, action: string) {
   return error instanceof Error ? error : new Error(message);
 }
 
+function renderEmailShell(options: {
+  eyebrow: string;
+  title: string;
+  intro: string;
+  bodyHtml: string;
+  footer?: string;
+}) {
+  return `
+    <div style="font-family:'Inter',system-ui,sans-serif;max-width:680px;margin:0 auto;padding:32px;background:#080808;color:#f5f5f5;border-radius:24px;border:1px solid rgba(255,255,255,0.08)">
+      <div style="display:inline-flex;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,0.1);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#a1a1aa;background:rgba(255,255,255,0.03)">
+        ${escapeHtml(options.eyebrow)}
+      </div>
+      <h1 style="margin:18px 0 12px;font-size:30px;line-height:1.08;color:#ffffff">${escapeHtml(options.title)}</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.8;color:#d4d4d8">${escapeHtml(options.intro)}</p>
+      ${options.bodyHtml}
+      <hr style="margin:24px 0;border:none;border-top:1px solid rgba(255,255,255,0.08)"/>
+      <p style="margin:0;font-size:12px;line-height:1.7;color:#8a8a92">
+        ${escapeHtml(options.footer || "Career OS / private student workspace")}
+      </p>
+    </div>
+  `;
+}
+
+function renderButton(label: string, url: string) {
+  return `
+    <div style="margin:24px 0">
+      <a href="${escapeHtml(url)}" style="display:inline-block;padding:14px 24px;border-radius:14px;background:#ffffff;color:#080808;text-decoration:none;font-weight:700">
+        ${escapeHtml(label)}
+      </a>
+    </div>
+  `;
+}
+
+function renderInfoCard(text: string) {
+  return `
+    <div style="border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:18px;background:rgba(255,255,255,0.03);font-size:14px;line-height:1.75;color:#d4d4d8">
+      ${escapeHtml(text)}
+    </div>
+  `;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendPasswordResetEmail(
   email: string,
   resetUrl: string,
@@ -53,29 +104,18 @@ export async function sendPasswordResetEmail(
       from: FROM_ADDRESS,
       to: email,
       subject: "Reset your Career OS password",
-      html: `
-        <div style="font-family:'Inter',system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0a0f;color:#e2e8f0;border-radius:16px;border:1px solid rgba(255,255,255,0.06)">
-          <div style="text-align:center;margin-bottom:24px">
-            <span style="display:inline-block;padding:6px 16px;border-radius:999px;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#5eead4;border:1px solid rgba(20,184,166,0.2);background:rgba(20,184,166,0.06)">Career OS</span>
-          </div>
-          <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;color:white;text-align:center">Reset your password</h2>
-          <p style="margin:0 0 24px;font-size:14px;line-height:1.7;color:#94a3b8;text-align:center">
-            Click the button below to set a new password for your Career OS account. This link expires in 1 hour.
-          </p>
-          <div style="text-align:center;margin:24px 0">
-            <a href="${resetUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;font-size:14px;font-weight:600;border-radius:12px;text-decoration:none;box-shadow:0 4px 14px rgba(20,184,166,0.25)">
-              Reset password &rarr;
-            </a>
-          </div>
-          <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#64748b;text-align:center">
-            If you didn't request this, ignore this email. Your password will remain unchanged.
-          </p>
-          <hr style="margin:24px 0;border:none;border-top:1px solid rgba(255,255,255,0.06)"/>
-          <p style="margin:0;font-size:11px;color:#475569;text-align:center">
-            Career OS &middot; Secure Workspace
-          </p>
-        </div>
-      `,
+      html: renderEmailShell({
+        eyebrow: "Career OS security",
+        title: "Reset your password",
+        intro:
+          "Use the secure link below to set a new password for your Career OS account. The link expires in one hour.",
+        bodyHtml: [
+          renderButton("Reset password", resetUrl),
+          renderInfoCard(
+            "If you did not request a reset, ignore this email. Your current password will remain active.",
+          ),
+        ].join(""),
+      }),
     });
     console.log(`[email] Password reset email sent to ${email}`);
   } catch (error) {
@@ -95,34 +135,46 @@ export async function sendVerificationEmail(
       from: FROM_ADDRESS,
       to: email,
       subject: "Verify your Career OS email",
-      html: `
-        <div style="font-family:'Inter',system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0a0f;color:#e2e8f0;border-radius:16px;border:1px solid rgba(255,255,255,0.06)">
-          <div style="text-align:center;margin-bottom:24px">
-            <span style="display:inline-block;padding:6px 16px;border-radius:999px;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#5eead4;border:1px solid rgba(20,184,166,0.2);background:rgba(20,184,166,0.06)">Career OS</span>
-          </div>
-          <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;color:white;text-align:center">Verify your email</h2>
-          <p style="margin:0 0 24px;font-size:14px;line-height:1.7;color:#94a3b8;text-align:center">
-            Click the button below to verify your email address and activate your Career OS workspace.
-          </p>
-          <div style="text-align:center;margin:24px 0">
-            <a href="${verificationUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;font-size:14px;font-weight:600;border-radius:12px;text-decoration:none;box-shadow:0 4px 14px rgba(20,184,166,0.25)">
-              Verify email &rarr;
-            </a>
-          </div>
-          <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#64748b;text-align:center">
-            If you didn't create an account, ignore this email.
-          </p>
-          <hr style="margin:24px 0;border:none;border-top:1px solid rgba(255,255,255,0.06)"/>
-          <p style="margin:0;font-size:11px;color:#475569;text-align:center">
-            Career OS &middot; Secure Workspace
-          </p>
-        </div>
-      `,
+      html: renderEmailShell({
+        eyebrow: "Career OS security",
+        title: "Verify your email",
+        intro:
+          "Confirm this email address to activate password sign-in and secure the workspace behind your account.",
+        bodyHtml: [
+          renderButton("Verify email", verificationUrl),
+          renderInfoCard(
+            "If you did not create this account, ignore the message and no changes will be applied.",
+          ),
+        ].join(""),
+      }),
     });
     console.log(`[email] Verification email sent to ${email}`);
   } catch (error) {
     const normalizedError = normalizeEmailError(error, "email verification");
     console.error("[email] Failed to send verification email:", normalizedError);
+    throw normalizedError;
+  }
+}
+
+export async function sendWeeklyDigestEmail(email: string, digest: WeeklyDigest) {
+  try {
+    const emailClient = getResendClient();
+    await emailClient.emails.send({
+      from: FROM_ADDRESS,
+      to: email,
+      subject: digest.subject,
+      html: renderEmailShell({
+        eyebrow: "Career OS weekly digest",
+        title: digest.headline,
+        intro: digest.preview,
+        bodyHtml: digest.html,
+        footer: "Career OS / weekly review generated from your private workspace data",
+      }),
+    });
+    console.log(`[email] Weekly digest email sent to ${email}`);
+  } catch (error) {
+    const normalizedError = normalizeEmailError(error, "weekly digest");
+    console.error("[email] Failed to send weekly digest email:", normalizedError);
     throw normalizedError;
   }
 }

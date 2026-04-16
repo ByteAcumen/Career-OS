@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getRequestSession } from "@/lib/auth-session";
-import { getAssistantConversation } from "@/lib/assistant";
+import { getAssistantConversation, deleteAssistantConversation } from "@/lib/assistant";
 
 export const dynamic = "force-dynamic";
 
@@ -22,4 +22,21 @@ export async function GET(
   }
 
   return NextResponse.json({ conversation });
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ conversationId: string }> },
+) {
+  const session = await getRequestSession(request);
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const { conversationId } = await context.params;
+  
+  // deleteAssistantConversation securely enforces userId
+  await deleteAssistantConversation(session.user.id, conversationId);
+
+  return NextResponse.json({ success: true });
 }
