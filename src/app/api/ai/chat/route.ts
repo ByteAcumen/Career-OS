@@ -13,6 +13,7 @@ import {
   streamChat,
   AiError,
   planAssistantActions,
+  planAssistantActionsLocally,
   type AssistantAction,
 } from "@/lib/ai";
 import {
@@ -20,9 +21,11 @@ import {
   createBuildEntry,
   createDsaEntry,
   createPlannerTask,
+  deletePlannerTask,
   getDashboardData,
   saveReview,
   saveSettings,
+  updatePlannerTaskStatus,
 } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";
 import { assistantContextPages } from "@/lib/types";
@@ -69,7 +72,7 @@ function getAiErrorStatus(error: AiError) {
 }
 
 function looksLikeActionRequest(message: string) {
-  return /\b(add|create|log|save|set|update|change|plan|schedule|record|track)\b/i.test(message);
+  return /\b(add|create|log|save|set|update|change|plan|schedule|record|track|mark|complete|finish|start|resume|reopen|delete|remove)\b/i.test(message);
 }
 
 function createTextStream(text: string) {
@@ -166,6 +169,24 @@ async function applyAssistantActions(
       applied.push({
         type: action.type,
         summary: `Updated workspace settings: ${Object.keys(action.settings).join(", ")}.`,
+      });
+      continue;
+    }
+
+    if (action.type === "update_task_status") {
+      await updatePlannerTaskStatus(userId, action.taskId, action.status);
+      applied.push({
+        type: action.type,
+        summary: `Marked "${action.title}" as ${action.status.replace("_", " ")}.`,
+      });
+      continue;
+    }
+
+    if (action.type === "delete_task") {
+      await deletePlannerTask(userId, action.taskId);
+      applied.push({
+        type: action.type,
+        summary: `Removed task: ${action.title}.`,
       });
       continue;
     }
@@ -290,13 +311,18 @@ export async function POST(request: Request) {
 
     if (latestUserMessage && looksLikeActionRequest(latestUserMessage)) {
       try {
-        const actionPlan = await planAssistantActions({
-          userId: session.user.id,
-          dashboard,
-          messages,
-          preferredProvider: dashboard.settings.aiProvider,
-          configuredModel: dashboard.settings.openAiModel,
-        });
+        const actionPlan =
+          planAssistantActionsLocally({
+            dashboard,
+            messages,
+          }) ??
+          (await planAssistantActions({
+            userId: session.user.id,
+            dashboard,
+            messages,
+            preferredProvider: dashboard.settings.aiProvider,
+            configuredModel: dashboard.settings.openAiModel,
+          }));
 
         if (actionPlan.shouldAct && actionPlan.actions.length > 0) {
           appliedActions = await applyAssistantActions(

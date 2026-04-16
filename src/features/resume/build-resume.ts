@@ -1,6 +1,9 @@
 import type { DashboardData } from "@/lib/types";
 
-type ResumeOptions = {
+export type ResumeMode = "deterministic" | "ai-optimized";
+export type ResumeEmphasis = "balanced" | "projects" | "dsa";
+
+export type ResumeOptions = {
   user: {
     name?: string | null;
     email: string;
@@ -8,23 +11,25 @@ type ResumeOptions = {
   targetRole?: string | null;
   company?: string | null;
   jobDescription?: string | null;
-  emphasis?: "balanced" | "projects" | "dsa";
+  emphasis?: ResumeEmphasis;
+  sourceResumeText?: string | null;
+  sourceFileName?: string | null;
 };
 
-type ResumeLink = {
+export type ResumeLink = {
   label: string;
   url: string;
 };
 
-type ResumeProject = {
+export type ResumeProject = {
   title: string;
   subtitle: string;
   bullets: string[];
   link?: string | null;
 };
 
-type ResumeDraft = {
-  mode: "deterministic";
+export type ResumeDraft = {
+  mode: ResumeMode;
   generatedAt: string;
   targetRole: string;
   company: string | null;
@@ -41,8 +46,22 @@ type ResumeDraft = {
   projectHighlights: ResumeProject[];
   problemSolvingHighlights: string[];
   editingNotes: string[];
+  improvementSummary: string | null;
+  importedResume: {
+    used: boolean;
+    fileName: string | null;
+  };
   markdown: string;
   latex: string;
+};
+
+type ResumeRenderableSections = {
+  header: ResumeDraft["header"];
+  summaryBullets: string[];
+  focusAreas: string[];
+  projectHighlights: ResumeProject[];
+  problemSolvingHighlights: string[];
+  editingNotes: string[];
 };
 
 const TECH_STOP_WORDS = new Set([
@@ -94,15 +113,17 @@ export function buildResumeDraft(
   const targetRole =
     options.targetRole?.trim() || dashboard.settings.targetRole || "Software Engineer";
   const company = options.company?.trim() || null;
+  const sourceResumeText = cleanResumeSourceText(options.sourceResumeText);
   const keywords = extractKeywords([
     options.jobDescription ?? "",
     options.company ?? "",
     options.targetRole ?? "",
+    sourceResumeText ?? "",
   ]);
   const links = buildLinks(dashboard.settings);
   const scoredBuilds = scoreBuilds(dashboard, keywords, options.emphasis ?? "balanced");
   const projectHighlights = scoredBuilds.slice(0, 3).map((entry) => buildProjectHighlight(entry));
-  const focusAreas = buildFocusAreas(dashboard, keywords);
+  const focusAreas = buildFocusAreas(dashboard, keywords, sourceResumeText);
   const problemSolvingHighlights = buildProblemSolvingHighlights(dashboard, keywords);
   const summaryBullets = buildSummaryBullets(
     dashboard,
@@ -111,9 +132,15 @@ export function buildResumeDraft(
     focusAreas,
     keywords,
     projectHighlights.length,
+    Boolean(sourceResumeText),
   );
   const education = buildEducationLine(dashboard.settings);
-  const editingNotes = buildEditingNotes(dashboard, projectHighlights.length, keywords);
+  const editingNotes = buildEditingNotes(
+    dashboard,
+    projectHighlights.length,
+    keywords,
+    Boolean(sourceResumeText),
+  );
   const header = {
     name: options.user.name?.trim() || "Career OS Student",
     email: options.user.email,
@@ -122,7 +149,7 @@ export function buildResumeDraft(
     links,
   };
 
-  return {
+  return finalizeResumeDraft({
     mode: "deterministic",
     generatedAt: new Date().toISOString(),
     targetRole,
@@ -134,22 +161,199 @@ export function buildResumeDraft(
     projectHighlights,
     problemSolvingHighlights,
     editingNotes,
-    markdown: renderResumeMarkdown({
-      header,
-      summaryBullets,
-      focusAreas,
-      projectHighlights,
-      problemSolvingHighlights,
-      editingNotes,
-    }),
-    latex: renderResumeLatex({
-      header,
-      summaryBullets,
-      focusAreas,
-      projectHighlights,
-      problemSolvingHighlights,
-    }),
+    improvementSummary: sourceResumeText
+      ? "Imported an existing resume so stronger quantified bullets can be merged into this draft."
+      : null,
+    importedResume: {
+      used: Boolean(sourceResumeText),
+      fileName: options.sourceFileName?.trim() || null,
+    },
+  });
+}
+
+export function composeResumeDraft(
+  baseDraft: ResumeDraft,
+  overrides: Partial<
+    Pick<
+      ResumeDraft,
+      | "mode"
+      | "generatedAt"
+      | "matchedKeywords"
+      | "summaryBullets"
+      | "focusAreas"
+      | "projectHighlights"
+      | "problemSolvingHighlights"
+      | "editingNotes"
+      | "improvementSummary"
+      | "importedResume"
+    >
+  >,
+): ResumeDraft {
+  return finalizeResumeDraft({
+    mode: overrides.mode ?? baseDraft.mode,
+    generatedAt: overrides.generatedAt ?? new Date().toISOString(),
+    targetRole: baseDraft.targetRole,
+    company: baseDraft.company,
+    matchedKeywords: uniqueStrings(overrides.matchedKeywords ?? baseDraft.matchedKeywords).slice(0, 12),
+    header: baseDraft.header,
+    summaryBullets: uniqueStrings(overrides.summaryBullets ?? baseDraft.summaryBullets).slice(0, 4),
+    focusAreas: uniqueStrings(overrides.focusAreas ?? baseDraft.focusAreas).slice(0, 10),
+    projectHighlights: normalizeProjects(overrides.projectHighlights ?? baseDraft.projectHighlights).slice(
+      0,
+      4,
+    ),
+    problemSolvingHighlights: uniqueStrings(
+      overrides.problemSolvingHighlights ?? baseDraft.problemSolvingHighlights,
+    ).slice(0, 5),
+    editingNotes: uniqueStrings(overrides.editingNotes ?? baseDraft.editingNotes).slice(0, 6),
+    improvementSummary:
+      overrides.improvementSummary === undefined
+        ? baseDraft.improvementSummary
+        : overrides.improvementSummary,
+    importedResume: overrides.importedResume ?? baseDraft.importedResume,
+  });
+}
+
+export function renderResumeMarkdown(input: ResumeRenderableSections) {
+  const lines: string[] = [];
+
+  lines.push(`# ${input.header.name}`);
+  lines.push(input.header.title);
+  lines.push(input.header.email);
+  if (input.header.education) {
+    lines.push(input.header.education);
+  }
+  if (input.header.links.length) {
+    lines.push(input.header.links.map((link) => `[${link.label}](${link.url})`).join(" | "));
+  }
+
+  lines.push("", "## Summary");
+  for (const bullet of input.summaryBullets) {
+    lines.push(`- ${bullet}`);
+  }
+
+  lines.push("", "## Focus Areas");
+  lines.push(input.focusAreas.join(" | "));
+
+  lines.push("", "## Selected Projects");
+  for (const project of input.projectHighlights) {
+    lines.push(`### ${project.title}`);
+    lines.push(project.subtitle);
+    if (project.link) {
+      lines.push(project.link);
+    }
+    for (const bullet of project.bullets) {
+      lines.push(`- ${bullet}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Problem Solving");
+  for (const bullet of input.problemSolvingHighlights) {
+    lines.push(`- ${bullet}`);
+  }
+
+  lines.push("", "## Editing Notes");
+  for (const note of input.editingNotes) {
+    lines.push(`- ${note}`);
+  }
+
+  return lines.join("\n").trim();
+}
+
+export function renderResumeLatex(input: ResumeRenderableSections) {
+  const lines: string[] = [
+    "\\documentclass[10pt]{article}",
+    "\\usepackage[margin=0.7in]{geometry}",
+    "\\usepackage[hidelinks]{hyperref}",
+    "\\usepackage{enumitem}",
+    "\\setlist[itemize]{leftmargin=1.1em,itemsep=0.25em,topsep=0.3em}",
+    "\\pagestyle{empty}",
+    "\\begin{document}",
+    `\\begin{center}{\\LARGE \\textbf{${latexEscape(input.header.name)}}}\\\\[0.15cm]`,
+    `${latexEscape(input.header.title)} \\\\`,
+    `${latexEscape(input.header.email)}`,
+  ];
+
+  if (input.header.links.length) {
+    lines.push("\\\\");
+    lines.push(
+      input.header.links
+        .map((link) => `\\href{${latexEscape(link.url)}}{${latexEscape(link.label)}}`)
+        .join(" $\\vert$ "),
+    );
+  }
+
+  if (input.header.education) {
+    lines.push("\\\\");
+    lines.push(latexEscape(input.header.education));
+  }
+
+  lines.push("\\end{center}");
+  lines.push("\\section*{Summary}");
+  lines.push("\\begin{itemize}");
+  for (const bullet of input.summaryBullets) {
+    lines.push(`\\item ${latexEscape(bullet)}`);
+  }
+  lines.push("\\end{itemize}");
+
+  lines.push("\\section*{Focus Areas}");
+  lines.push(latexEscape(input.focusAreas.join(" | ")));
+
+  lines.push("\\section*{Selected Projects}");
+  for (const project of input.projectHighlights) {
+    lines.push(`\\textbf{${latexEscape(project.title)}} \\hfill ${latexEscape(project.subtitle)}\\\\`);
+    if (project.link) {
+      lines.push(`\\href{${latexEscape(project.link)}}{${latexEscape(project.link)}}\\\\`);
+    }
+    lines.push("\\begin{itemize}");
+    for (const bullet of project.bullets) {
+      lines.push(`\\item ${latexEscape(bullet)}`);
+    }
+    lines.push("\\end{itemize}");
+  }
+
+  lines.push("\\section*{Problem Solving}");
+  lines.push("\\begin{itemize}");
+  for (const bullet of input.problemSolvingHighlights) {
+    lines.push(`\\item ${latexEscape(bullet)}`);
+  }
+  lines.push("\\end{itemize}");
+  lines.push("\\end{document}");
+
+  return lines.join("\n");
+}
+
+function finalizeResumeDraft(
+  input: Omit<ResumeDraft, "markdown" | "latex">,
+): ResumeDraft {
+  const sections: ResumeRenderableSections = {
+    header: input.header,
+    summaryBullets: uniqueStrings(input.summaryBullets).slice(0, 4),
+    focusAreas: uniqueStrings(input.focusAreas).slice(0, 10),
+    projectHighlights: normalizeProjects(input.projectHighlights).slice(0, 4),
+    problemSolvingHighlights: uniqueStrings(input.problemSolvingHighlights).slice(0, 5),
+    editingNotes: uniqueStrings(input.editingNotes).slice(0, 6),
   };
+
+  return {
+    ...input,
+    matchedKeywords: uniqueStrings(input.matchedKeywords).slice(0, 12),
+    ...sections,
+    markdown: renderResumeMarkdown(sections),
+    latex: renderResumeLatex(sections),
+  };
+}
+
+function normalizeProjects(projects: ResumeProject[]) {
+  return projects
+    .map((project) => ({
+      title: project.title.trim(),
+      subtitle: project.subtitle.trim() || "Project",
+      link: project.link?.trim() || null,
+      bullets: uniqueStrings(project.bullets.map((bullet) => normalizeSentence(bullet))).slice(0, 4),
+    }))
+    .filter((project) => project.title && project.bullets.length > 0);
 }
 
 function buildLinks(settings: DashboardData["settings"]) {
@@ -175,7 +379,11 @@ function buildEducationLine(settings: DashboardData["settings"]) {
   return parts.length ? parts.join(" | ") : null;
 }
 
-function buildFocusAreas(dashboard: DashboardData, keywords: string[]) {
+function buildFocusAreas(
+  dashboard: DashboardData,
+  keywords: string[],
+  sourceResumeText: string | null,
+) {
   const areaCounts = new Map<string, number>();
 
   for (const build of dashboard.recentBuilds) {
@@ -190,6 +398,13 @@ function buildFocusAreas(dashboard: DashboardData, keywords: string[]) {
   for (const keyword of keywords) {
     if (keyword.length >= 4) {
       areaCounts.set(keyword, (areaCounts.get(keyword) ?? 0) + 3);
+    }
+  }
+
+  if (sourceResumeText) {
+    for (const token of tokenize(sourceResumeText).slice(0, 180)) {
+      if (token.length < 3 || TECH_STOP_WORDS.has(token)) continue;
+      areaCounts.set(token, (areaCounts.get(token) ?? 0) + 1);
     }
   }
 
@@ -209,7 +424,7 @@ function registerFocusValue(areaCounts: Map<string, number>, value: string) {
 function scoreBuilds(
   dashboard: DashboardData,
   keywords: string[],
-  emphasis: NonNullable<ResumeOptions["emphasis"]>,
+  emphasis: ResumeEmphasis,
 ) {
   const buildWeight = emphasis === "projects" ? 5 : 2;
   const dsaWeight = emphasis === "dsa" ? 1 : 2;
@@ -279,6 +494,7 @@ function buildSummaryBullets(
   focusAreas: string[],
   keywords: string[],
   projectCount: number,
+  hasImportedResume: boolean,
 ) {
   const summary = [
     normalizeSentence(
@@ -305,6 +521,12 @@ function buildSummaryBullets(
     );
   }
 
+  if (hasImportedResume) {
+    summary.push(
+      "An uploaded resume was used as reference so stronger quantified language can be preserved where it still matches your current work.",
+    );
+  }
+
   return summary.slice(0, 3);
 }
 
@@ -312,14 +534,17 @@ function buildEditingNotes(
   dashboard: DashboardData,
   projectCount: number,
   keywords: string[],
+  hasImportedResume: boolean,
 ) {
   const notes = [
     projectCount === 0
       ? "Log at least one shipped build with proof and impact so the projects section becomes stronger."
       : "Replace generic verbs with stack-specific nouns once you choose the target posting.",
-    dashboard.settings.resumeUrl
-      ? "Compare this draft against your saved resume link and pull over any quantified outcomes that are stronger."
-      : "If you have an older resume, merge its best quantified outcomes into the bullets below.",
+    hasImportedResume
+      ? "Merge only truthful quantified outcomes from the uploaded resume and drop stale claims before exporting."
+      : dashboard.settings.resumeUrl
+        ? "Compare this draft against your saved resume link and pull over any quantified outcomes that are stronger."
+        : "If you have an older resume, merge its best quantified outcomes into the bullets below.",
     keywords.length
       ? `Mirror the exact phrasing from the job description for ${formatList(keywords.slice(0, 4))} where it is truthful.`
       : "Paste a job description into the resume API later to bias project ordering toward the role.",
@@ -328,127 +553,18 @@ function buildEditingNotes(
   return notes.filter(Boolean);
 }
 
-function renderResumeMarkdown(input: {
-  header: ResumeDraft["header"];
-  summaryBullets: string[];
-  focusAreas: string[];
-  projectHighlights: ResumeProject[];
-  problemSolvingHighlights: string[];
-  editingNotes: string[];
-}) {
-  const lines: string[] = [];
+function cleanResumeSourceText(value: string | null | undefined) {
+  if (!value) return null;
 
-  lines.push(`# ${input.header.name}`);
-  lines.push(input.header.title);
-  lines.push(input.header.email);
-  if (input.header.education) {
-    lines.push(input.header.education);
-  }
-  if (input.header.links.length) {
-    lines.push(input.header.links.map((link) => `[${link.label}](${link.url})`).join(" | "));
-  }
+  const normalized = value
+    .replace(/\u0000/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
-  lines.push("", "## Summary");
-  for (const bullet of input.summaryBullets) {
-    lines.push(`- ${bullet}`);
-  }
-
-  lines.push("", "## Focus Areas");
-  lines.push(input.focusAreas.join(" | "));
-
-  lines.push("", "## Selected Projects");
-  for (const project of input.projectHighlights) {
-    lines.push(`### ${project.title}`);
-    lines.push(project.subtitle);
-    if (project.link) {
-      lines.push(project.link);
-    }
-    for (const bullet of project.bullets) {
-      lines.push(`- ${bullet}`);
-    }
-    lines.push("");
-  }
-
-  lines.push("## Problem Solving");
-  for (const bullet of input.problemSolvingHighlights) {
-    lines.push(`- ${bullet}`);
-  }
-
-  lines.push("", "## Editing Notes");
-  for (const note of input.editingNotes) {
-    lines.push(`- ${note}`);
-  }
-
-  return lines.join("\n").trim();
-}
-
-function renderResumeLatex(input: {
-  header: ResumeDraft["header"];
-  summaryBullets: string[];
-  focusAreas: string[];
-  projectHighlights: ResumeProject[];
-  problemSolvingHighlights: string[];
-}) {
-  const lines: string[] = [
-    "\\documentclass[10pt]{article}",
-    "\\usepackage[margin=0.7in]{geometry}",
-    "\\usepackage[hidelinks]{hyperref}",
-    "\\usepackage{enumitem}",
-    "\\setlist[itemize]{leftmargin=1.1em,itemsep=0.25em,topsep=0.3em}",
-    "\\pagestyle{empty}",
-    "\\begin{document}",
-    `\\begin{center}{\\LARGE \\textbf{${latexEscape(input.header.name)}}}\\\\[0.15cm]`,
-    `${latexEscape(input.header.title)} \\\\`,
-    `${latexEscape(input.header.email)}`,
-  ];
-
-  if (input.header.links.length) {
-    lines.push("\\\\");
-    lines.push(
-      input.header.links
-        .map((link) => `\\href{${latexEscape(link.url)}}{${latexEscape(link.label)}}`)
-        .join(" $\\vert$ "),
-    );
-  }
-
-  if (input.header.education) {
-    lines.push("\\\\");
-    lines.push(latexEscape(input.header.education));
-  }
-
-  lines.push("\\end{center}");
-  lines.push("\\section*{Summary}");
-  lines.push("\\begin{itemize}");
-  for (const bullet of input.summaryBullets) {
-    lines.push(`\\item ${latexEscape(bullet)}`);
-  }
-  lines.push("\\end{itemize}");
-
-  lines.push("\\section*{Focus Areas}");
-  lines.push(latexEscape(input.focusAreas.join(" | ")));
-
-  lines.push("\\section*{Selected Projects}");
-  for (const project of input.projectHighlights) {
-    lines.push(`\\textbf{${latexEscape(project.title)}} \\hfill ${latexEscape(project.subtitle)}\\\\`);
-    if (project.link) {
-      lines.push(`\\href{${latexEscape(project.link)}}{${latexEscape(project.link)}}\\\\`);
-    }
-    lines.push("\\begin{itemize}");
-    for (const bullet of project.bullets) {
-      lines.push(`\\item ${latexEscape(bullet)}`);
-    }
-    lines.push("\\end{itemize}");
-  }
-
-  lines.push("\\section*{Problem Solving}");
-  lines.push("\\begin{itemize}");
-  for (const bullet of input.problemSolvingHighlights) {
-    lines.push(`\\item ${latexEscape(bullet)}`);
-  }
-  lines.push("\\end{itemize}");
-  lines.push("\\end{document}");
-
-  return lines.join("\n");
+  if (!normalized) return null;
+  return normalized.slice(0, 16_000);
 }
 
 function tokenize(text: string) {
