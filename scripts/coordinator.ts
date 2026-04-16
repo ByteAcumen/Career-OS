@@ -15,9 +15,10 @@ type ClaimSet = {
 function runCommand(command: string) {
   try {
     return execSync(command, { encoding: "utf8", stdio: "pipe" });
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as Error;
     console.error(`Command failed: ${command}`);
-    console.error(error.message);
+    console.error(err.message);
     process.exit(1);
   }
 }
@@ -123,7 +124,32 @@ function parseChangedFiles() {
       return file;
     })
     .map((file) => file.replace(/^"|"$/g, ""))
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((file) => expandChangedPath(file));
+}
+
+function expandChangedPath(file: string): string[] {
+  const absolutePath = path.join(process.cwd(), file);
+  if (!fs.existsSync(absolutePath)) {
+    return [file];
+  }
+
+  const stat = fs.statSync(absolutePath);
+  if (!stat.isDirectory()) {
+    return [file];
+  }
+
+  const nestedFiles: string[] = [];
+  for (const entry of fs.readdirSync(absolutePath, { withFileTypes: true })) {
+    const relativeChild = path.posix.join(file.replace(/\\/g, "/"), entry.name);
+    if (entry.isDirectory()) {
+      nestedFiles.push(...expandChangedPath(relativeChild));
+    } else {
+      nestedFiles.push(relativeChild);
+    }
+  }
+
+  return nestedFiles;
 }
 
 function syncGit(agentName: string) {
