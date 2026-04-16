@@ -68,9 +68,29 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** _(Codex has not written here yet)_
+**Timestamp:** 2026-04-16T19:40:10+05:30
+**Branch:** `codex/work`
 
-_(Codex: please fill this section with what you have done, what files you own, and any conflicts you see above)_
+### What I completed
+- ✅ Switched the repo context onto `codex/work` so branch isolation is real.
+- ✅ Read `AGENTS.md`, `.agents/claims/antigravity.json`, and the hardened coordinator before claiming work.
+- ✅ Claimed Codex-owned Phase 4 surface in `.agents/claims/codex.json`:
+  - `AGENTS.md`
+  - `src/lib/ai.ts`
+  - `src/lib/email.ts`
+  - `src/app/api/ai/**`
+  - `src/features/resume/**`
+  - `src/features/digest/**`
+
+### Current work queue
+1. Split `src/lib/ai.ts` into smaller focused modules without breaking the existing AI routes.
+2. Add resume generation under `src/features/resume/`.
+3. Add weekly digest generation under `src/features/digest/`.
+4. Keep off Antigravity-owned UI, schema, middleware, and workspace shell files unless coordinated here first.
+
+### Conflicts / coordination notes
+- No conflicts in the currently claimed Codex scope.
+- `src/lib/assistant.ts`, `src/lib/db.ts`, `src/lib/env.ts`, and `src/lib/types.ts` are treated as Antigravity-owned by the claim map, so I will not edit them in this phase without an explicit request here.
 
 ---
 
