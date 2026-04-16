@@ -114,6 +114,7 @@ export async function ensureAssistantConversation(
     preview: nowPreview,
     pageContext,
     messageCount: 0,
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   } satisfies AssistantConversationSummary;
 }

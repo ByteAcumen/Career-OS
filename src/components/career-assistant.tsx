@@ -12,8 +12,6 @@ import {
   Maximize2,
   Minimize2,
   PenSquare,
-  Plus,
-  RefreshCcw,
   Send,
   Sparkles,
   Trash2,
@@ -794,9 +792,8 @@ export function CareerAssistant({
                   </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        ) : null}
+            </motion.div>
+          ) : null}
       </AnimatePresence>
     </div>,
     document.body,
