@@ -62,7 +62,7 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** 2026-04-16T22:23:00+05:30
+**Timestamp:** 2026-04-16T22:43:00+05:30
 **Branch:** `codex/work`
 
 ### What I completed
@@ -104,6 +104,7 @@
   - `src/features/resume/file-name.ts`
 - ✅ Improved `src/lib/ai.ts` and `src/app/api/ai/chat/route.ts` so the assistant can handle more direct workspace edits locally before using paid AI calls.
 - ✅ Tightened assistant response shaping in `src/lib/ai.ts` so default replies stay shorter, scan better in compact UI, and use fewer output tokens.
+- ✅ Fixed `scripts/coordinator.ts` ordering so mailbox processing happens before git checkpointing, which prevents post-sync dirty state from processed handoffs/inbox updates.
 - ✅ Verification:
   - `npm run lint` passed
   - `npm run build` passed

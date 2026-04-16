@@ -203,7 +203,12 @@ function processHandoffs() {
 
   const handoffs = fs
     .readdirSync(HANDOFFS_DIR)
-    .filter((file) => file.endsWith(".json") && !file.startsWith("template"));
+    .filter(
+      (file) =>
+        file.endsWith(".json") &&
+        !file.startsWith("template") &&
+        !file.startsWith("processed_"),
+    );
 
   if (handoffs.length === 0) {
     console.log("   No new handoffs.");
@@ -247,8 +252,8 @@ function main() {
   console.log(`📍 Current Agent Context: ${currentAgent}`);
 
   checkClaims();
-  syncGit(currentAgent);
   processHandoffs();
+  syncGit(currentAgent);
 
   console.log("\n🚀 Coordination complete. Ready for next turn.");
 }
