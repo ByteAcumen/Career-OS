@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getRequestSession } from "@/lib/auth-session";
 import {
-  buildChatContext,
+  appendAssistantConversationMessage,
+  buildAssistantContext,
+  buildRuleBasedAssistantReply,
+  ensureAssistantConversation,
+  normalizeAssistantPage,
+} from "@/lib/assistant";
+import {
   streamChat,
   AiError,
   planAssistantActions,
@@ -18,8 +25,26 @@ import {
   saveSettings,
 } from "@/lib/dashboard";
 import { rateLimit } from "@/lib/rate-limit";
+import { assistantContextPages } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+// ---------------------------------------------------------------------------
+// Request schema — validates body before any business logic runs
+// ---------------------------------------------------------------------------
+const ChatRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(4000),
+      }),
+    )
+    .min(1)
+    .max(30),
+  conversationId: z.string().min(8).max(120).optional(),
+  page: z.enum(assistantContextPages).optional(),
+});
 
 type AppliedAction = {
   type: AssistantAction["type"];
@@ -44,9 +69,7 @@ function getAiErrorStatus(error: AiError) {
 }
 
 function looksLikeActionRequest(message: string) {
-  return /\b(add|create|log|save|set|update|change|plan|schedule|record|track)\b/i.test(
-    message,
-  );
+  return /\b(add|create|log|save|set|update|change|plan|schedule|record|track)\b/i.test(message);
 }
 
 function createTextStream(text: string) {
@@ -55,6 +78,49 @@ function createTextStream(text: string) {
     start(controller) {
       controller.enqueue(encoder.encode(text));
       controller.close();
+    },
+  });
+}
+
+function createPersistedStream(
+  source: ReadableStream<Uint8Array>,
+  onComplete: (content: string) => Promise<void>,
+) {
+  const reader = source.getReader();
+  const decoder = new TextDecoder();
+  let fullText = "";
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          if (!value) {
+            continue;
+          }
+
+          fullText += decoder.decode(value, { stream: true });
+          controller.enqueue(value);
+        }
+
+        fullText += decoder.decode();
+
+        if (fullText.trim()) {
+          await onComplete(fullText);
+        }
+
+        controller.close();
+      } catch (error) {
+        if (fullText.trim()) {
+          await onComplete(fullText);
+        }
+
+        controller.error(error);
+      }
     },
   });
 }
@@ -182,23 +248,45 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
-    const messages = body.messages as Array<{ role: "user" | "assistant"; content: string }>;
+    const rawBody = await request.json();
+    const parsed = ChatRequestSchema.safeParse(rawBody);
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response("Bad Request: messages array is required", { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid request body", details: parsed.error.flatten() },
+        { status: 400 },
+      );
     }
+
+    const { messages, conversationId, page } = parsed.data;
+    const pageContext = normalizeAssistantPage(page);
 
     let dashboard = await getDashboardData(session.user.id, undefined, {
       includeGithubActivity: false,
       includeIntegrations: false,
       includePreviousDay: false,
     });
+
     const latestUserMessage =
       [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
 
     let appliedActions: AppliedAction[] = [];
     let appliedSummary = "";
+    const conversation = await ensureAssistantConversation(
+      session.user.id,
+      conversationId,
+      pageContext,
+    );
+
+    if (latestUserMessage) {
+      await appendAssistantConversationMessage({
+        userId: session.user.id,
+        conversationId: conversation.id,
+        pageContext,
+        role: "user",
+        content: latestUserMessage,
+      });
+    }
 
     if (latestUserMessage && looksLikeActionRequest(latestUserMessage)) {
       try {
@@ -218,10 +306,18 @@ export async function POST(request: Request) {
           );
 
           if (appliedActions.length > 0) {
+            // Only re-fetch if actions were applied. Skip recent entries (dsa/builds/apps)
+            // for task/review/settings actions — they didn't change those tables.
+            // This avoids a second full 13-query getDashboardData round-trip.
+            const needsFullRefresh = appliedActions.some(
+              (a) =>
+                a.type === "log_dsa" || a.type === "log_build" || a.type === "log_application",
+            );
             dashboard = await getDashboardData(session.user.id, undefined, {
               includeGithubActivity: false,
               includeIntegrations: false,
               includePreviousDay: false,
+              includeRecentEntries: needsFullRefresh,
             });
             appliedSummary = buildAppliedActionSummary(appliedActions);
           }
@@ -231,8 +327,37 @@ export async function POST(request: Request) {
       }
     }
 
+    const localReply = buildRuleBasedAssistantReply({
+      dashboard,
+      pageContext,
+      latestUserMessage,
+      appliedSummary,
+    });
+
+    if (localReply) {
+      await appendAssistantConversationMessage({
+        userId: session.user.id,
+        conversationId: conversation.id,
+        pageContext,
+        role: "assistant",
+        content: localReply,
+      });
+
+      return new Response(createTextStream(localReply), {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          "x-ai-provider": "local",
+          "x-ai-model": "rule-based",
+          "x-ai-actions-applied": appliedActions.length ? "true" : "false",
+          "x-ai-conversation-id": conversation.id,
+        },
+      });
+    }
+
     const contextStr = [
-      buildChatContext(dashboard),
+      buildAssistantContext(dashboard, pageContext),
       appliedSummary ? `Recent assistant actions:\n${appliedSummary}` : "",
     ]
       .filter(Boolean)
@@ -247,17 +372,62 @@ export async function POST(request: Request) {
         dashboard.settings.openAiModel,
       );
 
-      return new Response(result.stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-          "x-ai-provider": result.provider,
-          "x-ai-model": result.model,
-          "x-ai-actions-applied": appliedActions.length ? "true" : "false",
+      return new Response(
+        createPersistedStream(result.stream, async (content) => {
+          await appendAssistantConversationMessage({
+            userId: session.user.id,
+            conversationId: conversation.id,
+            pageContext,
+            role: "assistant",
+            content,
+          });
+        }),
+        {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "x-ai-provider": result.provider,
+            "x-ai-model": result.model,
+            "x-ai-actions-applied": appliedActions.length ? "true" : "false",
+            "x-ai-conversation-id": conversation.id,
+          },
         },
-      });
+      );
     } catch (error) {
+      const localFallback = appliedActions.length
+        ? [
+            `I updated your workspace.\n\n${appliedSummary}`,
+            error instanceof AiError
+              ? `AI reply skipped because ${error.userMessage}`
+              : "AI reply skipped because the provider was unavailable.",
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+        : null;
+
+      if (localFallback) {
+        await appendAssistantConversationMessage({
+          userId: session.user.id,
+          conversationId: conversation.id,
+          pageContext,
+          role: "assistant",
+          content: localFallback,
+        });
+
+        return new Response(createTextStream(localFallback), {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "x-ai-provider": "actions-only",
+            "x-ai-model": "local",
+            "x-ai-actions-applied": "true",
+            "x-ai-conversation-id": conversation.id,
+          },
+        });
+      }
+
       if (appliedActions.length && error instanceof AiError) {
         return new Response(
           createTextStream(
@@ -271,6 +441,7 @@ export async function POST(request: Request) {
               "x-ai-provider": "actions-only",
               "x-ai-model": "local",
               "x-ai-actions-applied": "true",
+              "x-ai-conversation-id": conversation.id,
             },
           },
         );
@@ -278,7 +449,6 @@ export async function POST(request: Request) {
 
       throw error;
     }
-
   } catch (error) {
     if (error instanceof AiError) {
       return NextResponse.json(
@@ -293,9 +463,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return new Response(
-      JSON.stringify({ error: String(error) }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

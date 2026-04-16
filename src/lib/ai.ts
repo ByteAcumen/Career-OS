@@ -254,6 +254,8 @@ const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
 const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
+const CHAT_CONTEXT_MESSAGE_LIMIT = 8;
+const CHAT_MAX_OUTPUT_TOKENS = 420;
 const providerHealth = new Map<string, ProviderHealthEntry>();
 const COACH_SYSTEM_PROMPT =
   "You are a strict but caring study coach for a final-year CS student targeting product engineering roles. Be direct, realistic, and actionable.";
@@ -863,7 +865,8 @@ async function tryOpenRouterStream(
     model,
     messages: [{ role: "system", content: systemMessage }, ...messages],
     stream: true,
-    temperature: 0.4,
+    temperature: 0.35,
+    max_completion_tokens: CHAT_MAX_OUTPUT_TOKENS,
   });
 }
 
@@ -933,6 +936,10 @@ async function streamGemini(
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemMessage }] },
         contents,
+        generationConfig: {
+          temperature: 0.35,
+          maxOutputTokens: CHAT_MAX_OUTPUT_TOKENS,
+        },
       }),
     },
   );
@@ -990,7 +997,8 @@ async function streamOpenAI(
       model,
       messages: [{ role: "system", content: systemMessage }, ...messages],
       stream: true,
-      temperature: 0.4,
+      temperature: 0.35,
+      max_completion_tokens: CHAT_MAX_OUTPUT_TOKENS,
     });
 
     const encoder = new TextEncoder();
@@ -1424,7 +1432,7 @@ function normalizeChatMessages(messages: ChatMessage[]) {
   const cleaned = messages
     .map((message) => ({
       role: message.role,
-      content: clipText(message.content, message.role === "user" ? 1200 : 1600),
+      content: clipText(message.content, message.role === "user" ? 900 : 1200),
     }))
     .filter((message) => Boolean(message.content.trim()));
 
@@ -1432,7 +1440,7 @@ function normalizeChatMessages(messages: ChatMessage[]) {
     cleaned.shift();
   }
 
-  return cleaned.slice(-10);
+  return cleaned.slice(-CHAT_CONTEXT_MESSAGE_LIMIT);
 }
 
 function listEnabledProfiles(dashboard: DashboardData) {

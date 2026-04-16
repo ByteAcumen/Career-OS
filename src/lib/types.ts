@@ -242,3 +242,37 @@ export type WorkspaceUser = {
   email: string;
   image?: string | null;
 };
+
+export const assistantContextPages = [
+  "home",
+  "planner",
+  "logger",
+  "progress",
+  "strategy",
+  "settings",
+] as const;
+
+export type AssistantContextPage = (typeof assistantContextPages)[number];
+
+export type AssistantMessageRole = "user" | "assistant";
+
+export type AssistantConversationMessage = {
+  id: string;
+  role: AssistantMessageRole;
+  content: string;
+  createdAt: string;
+};
+
+export type AssistantConversationSummary = {
+  id: string;
+  title: string;
+  preview: string;
+  pageContext: AssistantContextPage;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AssistantConversation = AssistantConversationSummary & {
+  messages: AssistantConversationMessage[];
+};

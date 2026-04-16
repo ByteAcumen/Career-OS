@@ -272,6 +272,23 @@ export async function initializeSchema() {
         updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (userId, feature, fingerprint)
       );`,
+      `CREATE TABLE IF NOT EXISTS assistant_conversations (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+        title TEXT NOT NULL DEFAULT 'New chat',
+        lastPreview TEXT,
+        pageContext TEXT NOT NULL DEFAULT 'home',
+        createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE TABLE IF NOT EXISTS assistant_messages (
+        id TEXT PRIMARY KEY,
+        conversationId TEXT NOT NULL REFERENCES assistant_conversations(id) ON DELETE CASCADE,
+        userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
       `CREATE INDEX IF NOT EXISTS idx_daily_snapshots_user_date
        ON daily_snapshots (userId, dateKey);`,
       `CREATE INDEX IF NOT EXISTS idx_dsa_entries_user_date
@@ -288,6 +305,12 @@ export async function initializeSchema() {
        ON planner_tasks (userId, scope);`,
       `CREATE INDEX IF NOT EXISTS idx_ai_artifacts_user_feature_updated
        ON ai_artifacts (userId, feature, updatedAt);`,
+      `CREATE INDEX IF NOT EXISTS idx_assistant_conversations_user_updated
+       ON assistant_conversations (userId, updatedAt);`,
+      `CREATE INDEX IF NOT EXISTS idx_assistant_messages_conversation_created
+       ON assistant_messages (conversationId, createdAt);`,
+      `CREATE INDEX IF NOT EXISTS idx_assistant_messages_user_conversation
+       ON assistant_messages (userId, conversationId);`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_two_factor_user_id
        ON twoFactor (userId);`,
       `CREATE INDEX IF NOT EXISTS idx_two_factor_secret

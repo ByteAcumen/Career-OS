@@ -1,39 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
   CheckCircle2,
+  History,
   LoaderCircle,
   Maximize2,
   Minimize2,
-  RotateCcw,
+  PenSquare,
   Send,
+  Sparkles,
   X,
 } from "lucide-react";
 
+import type {
+  AssistantContextPage,
+  AssistantConversation,
+  AssistantConversationMessage,
+  AssistantConversationSummary,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
+const MAX_CONTEXT_MESSAGES = 8;
+const MAX_MESSAGE_CHARS = 1200;
 
-const MAX_CONTEXT_MESSAGES = 10;
-const MAX_MESSAGE_CHARS = 1400;
-const MAX_STORED_MESSAGES = 24;
-const WELCOME_MESSAGE: Message = {
+const WELCOME_MESSAGE: AssistantConversationMessage = {
   id: "assistant-welcome",
   role: "assistant",
   content:
-    "Ask for a review, a study plan, or a direct workspace update. I can add tasks, save review notes, and log work when you ask clearly.",
+    "I can review momentum, plan the next block, add tasks, save reviews, log work, and update settings when you ask clearly. Previous chats are now saved to your account.",
+  createdAt: new Date(0).toISOString(),
 };
 
-function buildRequestMessages(messages: Message[], nextUserMessage: Message) {
+const QUICK_PROMPTS = [
+  "Review my week and tell me the smallest recovery step.",
+  "What should I do now based on my current page context?",
+  "Help me log the work I just finished.",
+  "Review my settings and tell me what to improve.",
+];
+
+function buildRequestMessages(
+  messages: AssistantConversationMessage[],
+  nextUserMessage: AssistantConversationMessage,
+) {
   return [...messages, nextUserMessage]
     .filter((message, index) => !(index === 0 && message.role === "assistant"))
     .slice(-MAX_CONTEXT_MESSAGES)
@@ -46,14 +59,6 @@ function buildRequestMessages(messages: Message[], nextUserMessage: Message) {
     }));
 }
 
-function formatAssistantText(text: string) {
-  return text.split("\n").map((line, index) => (
-    <p key={`${line}-${index}`} className="leading-7">
-      {line}
-    </p>
-  ));
-}
-
 async function readAssistantError(response: Response) {
   const contentType = response.headers.get("content-type") ?? "";
 
@@ -64,10 +69,7 @@ async function readAssistantError(response: Response) {
       code?: string;
     };
 
-    if (payload.message) {
-      return payload.message;
-    }
-
+    if (payload.message) return payload.message;
     if (payload.provider || payload.code) {
       return [payload.provider, payload.code].filter(Boolean).join(": ");
     }
@@ -77,122 +79,270 @@ async function readAssistantError(response: Response) {
   return text || "The assistant could not complete that request.";
 }
 
-function getStorageKey(userId: string) {
-  return `career-os:assistant:${userId}`;
+function getLastConversationStorageKey(userId: string) {
+  return `career-os:assistant:last-conversation:${userId}`;
 }
 
-function sanitizeStoredMessages(messages: Message[]) {
-  const cleaned = messages
-    .filter(
-      (message) =>
-        message &&
-        (message.role === "user" || message.role === "assistant") &&
-        typeof message.content === "string" &&
-        typeof message.id === "string",
-    )
-    .slice(-MAX_STORED_MESSAGES);
-
-  return cleaned.length ? cleaned : [WELCOME_MESSAGE];
+function getLayoutStorageKey(userId: string) {
+  return `career-os:assistant:layout:${userId}`;
 }
 
-export function CareerAssistant({ userId }: { userId: string }) {
+function humanizePage(page: AssistantContextPage) {
+  return `${page.charAt(0).toUpperCase()}${page.slice(1)} context`;
+}
+
+function humanizeProvider(provider: string | null) {
+  switch (provider) {
+    case "openai":
+      return "OpenAI";
+    case "gemini":
+      return "Gemini";
+    case "openrouter":
+      return "OpenRouter";
+    case "local":
+      return "Local reply";
+    case "actions-only":
+      return "Workspace actions";
+    default:
+      return provider ?? "Assistant";
+  }
+}
+
+function relativeTime(dateString: string) {
+  const diffMinutes = Math.round((Date.now() - new Date(dateString).getTime()) / 60000);
+  if (!Number.isFinite(diffMinutes) || Math.abs(diffMinutes) < 1) return "now";
+  if (Math.abs(diffMinutes) < 60) return `${Math.abs(diffMinutes)}m`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) return `${Math.abs(diffHours)}h`;
+
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 7) return `${Math.abs(diffDays)}d`;
+
+  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" }).format(
+    new Date(dateString),
+  );
+}
+
+function renderAssistantText(text: string) {
+  return text.split("\n").map((line, index) => (
+    <p key={`${line}-${index}`} className="leading-7">
+      {line}
+    </p>
+  ));
+}
+
+export function CareerAssistant({
+  userId,
+  page,
+}: {
+  userId: string;
+  page: AssistantContextPage;
+}) {
   const router = useRouter();
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
-  const [input, setInput] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingConversation, setLoadingConversation] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [workspaceUpdated, setWorkspaceUpdated] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  const quickPrompts = useMemo(
-    () => [
-      "Review my week",
-      "Add a daily task for resume tailoring tonight",
-      "Log a build entry for today's project work",
-      "How should I plan tomorrow?",
-    ],
-    [],
+  const [conversations, setConversations] = useState<AssistantConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<AssistantConversationMessage[]>([WELCOME_MESSAGE]);
+  const [input, setInput] = useState("");
+  const [statusText, setStatusText] = useState(
+    "Focused on the current page to keep replies fast and lean.",
   );
+  const [providerText, setProviderText] = useState("Focused mode");
+
+  const canShowHistory = expanded && showHistory;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     try {
-      const raw = window.localStorage.getItem(getStorageKey(userId));
-      if (!raw) {
-        setMessages([WELCOME_MESSAGE]);
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as Message[];
-      setMessages(sanitizeStoredMessages(parsed));
+      const raw = window.localStorage.getItem(getLayoutStorageKey(userId));
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { expanded?: boolean };
+      setExpanded(Boolean(parsed.expanded));
     } catch {
-      setMessages([WELCOME_MESSAGE]);
+      // Ignore invalid local layout state.
     }
   }, [mounted, userId]);
 
   useEffect(() => {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     try {
-      window.localStorage.setItem(
-        getStorageKey(userId),
-        JSON.stringify(sanitizeStoredMessages(messages)),
-      );
+      window.localStorage.setItem(getLayoutStorageKey(userId), JSON.stringify({ expanded }));
     } catch {
-      // Ignore storage failures and keep the in-memory conversation alive.
+      // Ignore storage failures.
     }
-  }, [messages, mounted, userId]);
+  }, [expanded, mounted, userId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
+  }, [messages, streaming, loadingConversation]);
 
-  function clearConversation() {
-    setMessages([WELCOME_MESSAGE]);
+  const openConversation = useCallback(async (conversationId: string) => {
+    setLoadingConversation(true);
     setWorkspaceUpdated(false);
-
-    if (!mounted) {
-      return;
-    }
+    setStatusText("Loading saved conversation...");
 
     try {
-      window.localStorage.removeItem(getStorageKey(userId));
+      const response = await fetch(`/api/ai/chat/conversations/${conversationId}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(await readAssistantError(response));
+      }
+
+      const payload = (await response.json()) as { conversation: AssistantConversation };
+      setMessages(payload.conversation.messages.length ? payload.conversation.messages : [WELCOME_MESSAGE]);
+      setActiveConversationId(payload.conversation.id);
+      setProviderText(`${humanizePage(payload.conversation.pageContext)} loaded`);
+      setStatusText("Saved messages restored from your private workspace history.");
+
+      try {
+        window.localStorage.setItem(getLastConversationStorageKey(userId), payload.conversation.id);
+      } catch {
+        // Ignore storage failures.
+      }
+    } finally {
+      setLoadingConversation(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!open || bootstrapped || !mounted) return;
+
+    const run = async () => {
+      setLoadingHistory(true);
+
+      try {
+        const summaries = await fetchConversationSummaries();
+        setConversations(summaries);
+
+        const storedConversationId = window.localStorage.getItem(getLastConversationStorageKey(userId));
+        const targetConversationId =
+          storedConversationId && summaries.some((item) => item.id === storedConversationId)
+            ? storedConversationId
+            : summaries[0]?.id ?? null;
+
+        if (targetConversationId) {
+          await openConversation(targetConversationId);
+        }
+      } finally {
+        setLoadingHistory(false);
+        setBootstrapped(true);
+      }
+    };
+
+    void run();
+  }, [bootstrapped, mounted, open, openConversation, userId]);
+
+  async function fetchConversationSummaries() {
+    const response = await fetch("/api/ai/chat/conversations", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(await readAssistantError(response));
+    }
+
+    const payload = (await response.json()) as {
+      conversations: AssistantConversationSummary[];
+    };
+
+    return payload.conversations ?? [];
+  }
+
+  async function refreshConversationSummaries(nextActiveId?: string | null) {
+    const summaries = await fetchConversationSummaries();
+    setConversations(summaries);
+
+    const value = nextActiveId ?? activeConversationId;
+    if (value) {
+      try {
+        window.localStorage.setItem(getLastConversationStorageKey(userId), value);
+      } catch {
+        // Ignore storage failures.
+      }
+    }
+
+    return summaries;
+  }
+
+  function toggleHistory() {
+    setShowHistory((current) => {
+      const next = !current;
+      if (next) {
+        setExpanded(true);
+      }
+      return next;
+    });
+  }
+
+  function toggleExpanded() {
+    setExpanded((current) => {
+      const next = !current;
+      if (!next) {
+        setShowHistory(false);
+      }
+      return next;
+    });
+  }
+
+  function closeAssistant() {
+    setShowHistory(false);
+    setOpen(false);
+  }
+
+  function startFreshConversation() {
+    setActiveConversationId(null);
+    setMessages([WELCOME_MESSAGE]);
+    setInput("");
+    setWorkspaceUpdated(false);
+    setProviderText("Focused mode");
+    setStatusText("Starting a fresh conversation with the current page context.");
+
+    try {
+      window.localStorage.removeItem(getLastConversationStorageKey(userId));
     } catch {
       // Ignore storage failures.
     }
   }
 
   async function sendCurrentMessage() {
-    if (!input.trim() || streaming) {
-      return;
-    }
+    if (!input.trim() || streaming || loadingConversation) return;
 
-    const userMessage: Message = {
-      id: `${Date.now()}`,
+    const userMessage: AssistantConversationMessage = {
+      id: crypto.randomUUID(),
       role: "user",
       content: input.trim(),
+      createdAt: new Date().toISOString(),
     };
-    const assistantMessageId = `${Date.now()}-assistant`;
+    const assistantMessageId = crypto.randomUUID();
 
     setMessages((current) => [
       ...current,
       userMessage,
-      { id: assistantMessageId, role: "assistant", content: "" },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+      },
     ]);
     setInput("");
     setStreaming(true);
     setWorkspaceUpdated(false);
+    setStatusText("Thinking with focused workspace context...");
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -200,6 +350,8 @@ export function CareerAssistant({ userId }: { userId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: buildRequestMessages(messages, userMessage),
+          conversationId: activeConversationId ?? undefined,
+          page,
         }),
       });
 
@@ -211,23 +363,42 @@ export function CareerAssistant({ userId }: { userId: string }) {
         throw new Error("The assistant did not return a response stream.");
       }
 
+      const nextConversationId = response.headers.get("x-ai-conversation-id");
+      const provider = response.headers.get("x-ai-provider");
+      const model = response.headers.get("x-ai-model");
       const actionsApplied = response.headers.get("x-ai-actions-applied") === "true";
+
+      if (nextConversationId) {
+        setActiveConversationId(nextConversationId);
+
+        try {
+          window.localStorage.setItem(getLastConversationStorageKey(userId), nextConversationId);
+        } catch {
+          // Ignore storage failures.
+        }
+      }
+
+      setProviderText(
+        provider ? `${humanizeProvider(provider)}${model ? ` / ${model}` : ""}` : "Assistant reply",
+      );
+      setStatusText(
+        provider === "local"
+          ? "Using a faster local workspace reply to reduce API usage."
+          : "Streaming from the active provider with fallback available.",
+      );
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let currentText = "";
 
       while (true) {
         const { value, done } = await reader.read();
-        if (done) {
-          break;
-        }
+        if (done) break;
 
         currentText += decoder.decode(value, { stream: true });
         setMessages((current) =>
           current.map((message) =>
-            message.id === assistantMessageId
-              ? { ...message, content: currentText }
-              : message,
+            message.id === assistantMessageId ? { ...message, content: currentText } : message,
           ),
         );
       }
@@ -236,28 +407,25 @@ export function CareerAssistant({ userId }: { userId: string }) {
         setWorkspaceUpdated(true);
         router.refresh();
       }
+
+      await refreshConversationSummaries(nextConversationId ?? activeConversationId);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The assistant could not complete that request.";
+
       setMessages((current) =>
-        current.map((message) =>
-          message.id === assistantMessageId
-            ? {
-                ...message,
-                content:
-                  error instanceof Error
-                    ? error.message
-                    : "The assistant could not complete that request.",
-              }
-            : message,
+        current.map((entry) =>
+          entry.id === assistantMessageId ? { ...entry, content: message } : entry,
         ),
       );
+      setProviderText("Assistant issue");
+      setStatusText("The assistant hit a provider or network problem. Your saved chats are still safe.");
     } finally {
       setStreaming(false);
     }
   }
 
-  if (!mounted) {
-    return null;
-  }
+  if (!mounted) return null;
 
   return createPortal(
     <div className="pointer-events-none fixed bottom-4 right-4 z-[75] sm:bottom-6 sm:right-6">
@@ -269,12 +437,16 @@ export function CareerAssistant({ userId }: { userId: string }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.96 }}
             onClick={() => setOpen(true)}
-            className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(10,10,10,0.94)] px-3 py-3 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.95)] backdrop-blur sm:px-4"
+            className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(8,8,8,0.96)] px-3 py-3 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.98)] backdrop-blur sm:px-4"
           >
-            <div className="flex size-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/6">
+            <div className="relative flex size-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/6">
               <Bot className="size-4 text-white" />
+              <span className="absolute bottom-[7px] right-[7px] size-2 rounded-full bg-white" />
             </div>
-            <span className="hidden sm:inline">AI assistant</span>
+            <div className="hidden text-left sm:block">
+              <div className="text-sm font-semibold text-white">AI assistant</div>
+              <div className="text-[11px] text-white/48">{humanizePage(page)} / saved history</div>
+            </div>
           </motion.button>
         ) : null}
       </AnimatePresence>
@@ -285,145 +457,293 @@ export function CareerAssistant({ userId }: { userId: string }) {
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             className={cn(
-              "pointer-events-auto flex flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[rgba(10,10,10,0.96)] shadow-[0_32px_90px_-42px_rgba(0,0,0,0.98)] backdrop-blur",
+              "pointer-events-auto overflow-hidden rounded-[30px] border border-white/[0.08] bg-[rgba(8,8,8,0.98)] shadow-[0_40px_110px_-48px_rgba(0,0,0,0.98)] backdrop-blur",
               expanded
-                ? "h-[80vh] w-[min(92vw,760px)]"
-                : "h-[min(78vh,620px)] w-[min(92vw,380px)]",
+                ? "h-[min(88vh,760px)] w-[min(96vw,1000px)]"
+                : "h-[min(84vh,720px)] w-[min(96vw,560px)]",
             )}
           >
-            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/6">
-                  <Bot className="size-4.5 text-white" />
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-4 sm:px-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.05]">
+                    <Bot className="size-4.5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-white">Career AI Assistant</div>
+                    <div className="truncate text-[11px] text-white/48">{statusText}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-white">Career AI Assistant</div>
-                  <div className="text-xs text-[var(--muted)]">Context-aware, user-scoped, and action-capable</div>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={clearConversation}
-                  className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
-                  aria-label="Clear conversation"
-                  title="Clear conversation"
-                >
-                  <RotateCcw className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExpanded((value) => !value)}
-                  className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
-                >
-                  {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-5 custom-scrollbar">
-              <div className="grid gap-4">
-                {workspaceUpdated ? (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.06] px-3 py-2 text-xs font-medium text-white">
-                    <CheckCircle2 className="size-3.5" />
-                    Workspace updated from the conversation
-                  </div>
-                ) : null}
-
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[90%] rounded-[22px] px-4 py-3 text-sm",
-                        message.role === "user"
-                          ? "border border-white/10 bg-white text-black"
-                          : "border border-white/[0.08] bg-white/[0.04] text-white",
-                      )}
-                    >
-                      {message.role === "assistant"
-                        ? formatAssistantText(message.content)
-                        : message.content}
-                    </div>
-                  </div>
-                ))}
-
-                {streaming ? (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-sm text-[var(--muted)]">
-                    <LoaderCircle className="size-4 animate-spin" />
-                    Thinking...
-                  </div>
-                ) : null}
-
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-
-            {messages.length === 1 ? (
-              <div className="flex gap-2 overflow-x-auto px-5 pb-4 custom-scrollbar">
-                {quickPrompts.map((prompt) => (
+                <div className="flex items-center gap-2">
                   <button
-                    key={prompt}
                     type="button"
-                    onClick={() => setInput(prompt)}
-                    className="rounded-full border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.08]"
+                    onClick={toggleHistory}
+                    className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Toggle history"
                   >
-                    {prompt}
+                    <History className="size-4" />
                   </button>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="border-t border-white/[0.08] px-5 py-4">
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void sendCurrentMessage();
-                }}
-                className="grid gap-3"
-              >
-                <div className="flex items-end gap-3">
-                  <textarea
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        void sendCurrentMessage();
-                      }
-                    }}
-                    className="field-area min-h-[52px] max-h-[150px] flex-1 resize-none"
-                    placeholder="Ask about your plan, progress, or tell me to add tasks, save reviews, or log work..."
-                  />
                   <button
-                    type="submit"
-                    disabled={!input.trim() || streaming}
+                    type="button"
+                    onClick={toggleExpanded}
+                    className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
+                    aria-label={expanded ? "Minimize assistant" : "Expand assistant"}
+                  >
+                    {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeAssistant}
+                    className="rounded-full border border-[var(--line)] bg-white/6 p-2 text-[var(--muted)] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close assistant"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className={cn("flex min-h-0 flex-1 overflow-hidden", canShowHistory ? "flex-col md:flex-row" : "flex-col")}>
+                {canShowHistory ? (
+                  <aside
                     className={cn(
-                      "inline-flex size-12 items-center justify-center rounded-[18px] transition",
-                      input.trim() && !streaming
-                        ? "bg-white text-black hover:bg-neutral-200"
-                        : "cursor-not-allowed bg-white/[0.04] text-[var(--muted)]",
+                      "z-[2] flex shrink-0 flex-col border-white/[0.08] bg-[rgba(255,255,255,0.02)] max-md:max-h-[270px] max-md:border-b md:w-[258px] md:border-r",
                     )}
                   >
-                    <Send className="size-4" />
-                  </button>
-                </div>
+                    <div className="space-y-4 border-b border-white/[0.08] px-4 py-4">
+                      <button
+                        type="button"
+                        onClick={startFreshConversation}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] border border-white/[0.1] bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-neutral-200"
+                      >
+                        <PenSquare className="size-4" />
+                        New chat
+                      </button>
 
-                <div className="text-[11px] leading-5 text-[var(--muted)]">
-                  Conversation is saved on this device for your account. Ask explicitly if you want the assistant to change tasks, reviews, settings, or logs.
+                      <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/42">
+                          Live context
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-white">{humanizePage(page)}</div>
+                        <div className="mt-1 text-[12px] leading-6 text-white/52">
+                          Prioritizing the current page and core workspace signals to keep replies fast, cheaper, and action-ready.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 custom-scrollbar">
+                      {loadingHistory ? (
+                        <div className="space-y-3">
+                          {Array.from({ length: 5 }).map((_, index) => (
+                            <div key={index} className="skeleton-block h-[74px] rounded-[20px]" />
+                          ))}
+                        </div>
+                      ) : conversations.length ? (
+                        <div className="space-y-2">
+                          {conversations.map((conversation) => {
+                            const active = conversation.id === activeConversationId;
+
+                            return (
+                              <button
+                                key={conversation.id}
+                                type="button"
+                                onClick={() => void openConversation(conversation.id)}
+                                className={cn(
+                                  "w-full rounded-[20px] border px-3 py-3 text-left transition",
+                                  active
+                                    ? "border-white/[0.16] bg-white/[0.08] text-white"
+                                    : "border-white/[0.06] bg-white/[0.02] text-white/70 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white",
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold">{conversation.title}</div>
+                                    <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-white/46">
+                                      {conversation.preview}
+                                    </div>
+                                  </div>
+                                  <div className="shrink-0 rounded-full border border-white/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/46">
+                                    {relativeTime(conversation.updatedAt)}
+                                  </div>
+                                </div>
+                                <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/34">
+                                  {humanizePage(conversation.pageContext)} / {conversation.messageCount} messages
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="rounded-[22px] border border-dashed border-white/[0.08] bg-white/[0.02] p-4 text-[13px] leading-6 text-white/48">
+                          Saved chats will appear here once you start using the assistant.
+                        </div>
+                      )}
+                    </div>
+                  </aside>
+                ) : null}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex h-full flex-col">
+                    <div className="border-b border-white/[0.08] px-4 py-3 sm:px-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/58">
+                          {activeConversationId
+                            ? conversations.find((item) => item.id === activeConversationId)?.title ?? "Saved chat"
+                            : "New conversation"}
+                        </div>
+                        <div className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-white/48">
+                          {providerText}
+                        </div>
+                        <div className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium text-white/48">
+                          Workspace edits enabled
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 custom-scrollbar sm:px-5">
+                      {loadingConversation ? (
+                        <div className="space-y-4">
+                          <div className="ml-auto skeleton-block h-[54px] w-[62%] rounded-[22px]" />
+                          <div className="skeleton-block h-[108px] w-[78%] rounded-[24px]" />
+                          <div className="ml-auto skeleton-block h-[64px] w-[50%] rounded-[22px]" />
+                        </div>
+                      ) : messages.length <= 1 && !activeConversationId ? (
+                        <div className="flex h-full flex-col justify-center">
+                          <div className="mx-auto w-full max-w-[520px] space-y-5 rounded-[28px] border border-white/[0.08] bg-white/[0.03] p-5 shadow-[0_28px_80px_-50px_rgba(0,0,0,0.95)] sm:p-6">
+                            <div className="space-y-3">
+                              <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/60">
+                                <Sparkles className="size-3.5" />
+                                {humanizePage(page)}
+                              </div>
+                              <div className="text-[22px] font-semibold leading-[1.08] text-white sm:text-[26px]">
+                                Ask for the next move, not a giant brainstorm.
+                              </div>
+                              <p className="max-w-[52ch] text-[14px] leading-7 text-white/64">
+                                I load the most relevant workspace context from this page first, which keeps replies faster and reduces API usage while still letting me update the app when you ask clearly.
+                              </p>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {QUICK_PROMPTS.map((prompt) => (
+                                <button
+                                  key={prompt}
+                                  type="button"
+                                  onClick={() => setInput(prompt)}
+                                  className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] px-4 py-3.5 text-left text-[13px] leading-6 text-white/72 transition hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white"
+                                >
+                                  {prompt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {workspaceUpdated ? (
+                            <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.06] px-3 py-2 text-xs font-medium text-white">
+                              <CheckCircle2 className="size-3.5" />
+                              Workspace updated from this conversation
+                            </div>
+                          ) : null}
+
+                          {messages.map((message) => (
+                            <div
+                              key={message.id}
+                              className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
+                            >
+                              <div
+                                className={cn(
+                                  "max-w-[92%] rounded-[24px] border px-4 py-3.5 sm:max-w-[82%]",
+                                  message.role === "user"
+                                    ? "border-white bg-white text-black shadow-[0_22px_48px_-34px_rgba(255,255,255,0.55)]"
+                                    : "border-white/[0.08] bg-white/[0.04] text-white",
+                                )}
+                              >
+                                <div
+                                  className={cn(
+                                    "mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                                    message.role === "user" ? "text-black/48" : "text-white/40",
+                                  )}
+                                >
+                                  {message.role === "user" ? "You" : "Assistant"} / {relativeTime(message.createdAt)}
+                                </div>
+                                <div className={cn("space-y-2 text-[14px]", message.role === "user" ? "text-black" : "text-white")}>
+                                  {message.role === "assistant"
+                                    ? renderAssistantText(message.content)
+                                    : <p className="whitespace-pre-wrap break-words leading-7">{message.content}</p>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+
+                          {streaming ? (
+                            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white/[0.04] px-3 py-2 text-sm text-[var(--muted)]">
+                              <LoaderCircle className="size-4 animate-spin" />
+                              Streaming reply...
+                            </div>
+                          ) : null}
+
+                          <div ref={messagesEndRef} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-white/[0.08] px-4 py-4 sm:px-5">
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void sendCurrentMessage();
+                        }}
+                        className="space-y-3"
+                      >
+                        <div className="flex items-end gap-3">
+                          <textarea
+                            value={input}
+                            onChange={(event) => setInput(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey) {
+                                event.preventDefault();
+                                void sendCurrentMessage();
+                              }
+                            }}
+                            className="field-area min-h-[88px] max-h-[180px] flex-1 resize-none rounded-[22px]"
+                            placeholder="Ask for a review, next step, task creation, log update, or settings change..."
+                          />
+                          <button
+                            type="submit"
+                            disabled={!input.trim() || streaming || loadingConversation}
+                            className={cn(
+                              "inline-flex size-12 items-center justify-center rounded-[18px] transition",
+                              input.trim() && !streaming && !loadingConversation
+                                ? "bg-white text-black hover:bg-neutral-200"
+                                : "cursor-not-allowed bg-white/[0.04] text-[var(--muted)]",
+                            )}
+                          >
+                            <Send className="size-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-white/40">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+                              Focused page context
+                            </div>
+                            <div className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+                              Saved chat history
+                            </div>
+                            <div className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+                              Workspace edits enabled
+                            </div>
+                          </div>
+                          <div>Shift+Enter for a new line</div>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
                 </div>
-              </form>
+              </div>
             </div>
           </motion.div>
         ) : null}

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import { ErrorBoundary } from "@/components/error-boundary";
 import type { WorkspaceUser } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -370,7 +371,19 @@ export function WorkspaceShell({
           </header>
 
           <main className="mx-auto max-w-[1360px] px-4 py-5 sm:px-6 lg:px-7 lg:py-6">
-            {children}
+            <ErrorBoundary>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={page}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22, ease: "easeOut" }}
+                >
+                  {children}
+                </motion.div>
+              </AnimatePresence>
+            </ErrorBoundary>
           </main>
         </div>
 
@@ -387,7 +400,7 @@ export function WorkspaceShell({
           ) : null}
         </AnimatePresence>
 
-        <CareerAssistant userId={currentUser.id} />
+        <CareerAssistant userId={currentUser.id} page={page} />
       </div>
     </WorkspaceUiContext.Provider>
   );
