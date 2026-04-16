@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BrainCircuit, Check, Copy, FileText, LoaderCircle } from "lucide-react";
+import { BrainCircuit, Check, Copy, ExternalLink, FileText, LoaderCircle, ShieldCheck } from "lucide-react";
 
 import { getWeaknessCurriculumAction } from "@/app/actions";
 import { StudentStrategyPanel } from "@/components/student-strategy-panel";
@@ -18,6 +18,7 @@ import {
   sectionStagger,
 } from "@/components/workspace/workspace-primitives";
 import { postJson } from "@/lib/client-request";
+import { scoreAts, openInOverleaf, type AtsScoreResult } from "@/lib/ats-scorer";
 import type { StrategyPageData } from "@/lib/workspace-data";
 import type { StudentStrategy } from "@/lib/types";
 
@@ -46,6 +47,7 @@ export function WorkspaceStrategyPage({
     targetRole: string;
   }>(null);
   const [copied, setCopied] = useState(false);
+  const [atsScore, setAtsScore] = useState<AtsScoreResult | null>(null);
 
   async function generateStrategy() {
     setStrategyLoading(true);
@@ -107,6 +109,10 @@ export function WorkspaceStrategyPage({
       }
       const payload = (await res.json()) as { resume: typeof resumeDraft };
       setResumeDraft(payload.resume);
+      // Run ATS scorer client-side immediately
+      if (payload.resume) {
+        setAtsScore(scoreAts(payload.resume.markdown, resumeJobDesc));
+      }
       setToast("Resume draft generated.");
     } catch (e) {
       setToast(e instanceof Error ? e.message : "Could not generate resume.");
@@ -376,6 +382,44 @@ export function WorkspaceStrategyPage({
                   exit={{ opacity: 0 }}
                   className="space-y-4"
                 >
+                  {/* ATS Score Panel */}
+                  {atsScore && (
+                    <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.02] p-4 sm:p-5">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                            <ShieldCheck className="size-3.5" />
+                            ATS Score
+                          </div>
+                          <div className="text-sm text-white/80">{atsScore.summary}</div>
+                        </div>
+                        <div className={`flex items-baseline gap-1 ${
+                            atsScore.grade === "A" || atsScore.grade === "B" ? "text-green-400" :
+                            atsScore.grade === "C" ? "text-amber-400" : "text-red-400"
+                        }`}>
+                          <span className="text-3xl font-semibold tracking-[-0.04em]">{atsScore.total}</span>
+                          <span className="text-sm font-medium opacity-60">/100</span>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {atsScore.breakdown.map((b, i) => (
+                          <div key={i} className="soft-card">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">{b.label}</span>
+                              <span className="text-xs font-semibold text-white/60">{b.score}/{b.max}</span>
+                            </div>
+                            <div className="mt-2 text-xs leading-5 text-white/80">{b.detail}</div>
+                            {b.tips.length > 0 && b.score < b.max && (
+                              <div className="mt-2 border-l-2 border-amber-500/50 pl-2 text-xs leading-5 text-[var(--muted)]">
+                                {b.tips[0]}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {resumeDraft.matchedKeywords.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {resumeDraft.matchedKeywords.map((kw) => (
@@ -390,7 +434,7 @@ export function WorkspaceStrategyPage({
                   )}
 
                   {/* Tab bar */}
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex gap-1 rounded-[14px] border border-white/[0.08] bg-white/[0.03] p-1">
                       {(["markdown", "latex"] as const).map((tab) => (
                         <button
@@ -407,22 +451,34 @@ export function WorkspaceStrategyPage({
                         </button>
                       ))}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyToClipboard(
-                          resumeTab === "markdown" ? resumeDraft.markdown : resumeDraft.latex,
-                        )
-                      }
-                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
-                    >
-                      {copied ? (
-                        <Check className="size-3.5 text-green-400" />
-                      ) : (
-                        <Copy className="size-3.5" />
+                    <div className="flex gap-2">
+                      {resumeTab === "latex" && (
+                        <button
+                          type="button"
+                          onClick={() => openInOverleaf(resumeDraft.latex)}
+                          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-neutral-200"
+                        >
+                          <ExternalLink className="size-3.5" />
+                          Open in Overleaf
+                        </button>
                       )}
-                      {copied ? "Copied" : "Copy"}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(
+                            resumeTab === "markdown" ? resumeDraft.markdown : resumeDraft.latex,
+                          )
+                        }
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+                      >
+                        {copied ? (
+                          <Check className="size-3.5 text-green-400" />
+                        ) : (
+                          <Copy className="size-3.5" />
+                        )}
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Content */}

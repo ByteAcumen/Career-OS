@@ -46,45 +46,11 @@ type ResumeDraft = {
 };
 
 const TECH_STOP_WORDS = new Set([
-  "about",
-  "after",
-  "again",
-  "among",
-  "build",
-  "built",
-  "career",
-  "company",
-  "could",
-  "daily",
-  "deliver",
-  "engineering",
-  "experience",
-  "focus",
-  "good",
-  "high",
-  "into",
-  "just",
-  "make",
-  "more",
-  "most",
-  "need",
-  "next",
-  "only",
-  "role",
-  "student",
-  "system",
-  "team",
-  "than",
-  "that",
-  "their",
-  "there",
-  "these",
-  "they",
-  "this",
-  "using",
-  "week",
-  "with",
-  "work",
+  "about", "after", "again", "among", "build", "built", "career", "company",
+  "could", "daily", "deliver", "engineering", "experience", "focus", "good",
+  "high", "into", "just", "make", "more", "most", "need", "next", "only",
+  "role", "student", "system", "team", "than", "that", "their", "there",
+  "these", "they", "this", "using", "week", "with", "work",
 ]);
 
 export function buildResumeDraft(
@@ -328,6 +294,8 @@ function buildEditingNotes(
   return notes.filter(Boolean);
 }
 
+// ─── Markdown Renderer ────────────────────────────────────────────────────────
+
 function renderResumeMarkdown(input: {
   header: ResumeDraft["header"];
   summaryBullets: string[];
@@ -382,6 +350,8 @@ function renderResumeMarkdown(input: {
   return lines.join("\n").trim();
 }
 
+// ─── LaTeX Renderer — Jake's Resume Style (Overleaf-ready, ATS-safe) ─────────
+
 function renderResumeLatex(input: {
   header: ResumeDraft["header"];
   summaryBullets: string[];
@@ -389,67 +359,130 @@ function renderResumeLatex(input: {
   projectHighlights: ResumeProject[];
   problemSolvingHighlights: string[];
 }) {
-  const lines: string[] = [
-    "\\documentclass[10pt]{article}",
-    "\\usepackage[margin=0.7in]{geometry}",
-    "\\usepackage[hidelinks]{hyperref}",
-    "\\usepackage{enumitem}",
-    "\\setlist[itemize]{leftmargin=1.1em,itemsep=0.25em,topsep=0.3em}",
-    "\\pagestyle{empty}",
-    "\\begin{document}",
-    `\\begin{center}{\\LARGE \\textbf{${latexEscape(input.header.name)}}}\\\\[0.15cm]`,
-    `${latexEscape(input.header.title)} \\\\`,
-    `${latexEscape(input.header.email)}`,
-  ];
+  const L = latexEscape;
 
-  if (input.header.links.length) {
-    lines.push("\\\\");
-    lines.push(
-      input.header.links
-        .map((link) => `\\href{${latexEscape(link.url)}}{${latexEscape(link.label)}}`)
-        .join(" $\\vert$ "),
+  const linkStr = input.header.links
+    .map((link) => `\\href{${L(link.url)}}{\\underline{${L(link.label)}}}`)
+    .join(" $|$ ");
+
+  const contactParts = [L(input.header.email), linkStr].filter(Boolean).join(" $|$ ");
+
+  const projectSection: string[] = ["\\section{Projects}", "  \\resumeSubHeadingListStart"];
+  for (const p of input.projectHighlights) {
+    const linkPart = p.link
+      ? `\\href{${L(p.link)}}{\\underline{${L(p.link.replace(/^https?:\/\//, ""))}}}`
+      : "";
+    projectSection.push(
+      `    \\resumeProjectHeading{\\textbf{${L(p.title)}} $|$ \\emph{${L(p.subtitle)}}}{${linkPart}}`,
+      "    \\resumeItemListStart",
+      ...p.bullets.map((b) => `      \\resumeItem{${L(b)}}`),
+      "    \\resumeItemListEnd",
     );
   }
+  projectSection.push("  \\resumeSubHeadingListEnd");
 
-  if (input.header.education) {
-    lines.push("\\\\");
-    lines.push(latexEscape(input.header.education));
-  }
+  const parts: string[] = [
+    "%--------------------------",
+    "% Career OS — Resume",
+    "% Jake's Resume Style — paste into Overleaf and compile with pdfLaTeX",
+    "%--------------------------",
+    "\\documentclass[letterpaper,11pt]{article}",
+    "",
+    "\\usepackage{latexsym}",
+    "\\usepackage[empty]{fullpage}",
+    "\\usepackage{titlesec}",
+    "\\usepackage{marvosym}",
+    "\\usepackage[usenames,dvipsnames]{color}",
+    "\\usepackage{verbatim}",
+    "\\usepackage{enumitem}",
+    "\\usepackage[hidelinks]{hyperref}",
+    "\\usepackage{fancyhdr}",
+    "\\usepackage[english]{babel}",
+    "\\usepackage{tabularx}",
+    "\\input{glyphtounicode}",
+    "",
+    "\\pagestyle{fancy}",
+    "\\fancyhf{}",
+    "\\fancyfoot{}",
+    "\\renewcommand{\\headrulewidth}{0pt}",
+    "\\renewcommand{\\footrulewidth}{0pt}",
+    "",
+    "\\addtolength{\\oddsidemargin}{-0.5in}",
+    "\\addtolength{\\evensidemargin}{-0.5in}",
+    "\\addtolength{\\textwidth}{1in}",
+    "\\addtolength{\\topmargin}{-.5in}",
+    "\\addtolength{\\textheight}{1.0in}",
+    "",
+    "\\urlstyle{same}",
+    "\\raggedbottom",
+    "\\raggedright",
+    "\\setlength{\\tabcolsep}{0in}",
+    "",
+    "\\titleformat{\\section}{",
+    "  \\vspace{-4pt}\\scshape\\raggedright\\large",
+    "}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]",
+    "",
+    "\\pdfgentounicode=1",
+    "",
+    "\\newcommand{\\resumeItem}[1]{",
+    "  \\item\\small{",
+    "    {#1 \\vspace{-2pt}}",
+    "  }",
+    "}",
+    "",
+    "\\newcommand{\\resumeProjectHeading}[2]{",
+    "  \\item",
+    "  \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}",
+    "    \\small#1 & #2 \\\\",
+    "  \\end{tabular*}\\vspace{-7pt}",
+    "}",
+    "",
+    "\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}",
+    "",
+    "\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}",
+    "\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}",
+    "\\newcommand{\\resumeItemListStart}{\\begin{itemize}}",
+    "\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}",
+    "",
+    "\\begin{document}",
+    "",
+    "%----------HEADING----------",
+    "\\begin{center}",
+    `  {\\Huge \\scshape ${L(input.header.name)}} \\\\ \\vspace{1pt}`,
+    `  \\small ${contactParts}`,
+    input.header.education ? `  \\\\ \\vspace{2pt} \\small ${L(input.header.education)}` : "",
+    "\\end{center}",
+    "",
+    "%-----------SUMMARY-----------",
+    "\\section{Summary}",
+    "  \\resumeSubHeadingListStart",
+    ...input.summaryBullets.map((b) => `    \\resumeItem{${L(b)}}`),
+    "  \\resumeSubHeadingListEnd",
+    "",
+    "%-----------TECHNICAL SKILLS-----------",
+    "\\section{Technical Skills}",
+    " \\begin{itemize}[leftmargin=0.15in, label={}]",
+    "  \\small{\\item{",
+    `    \\textbf{Focus Areas}{: ${L(input.focusAreas.join(", "))}} \\\\`,
+    "  }}",
+    " \\end{itemize}",
+    "",
+    "%-----------PROJECTS-----------",
+    ...projectSection,
+    "",
+    "%-----------PROBLEM SOLVING-----------",
+    "\\section{Problem Solving (DSA)}",
+    "  \\resumeSubHeadingListStart",
+    ...input.problemSolvingHighlights.map((b) => `    \\resumeItem{${L(b)}}`),
+    "  \\resumeSubHeadingListEnd",
+    "",
+    "\\end{document}",
+  ].filter((line) => line !== undefined);
 
-  lines.push("\\end{center}");
-  lines.push("\\section*{Summary}");
-  lines.push("\\begin{itemize}");
-  for (const bullet of input.summaryBullets) {
-    lines.push(`\\item ${latexEscape(bullet)}`);
-  }
-  lines.push("\\end{itemize}");
-
-  lines.push("\\section*{Focus Areas}");
-  lines.push(latexEscape(input.focusAreas.join(" | ")));
-
-  lines.push("\\section*{Selected Projects}");
-  for (const project of input.projectHighlights) {
-    lines.push(`\\textbf{${latexEscape(project.title)}} \\hfill ${latexEscape(project.subtitle)}\\\\`);
-    if (project.link) {
-      lines.push(`\\href{${latexEscape(project.link)}}{${latexEscape(project.link)}}\\\\`);
-    }
-    lines.push("\\begin{itemize}");
-    for (const bullet of project.bullets) {
-      lines.push(`\\item ${latexEscape(bullet)}`);
-    }
-    lines.push("\\end{itemize}");
-  }
-
-  lines.push("\\section*{Problem Solving}");
-  lines.push("\\begin{itemize}");
-  for (const bullet of input.problemSolvingHighlights) {
-    lines.push(`\\item ${latexEscape(bullet)}`);
-  }
-  lines.push("\\end{itemize}");
-  lines.push("\\end{document}");
-
-  return lines.join("\n");
+  return parts.join("\n");
 }
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function tokenize(text: string) {
   return text
