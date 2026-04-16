@@ -241,84 +241,115 @@ export async function saveSettings(
   userId: string,
   settings: Partial<DashboardData["settings"]>,
 ) {
-  await ensureSettings(userId);
-  const normalized = normalizeSettings(settings);
+  // 1. Fetch existing settings (or use defaults if missing)
+  const existingRs = await client.execute({
+    sql: `SELECT sheetUrl, resumeUrl, githubUrl, leetcodeUrl, linkedinUrl, portfolioUrl, codeforcesUrl,
+                codechefUrl, hackerrankUrl, jobTrackerUrl, primaryGoal, targetRole, targetCompanies,
+                university, degree, graduationYear, planStyle, customAiInstructions, aiProvider,
+                googleAppsScriptUrl, openAiModel, weekendDsaMinutes, weekendBuildMinutes,
+                weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget, weekdayDeepWorkMinutes,
+                weekdaySupportMinutes, weekdayTaskTarget, weekendTaskTarget, weeklyTheme,
+                timerFocusMinutes, timerBreakMinutes
+         FROM app_settings
+         WHERE userId = ?`,
+    args: [userId],
+  });
+  
+  const existing = existingRs.rows[0] as unknown as DashboardData["settings"] | undefined;
+  
+  // 2. Merge existing with new partial updates and normalize
+  const merged = normalizeSettings({ ...(existing || defaultSettings), ...settings });
+
+  // 3. Perform a single atomic UPSERT (handles both first-time creation and subsequent updates)
   await client.execute({
-    sql: `UPDATE app_settings
-      SET sheetUrl = ?,
-          resumeUrl = ?,
-          githubUrl = ?,
-          leetcodeUrl = ?,
-          linkedinUrl = ?,
-          portfolioUrl = ?,
-          codeforcesUrl = ?,
-          codechefUrl = ?,
-          hackerrankUrl = ?,
-          jobTrackerUrl = ?,
-          primaryGoal = ?,
-          targetRole = ?,
-          targetCompanies = ?,
-          university = ?,
-          degree = ?,
-          graduationYear = ?,
-          planStyle = ?,
-          customAiInstructions = ?,
-          aiProvider = ?,
-          googleAppsScriptUrl = ?,
-          openAiModel = ?,
-          weekendDsaMinutes = ?,
-          weekendBuildMinutes = ?,
-          weeklyDsaTarget = ?,
-          weeklyApplicationTarget = ?,
-          weeklyBuildTarget = ?,
-          weekdayDeepWorkMinutes = ?,
-          weekdaySupportMinutes = ?,
-          weekdayTaskTarget = ?,
-          weekendTaskTarget = ?,
-          weeklyTheme = ?,
-          timerFocusMinutes = ?,
-          timerBreakMinutes = ?,
-          updatedAt = CURRENT_TIMESTAMP
-      WHERE userId = ?`,
+    sql: `INSERT INTO app_settings
+      (userId, sheetUrl, resumeUrl, githubUrl, leetcodeUrl, linkedinUrl, portfolioUrl, codeforcesUrl,
+       codechefUrl, hackerrankUrl, jobTrackerUrl, primaryGoal, targetRole, targetCompanies, university, degree,
+       graduationYear, planStyle, customAiInstructions, aiProvider, googleAppsScriptUrl, openAiModel,
+       weekendDsaMinutes, weekendBuildMinutes, weeklyDsaTarget, weeklyApplicationTarget, weeklyBuildTarget,
+       weekdayDeepWorkMinutes, weekdaySupportMinutes, weekdayTaskTarget, weekendTaskTarget, weeklyTheme,
+       timerFocusMinutes, timerBreakMinutes)
+     VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?,
+       ?, ?, ?, ?, ?, ?, ?, ?,
+       ?, ?, ?, ?, ?, ?,
+       ?, ?, ?, ?, ?,
+       ?, ?, ?, ?, ?,
+       ?, ?)
+     ON CONFLICT(userId) DO UPDATE SET
+       sheetUrl = excluded.sheetUrl,
+       resumeUrl = excluded.resumeUrl,
+       githubUrl = excluded.githubUrl,
+       leetcodeUrl = excluded.leetcodeUrl,
+       linkedinUrl = excluded.linkedinUrl,
+       portfolioUrl = excluded.portfolioUrl,
+       codeforcesUrl = excluded.codeforcesUrl,
+       codechefUrl = excluded.codechefUrl,
+       hackerrankUrl = excluded.hackerrankUrl,
+       jobTrackerUrl = excluded.jobTrackerUrl,
+       primaryGoal = excluded.primaryGoal,
+       targetRole = excluded.targetRole,
+       targetCompanies = excluded.targetCompanies,
+       university = excluded.university,
+       degree = excluded.degree,
+       graduationYear = excluded.graduationYear,
+       planStyle = excluded.planStyle,
+       customAiInstructions = excluded.customAiInstructions,
+       aiProvider = excluded.aiProvider,
+       googleAppsScriptUrl = excluded.googleAppsScriptUrl,
+       openAiModel = excluded.openAiModel,
+       weekendDsaMinutes = excluded.weekendDsaMinutes,
+       weekendBuildMinutes = excluded.weekendBuildMinutes,
+       weeklyDsaTarget = excluded.weeklyDsaTarget,
+       weeklyApplicationTarget = excluded.weeklyApplicationTarget,
+       weeklyBuildTarget = excluded.weeklyBuildTarget,
+       weekdayDeepWorkMinutes = excluded.weekdayDeepWorkMinutes,
+       weekdaySupportMinutes = excluded.weekdaySupportMinutes,
+       weekdayTaskTarget = excluded.weekdayTaskTarget,
+       weekendTaskTarget = excluded.weekendTaskTarget,
+       weeklyTheme = excluded.weeklyTheme,
+       timerFocusMinutes = excluded.timerFocusMinutes,
+       timerBreakMinutes = excluded.timerBreakMinutes,
+       updatedAt = CURRENT_TIMESTAMP`,
     args: [
-      normalized.sheetUrl,
-      normalized.resumeUrl,
-      normalized.githubUrl,
-      normalized.leetcodeUrl,
-      normalized.linkedinUrl,
-      normalized.portfolioUrl,
-      normalized.codeforcesUrl,
-      normalized.codechefUrl,
-      normalized.hackerrankUrl,
-      normalized.jobTrackerUrl,
-      normalized.primaryGoal,
-      normalized.targetRole,
-      normalized.targetCompanies,
-      normalized.university,
-      normalized.degree,
-      normalized.graduationYear,
-      normalized.planStyle,
-      normalized.customAiInstructions,
-      normalized.aiProvider,
-      normalized.googleAppsScriptUrl,
-      normalized.openAiModel,
-      normalized.weekendDsaMinutes,
-      normalized.weekendBuildMinutes,
-      normalized.weeklyDsaTarget,
-      normalized.weeklyApplicationTarget,
-      normalized.weeklyBuildTarget,
-      normalized.weekdayDeepWorkMinutes,
-      normalized.weekdaySupportMinutes,
-      normalized.weekdayTaskTarget,
-      normalized.weekendTaskTarget,
-      normalized.weeklyTheme,
-      normalized.timerFocusMinutes,
-      normalized.timerBreakMinutes,
       userId,
+      merged.sheetUrl,
+      merged.resumeUrl,
+      merged.githubUrl,
+      merged.leetcodeUrl,
+      merged.linkedinUrl,
+      merged.portfolioUrl,
+      merged.codeforcesUrl,
+      merged.codechefUrl,
+      merged.hackerrankUrl,
+      merged.jobTrackerUrl,
+      merged.primaryGoal,
+      merged.targetRole,
+      merged.targetCompanies,
+      merged.university,
+      merged.degree,
+      merged.graduationYear,
+      merged.planStyle,
+      merged.customAiInstructions,
+      merged.aiProvider,
+      merged.googleAppsScriptUrl,
+      merged.openAiModel,
+      merged.weekendDsaMinutes,
+      merged.weekendBuildMinutes,
+      merged.weeklyDsaTarget,
+      merged.weeklyApplicationTarget,
+      merged.weeklyBuildTarget,
+      merged.weekdayDeepWorkMinutes,
+      merged.weekdaySupportMinutes,
+      merged.weekdayTaskTarget,
+      merged.weekendTaskTarget,
+      merged.weeklyTheme,
+      merged.timerFocusMinutes,
+      merged.timerBreakMinutes,
     ],
   });
 
-  return normalized;
+  return merged;
 }
 
 export async function ensureSnapshot(userId: string, dateKey = toDateKey()) {
@@ -793,29 +824,31 @@ export async function getDailyDetail(userId: string, dateKey: string) {
   const snapshot = await getSnapshot(userId, dateKey);
   if (!snapshot) return null;
 
-  const dsaRs = await client.execute({
-    sql: `SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt
-         FROM dsa_entries
-         WHERE userId = ? AND snapshotDateKey = ?
-         ORDER BY createdAt DESC`,
-    args: [userId, dateKey],
-  });
-  
-  const buildRs = await client.execute({
-    sql: `SELECT id, title, area, proof, impact, repositoryUrl, createdAt
-         FROM build_entries
-         WHERE userId = ? AND snapshotDateKey = ?
-         ORDER BY createdAt DESC`,
-    args: [userId, dateKey],
-  });
-  
-  const appRs = await client.execute({
-    sql: `SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt
-         FROM application_entries
-         WHERE userId = ? AND snapshotDateKey = ?
-         ORDER BY createdAt DESC`,
-    args: [userId, dateKey],
-  });
+  // Run all 3 entry queries in parallel — they are fully independent of each other.
+  // Previously sequential: 3× round-trip. Now: 1× round-trip.
+  const [dsaRs, buildRs, appRs] = await Promise.all([
+    client.execute({
+      sql: `SELECT id, title, difficulty, pattern, insight, repositoryUrl, createdAt
+           FROM dsa_entries
+           WHERE userId = ? AND snapshotDateKey = ?
+           ORDER BY createdAt DESC`,
+      args: [userId, dateKey],
+    }),
+    client.execute({
+      sql: `SELECT id, title, area, proof, impact, repositoryUrl, createdAt
+           FROM build_entries
+           WHERE userId = ? AND snapshotDateKey = ?
+           ORDER BY createdAt DESC`,
+      args: [userId, dateKey],
+    }),
+    client.execute({
+      sql: `SELECT id, company, role, status, note, roleUrl, syncedToSheet, createdAt
+           FROM application_entries
+           WHERE userId = ? AND snapshotDateKey = ?
+           ORDER BY createdAt DESC`,
+      args: [userId, dateKey],
+    }),
+  ]);
 
   return {
     dateKey: snapshot.dateKey,

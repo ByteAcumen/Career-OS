@@ -9,6 +9,12 @@ type ProviderState = {
   hint: string | null;
 };
 
+// Short-lived cache: avoids DB round-trips on every AI call.
+// Each message can trigger resolveAiProviderKey for up to 3 providers.
+// 60-second TTL is safe — keys don't change mid-conversation.
+type KeyCacheEntry = { key: string | null; expiresAt: number };
+const keyCache = new Map<string, KeyCacheEntry>();
+
 const providers: AiProvider[] = ["openai", "gemini", "openrouter"];
 
 export async function saveAiCredential(userId: string, provider: AiProvider, apiKey: string) {
@@ -24,6 +30,9 @@ export async function saveAiCredential(userId: string, provider: AiProvider, api
       updatedAt = CURRENT_TIMESTAMP`,
     args: [userId, provider, encryptSecret(normalized), maskSecret(normalized)],
   });
+
+  // Invalidate cache so the new key is picked up immediately
+  keyCache.delete(`${userId}:${provider}`);
 }
 
 export async function deleteAiCredential(userId: string, provider: AiProvider) {
@@ -32,6 +41,9 @@ export async function deleteAiCredential(userId: string, provider: AiProvider) {
      WHERE userId = ? AND provider = ?`,
     args: [userId, provider],
   });
+
+  // Invalidate cache after deleting
+  keyCache.delete(`${userId}:${provider}`);
 }
 
 export async function getAiCredential(userId: string, provider: AiProvider) {
@@ -41,7 +53,7 @@ export async function getAiCredential(userId: string, provider: AiProvider) {
        WHERE userId = ? AND provider = ?`,
     args: [userId, provider],
   });
-  
+
   const row = rs.rows[0] as unknown as { encryptedApiKey?: string } | undefined;
 
   if (!row?.encryptedApiKey) {
@@ -58,7 +70,7 @@ export async function getAiProviderStatus(userId: string) {
        WHERE userId = ?`,
     args: [userId],
   });
-  
+
   const rows = rs.rows as unknown as Array<{ provider: AiProvider; keyHint: string | null }>;
   const stored = new Map(rows.map((row) => [row.provider, row]));
 
@@ -108,14 +120,23 @@ export async function getAiProviderStatus(userId: string) {
 }
 
 export async function resolveAiProviderKey(userId: string, provider: AiProvider) {
-  const stored = await getAiCredential(userId, provider);
-  if (stored) {
-    return stored;
+  const cacheKey = `${userId}:${provider}`;
+  const cached = keyCache.get(cacheKey);
+
+  // Return cached value if still fresh (60-second TTL)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.key;
   }
 
+  // Resolve from DB, fall back to server-level env key
+  const stored = await getAiCredential(userId, provider);
   const envKey = getEnvKey(provider);
-  const fallback = process.env[envKey]?.trim();
-  return fallback || null;
+  const key = stored ?? process.env[envKey]?.trim() ?? null;
+
+  // Cache for 60 seconds to eliminate repeated DB reads per conversation
+  keyCache.set(cacheKey, { key, expiresAt: Date.now() + 60_000 });
+
+  return key || null;
 }
 
 /** Check all providers and return the first one with a valid key */

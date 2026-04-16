@@ -1,14 +1,21 @@
-﻿import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 
 import { getEnvValue } from "@/lib/env";
 
-function getVaultKey() {
+// Cached at module level — scryptSync is CPU-heavy (intentionally), computing it
+// on every decrypt call wastes 50–200ms per AI request. Derive once at startup.
+let _cachedVaultKey: Buffer | null = null;
+
+function getVaultKey(): Buffer {
+  if (_cachedVaultKey) return _cachedVaultKey;
+
   const secret = getEnvValue("BETTER_AUTH_SECRET");
   if (!secret) {
     throw new Error("BETTER_AUTH_SECRET is required to protect stored secrets.");
   }
 
-  return scryptSync(secret, "career-os-secret-vault", 32);
+  _cachedVaultKey = scryptSync(secret, "career-os-secret-vault", 32) as Buffer;
+  return _cachedVaultKey;
 }
 
 export function encryptSecret(value: string) {

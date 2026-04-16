@@ -16,6 +16,17 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Optimize tree-shaking for heavy packages — tells Next.js to only import
+  // used exports instead of bundling the entire library.
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts", "date-fns"],
+  },
+
+  // Prefer modern image formats for faster loads
+  images: {
+    formats: ["image/avif", "image/webp"],
+  },
+
   async headers() {
     return [
       {
@@ -49,3 +60,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
