@@ -389,94 +389,61 @@ export function LandingPage() {
       </nav>
 
       {/* ── Hero ── */}
-      <section className="relative z-10 mx-auto max-w-[1280px] px-4 pt-16 pb-20 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24 lg:pb-28">
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+      <section className="relative z-10 mx-auto max-w-[1280px] px-4 pt-20 pb-20 sm:px-6 sm:pt-28 lg:px-8 lg:pt-36 lg:pb-32">
+        <div className="flex flex-col items-center text-center">
 
-          {/* ── Left column: Copy ── */}
-          <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col">
-
-            {/* Badge */}
-            <motion.div variants={fadeUp}>
-              <span className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-violet-300">
-                <Sparkles className="size-3" />
-                Focused interview prep
-              </span>
-            </motion.div>
-
-            {/* Headline — fixed sizing so rotation never overflows */}
-            <motion.h1
-              variants={fadeUp}
-              className="mt-6 text-[clamp(2.8rem,6vw,4.5rem)] font-bold leading-[1.05] tracking-tight text-white/95"
-            >
-              A cleaner way to run your{" "}
-              <span className="inline-flex items-baseline">
-                <RotatingWord />
-              </span>
-            </motion.h1>
-
-            {/* Sub-copy */}
-            <motion.p
-              variants={fadeUp}
-              className="mt-5 max-w-[480px] text-[15px] leading-[1.85] text-white/55"
-            >
-              Plan the week, log real proof of work, review momentum, and use AI that reads your actual data — not generic prompts.
-            </motion.p>
-
-            {/* Feature bullets */}
-            <motion.ul variants={stagger} className="mt-6 flex flex-col gap-2">
-              {[
-                "Private per-account workspace with AES-256 encryption",
-                "AI grounded in your real activity, goals, and logs",
-                "Focus timer, progress tracking & streaks built in",
-              ].map((item) => (
-                <motion.li key={item} variants={fadeUp} className="flex items-start gap-2.5 text-sm text-white/50">
-                  <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10">
-                    <CheckCircle2 className="size-2.5 text-emerald-400" />
-                  </div>
-                  {item}
-                </motion.li>
-              ))}
-            </motion.ul>
-
-            {/* CTAs */}
-            <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href="/sign-up"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-bold text-black shadow-[0_0_32px_rgba(255,255,255,0.15)] transition-all hover:bg-neutral-100 hover:shadow-[0_0_48px_rgba(255,255,255,0.25)] hover:scale-105"
-              >
-                Start free workspace
-                <ArrowRight className="size-4" />
-              </Link>
-              <Link
-                href="/sign-in"
-                className="inline-flex items-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.04] px-6 py-3 text-[15px] font-medium text-white/70 transition-all hover:border-white/[0.18] hover:bg-white/[0.07] hover:text-white hover:-translate-y-0.5"
-              >
-                Sign in
-              </Link>
-            </motion.div>
-
-            {/* Stats pills */}
-            <motion.div variants={stagger} className="mt-8 flex flex-wrap gap-2.5">
-              {STATS.map((s) => (
-                <motion.div
-                  key={s.label}
-                  variants={fadeUp}
-                  className="flex items-center gap-2.5 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-3"
-                >
-                  <div>
-                    <div className="text-[8px] font-bold uppercase tracking-[0.16em] text-white/30">{s.label}</div>
-                    <div className="mt-0.5 text-base font-semibold text-white">{s.value}</div>
-                    <div className="text-[10px] text-white/35">{s.sub}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+          {/* Badge */}
+          <motion.div variants={fadeUp} initial="hidden" animate="show">
+            <span className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/8 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-300">
+              <Sparkles className="size-3.5" />
+              The ultimate student workspace
+            </span>
           </motion.div>
 
-          {/* ── Right column: Dashboard preview ── */}
-          <motion.div initial="hidden" animate="show" variants={scaleIn} transition={{ delay: 0.15 }}>
-            <DashboardPreview />
+          {/* Headline */}
+          <motion.h1
+            variants={fadeUp} initial="hidden" animate="show"
+            className="mt-8 max-w-4xl text-[clamp(2.8rem,7vw,5.5rem)] font-bold leading-[1.05] tracking-tight text-white/95"
+          >
+            A smarter way to run your{" "}
+            <span className="inline-flex items-baseline">
+              <RotatingWord />
+            </span>
+          </motion.h1>
+
+          {/* Sub-copy */}
+          <motion.p
+            variants={fadeUp} initial="hidden" animate="show"
+            className="mt-8 max-w-2xl text-[16px] leading-[1.85] text-white/55 sm:text-[18px]"
+          >
+            Plan the week, log real proof of work, track your momentum, and use AI that reads your actual data — not generic prompts.
+          </motion.p>
+
+          {/* CTAs */}
+          <motion.div variants={fadeUp} initial="hidden" animate="show" className="mt-10 flex flex-col sm:flex-row items-center gap-4">
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-[16px] font-bold text-black shadow-[0_0_32px_rgba(255,255,255,0.15)] transition-all hover:bg-neutral-100 hover:shadow-[0_0_48px_rgba(255,255,255,0.25)] hover:scale-105"
+            >
+              Start free workspace
+              <ArrowRight className="size-4.5" />
+            </Link>
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.04] px-8 py-4 text-[16px] font-medium text-white/70 transition-all hover:border-white/[0.18] hover:bg-white/[0.07] hover:text-white"
+            >
+              Sign in
+            </Link>
           </motion.div>
+
+          {/* Large Dashboard Preview Showcase */}
+          <motion.div initial="hidden" animate="show" variants={scaleIn} transition={{ delay: 0.15 }} className="mt-20 w-full max-w-[1080px]">
+             <div className="relative">
+                <div className="absolute -inset-1 rounded-[28px] bg-gradient-to-b from-white/10 to-transparent opacity-30 blur-sm"></div>
+                <DashboardPreview />
+             </div>
+          </motion.div>
+
         </div>
       </section>
 

@@ -485,7 +485,7 @@ export function CareerAssistant({
             )}
           >
             <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3 sm:px-4">
+              <div className="shrink-0 flex items-center justify-between border-b border-white/[0.08] px-4 py-3 sm:px-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.05]">
                     <Bot className="size-4.5 text-white" />
@@ -524,7 +524,7 @@ export function CareerAssistant({
                 </div>
               </div>
 
-              <div className={cn("flex min-h-0 flex-1 overflow-hidden", canShowHistory ? "flex-col md:flex-row" : "flex-col")}>
+              <div className={cn("flex h-full flex-1 overflow-hidden", canShowHistory ? "flex-col md:flex-row" : "flex-col")}>
                 {canShowHistory ? (
                   <aside
                     className={cn(
@@ -619,7 +619,7 @@ export function CareerAssistant({
                   </aside>
                 ) : null}
 
-                <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
                   <div className="shrink-0 border-b border-white/[0.08] px-4 py-2 sm:px-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/58">
@@ -636,7 +636,7 @@ export function CareerAssistant({
                       </div>
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-4" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.14) transparent" }}>
+                    <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-4 custom-scrollbar">
                       {loadingConversation ? (
                         <div className="space-y-4">
                           <div className="ml-auto skeleton-block h-[54px] w-[62%] rounded-[22px]" />
