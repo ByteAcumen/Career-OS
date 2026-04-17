@@ -203,7 +203,7 @@ function FeatureCard({ feature, large }: { feature: (typeof FEATURES)[number]; l
         mx.set(e.clientX - r.left);
         my.set(e.clientY - r.top);
       }}
-      className={`bento-card group relative overflow-hidden ${large ? "sm:col-span-2" : ""}`}
+      className={`bento-card group relative overflow-hidden`}
     >
       <motion.div className="pointer-events-none absolute inset-0 z-10" style={{ background: gradient }} />
       <div className={`absolute inset-0 bg-gradient-to-br ${feature.accent} opacity-0 transition-opacity duration-500 group-hover:opacity-100`} />
@@ -475,7 +475,7 @@ export function LandingPage() {
             whileInView="show"
             viewport={{ once: true, margin: "-40px" }}
             variants={stagger}
-            className="bento-grid"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
             {FEATURES.map((feature) => (
               <FeatureCard key={feature.title} feature={feature} large={feature.large} />
