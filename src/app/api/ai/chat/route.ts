@@ -75,6 +75,12 @@ function looksLikeActionRequest(message: string) {
   return /\b(add|create|log|save|set|update|change|plan|schedule|record|track|mark|complete|finish|start|resume|reopen|delete|remove)\b/i.test(message);
 }
 
+function looksLikeWorkLogRequest(message: string) {
+  return /\b(log|record|save|track)\b[\s\S]{0,120}\b(today|todays|today's|work|progress|activity)\b/i.test(
+    message,
+  );
+}
+
 function createTextStream(text: string) {
   const encoder = new TextEncoder();
   return new ReadableStream({
@@ -359,6 +365,37 @@ export async function POST(request: Request) {
       latestUserMessage,
       appliedSummary,
     });
+
+    const needsWorkLogDetails =
+      latestUserMessage &&
+      looksLikeActionRequest(latestUserMessage) &&
+      looksLikeWorkLogRequest(latestUserMessage) &&
+      appliedActions.length === 0;
+
+    if (needsWorkLogDetails) {
+      const followUp =
+        "I can log this directly, but I still need concrete entries. Paste in this format and I will save it immediately:\n\n- Completed LeetCode: <problem names>\n- Built: <project + feature>\n- Reviewed PR: <what you reviewed>\n- Applied: <company + role> (optional)";
+
+      await appendAssistantConversationMessage({
+        userId: session.user.id,
+        conversationId: conversation.id,
+        pageContext,
+        role: "assistant",
+        content: followUp,
+      });
+
+      return new Response(createTextStream(followUp), {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          "x-ai-provider": "local",
+          "x-ai-model": "worklog-guard",
+          "x-ai-actions-applied": "false",
+          "x-ai-conversation-id": conversation.id,
+        },
+      });
+    }
 
     if (localReply) {
       await appendAssistantConversationMessage({
