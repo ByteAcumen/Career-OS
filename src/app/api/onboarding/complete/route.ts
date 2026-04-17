@@ -9,7 +9,7 @@ import type { AiProvider } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const aiProviders: AiProvider[] = ["openai", "gemini", "openrouter"];
+const aiProviders: AiProvider[] = ["openai", "gemini", "openrouter", "groq"];
 
 function normalizeUrl(value: string) {
   const trimmed = value.trim();
@@ -67,12 +67,14 @@ const onboardingCompleteSchema = z.object({
       openai: optionalAiKeySchema,
       gemini: optionalAiKeySchema,
       openrouter: optionalAiKeySchema,
+      groq: optionalAiKeySchema,
     })
     .optional()
     .default({
       openai: "",
       gemini: "",
       openrouter: "",
+      groq: "",
     }),
 });
 

@@ -64,6 +64,7 @@ const providerLabels: Record<AiProvider, string> = {
   openai: "OpenAI",
   gemini: "Gemini",
   openrouter: "OpenRouter",
+  groq: "Groq",
 };
 
 export function SetupOnboardingScreen({
@@ -82,6 +83,7 @@ export function SetupOnboardingScreen({
     openai: "",
     gemini: "",
     openrouter: "",
+    groq: "",
   });
 
   const requiredStatus = useMemo(() => {
@@ -367,6 +369,7 @@ export function SetupOnboardingScreen({
                   <option value="openai">OpenAI</option>
                   <option value="gemini">Gemini</option>
                   <option value="openrouter">OpenRouter</option>
+                  <option value="groq">Groq</option>
                 </select>
               </label>
 
