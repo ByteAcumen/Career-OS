@@ -1,7 +1,6 @@
 import { Buffer } from "node:buffer";
 
 import mammoth from "mammoth";
-import { extractText } from "unpdf";
 
 export type ParsedResumeUpload = {
   fileName: string;
@@ -47,9 +46,11 @@ export async function parseUploadedResume(file: File): Promise<ParsedResumeUploa
 
   if (isPdfFile(file.type, extension)) {
     format = "pdf";
-    const extracted = await extractText(bytes, { mergePages: true });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse");
+    const extracted = await pdfParse(Buffer.from(buffer));
     extractedText = extracted.text;
-    totalPages = extracted.totalPages;
+    totalPages = extracted.numpages;
   } else if (isDocxFile(file.type, extension)) {
     format = "docx";
     const extracted = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });

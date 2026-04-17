@@ -14,8 +14,11 @@ import {
   PenSquare,
   Send,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
+
+import ReactMarkdown from "react-markdown";
 
 import type {
   AssistantContextPage,
@@ -25,7 +28,7 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const MAX_CONTEXT_MESSAGES = 8;
+const MAX_CONTEXT_MESSAGES = 4;
 const MAX_MESSAGE_CHARS = 1200;
 
 const WELCOME_MESSAGE: AssistantConversationMessage = {
@@ -124,13 +127,7 @@ function relativeTime(dateString: string) {
   );
 }
 
-function renderAssistantText(text: string) {
-  return text.split("\n").map((line, index) => (
-    <p key={`${line}-${index}`} className="leading-7">
-      {line}
-    </p>
-  ));
-}
+
 
 export function CareerAssistant({
   userId,
@@ -303,6 +300,27 @@ export function CareerAssistant({
     setOpen(false);
   }
 
+  async function deleteConversation(e: React.MouseEvent, targetId: string) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this conversation permanently?")) return;
+
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`/api/ai/chat/conversations/${targetId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        if (targetId === activeConversationId) {
+          startFreshConversation();
+        } else {
+          await refreshConversationSummaries();
+        }
+      }
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
   function startFreshConversation() {
     setActiveConversationId(null);
     setMessages([WELCOME_MESSAGE]);
@@ -433,11 +451,12 @@ export function CareerAssistant({
         {!open ? (
           <motion.button
             type="button"
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            initial={{ opacity: 0, y: 16, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            exit={{ opacity: 0, y: 16, scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 420, damping: 30 }}
             onClick={() => setOpen(true)}
-            className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/[0.08] bg-[rgba(8,8,8,0.96)] px-3 py-3 text-sm font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.98)] backdrop-blur sm:px-4"
+            className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-white/10 bg-[rgba(10,10,10,0.85)] px-3 py-3 text-sm font-medium text-white shadow-[0_8px_32px_-12px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:px-4 transition-transform hover:scale-105"
           >
             <div className="relative flex size-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/6">
               <Bot className="size-4 text-white" />
@@ -454,12 +473,12 @@ export function CareerAssistant({
       <AnimatePresence>
         {open ? (
           <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 24, scale: 0.96, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: 24, scale: 0.96, filter: "blur(4px)" }}
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
             className={cn(
-              "pointer-events-auto overflow-hidden rounded-[30px] border border-white/[0.08] bg-[rgba(8,8,8,0.98)] shadow-[0_40px_110px_-48px_rgba(0,0,0,0.98)] backdrop-blur",
+              "pointer-events-auto overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(12,12,12,0.85)] shadow-[0_40px_110px_-20px_rgba(0,0,0,0.98)] backdrop-blur-2xl ring-1 ring-white/5",
               expanded
                 ? "h-[min(88vh,760px)] w-[min(96vw,1000px)]"
                 : "h-[min(84vh,720px)] w-[min(96vw,560px)]",
@@ -546,12 +565,18 @@ export function CareerAssistant({
                             const active = conversation.id === activeConversationId;
 
                             return (
-                              <button
+                              <div
                                 key={conversation.id}
-                                type="button"
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => void openConversation(conversation.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    void openConversation(conversation.id);
+                                  }
+                                }}
                                 className={cn(
-                                  "w-full rounded-[20px] border px-3 py-3 text-left transition",
+                                  "group w-full rounded-[20px] border px-3 py-3 text-left transition",
                                   active
                                     ? "border-white/[0.16] bg-white/[0.08] text-white"
                                     : "border-white/[0.06] bg-white/[0.02] text-white/70 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white",
@@ -564,14 +589,24 @@ export function CareerAssistant({
                                       {conversation.preview}
                                     </div>
                                   </div>
-                                  <div className="shrink-0 rounded-full border border-white/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/46">
-                                    {relativeTime(conversation.updatedAt)}
+                                  <div className="flex shrink-0 items-center justify-end gap-2">
+                                    <div className="rounded-full border border-white/[0.08] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/46">
+                                      {relativeTime(conversation.updatedAt)}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => deleteConversation(e, conversation.id)}
+                                      className="rounded-full p-1.5 text-white/40 opacity-0 transition-all hover:bg-red-400/10 hover:text-red-400 group-hover:opacity-100"
+                                      title="Delete conversation"
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </button>
                                   </div>
                                 </div>
                                 <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/34">
                                   {humanizePage(conversation.pageContext)} / {conversation.messageCount} messages
                                 </div>
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -584,9 +619,8 @@ export function CareerAssistant({
                   </aside>
                 ) : null}
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex h-full flex-col">
-                    <div className="border-b border-white/[0.08] px-4 py-3 sm:px-5">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="shrink-0 border-b border-white/[0.08] px-4 py-3 sm:px-5">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/58">
                           {activeConversationId
@@ -602,7 +636,7 @@ export function CareerAssistant({
                       </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 custom-scrollbar sm:px-5">
+                    <div className="flex-[1_1_0%] overflow-y-auto px-4 py-5 pb-6 sm:px-5" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.14) transparent" }}>
                       {loadingConversation ? (
                         <div className="space-y-4">
                           <div className="ml-auto skeleton-block h-[54px] w-[62%] rounded-[22px]" />
@@ -655,10 +689,10 @@ export function CareerAssistant({
                             >
                               <div
                                 className={cn(
-                                  "max-w-[92%] rounded-[24px] border px-4 py-3.5 sm:max-w-[82%]",
+                                  "max-w-[92%] rounded-[24px] border px-4 py-3.5 sm:max-w-[85%]",
                                   message.role === "user"
-                                    ? "border-white bg-white text-black shadow-[0_22px_48px_-34px_rgba(255,255,255,0.55)]"
-                                    : "border-white/[0.08] bg-white/[0.04] text-white",
+                                    ? "border-white/20 bg-white text-black shadow-[0_8px_32px_-12px_rgba(255,255,255,0.2)]"
+                                    : "border-white/[0.06] bg-white/[0.02] text-white backdrop-blur-md shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]",
                                 )}
                               >
                                 <div
@@ -670,9 +704,23 @@ export function CareerAssistant({
                                   {message.role === "user" ? "You" : "Assistant"} / {relativeTime(message.createdAt)}
                                 </div>
                                 <div className={cn("space-y-2 text-[14px]", message.role === "user" ? "text-black" : "text-white")}>
-                                  {message.role === "assistant"
-                                    ? renderAssistantText(message.content)
-                                    : <p className="whitespace-pre-wrap break-words leading-7">{message.content}</p>}
+                                  {message.role === "assistant" ? (
+                                    <ReactMarkdown
+                                      components={{
+                                        p: ({ children }) => <p className="mb-3 last:mb-0 leading-7">{children}</p>,
+                                        ul: ({ children }) => <ul className="mb-3 list-disc pl-4 space-y-1">{children}</ul>,
+                                        ol: ({ children }) => <ol className="mb-3 list-decimal pl-4 space-y-1">{children}</ol>,
+                                        li: ({ children }) => <li className="leading-6">{children}</li>,
+                                        code: ({ children }) => <code className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[13px]">{children}</code>,
+                                        pre: ({ children }) => <pre className="mb-3 overflow-x-auto rounded-xl bg-black/40 p-4 text-[13px] ring-1 ring-white/10">{children}</pre>,
+                                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                                      }}
+                                    >
+                                      {message.content}
+                                    </ReactMarkdown>
+                                  ) : (
+                                    <p className="whitespace-pre-wrap break-words leading-7">{message.content}</p>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -744,9 +792,8 @@ export function CareerAssistant({
                   </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        ) : null}
+            </motion.div>
+          ) : null}
       </AnimatePresence>
     </div>,
     document.body,

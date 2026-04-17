@@ -15,7 +15,7 @@ type ProviderState = {
 type KeyCacheEntry = { key: string | null; expiresAt: number };
 const keyCache = new Map<string, KeyCacheEntry>();
 
-const providers: AiProvider[] = ["openai", "gemini", "openrouter"];
+const providers: AiProvider[] = ["openai", "gemini", "openrouter", "groq"];
 
 export async function saveAiCredential(userId: string, provider: AiProvider, apiKey: string) {
   const normalized = apiKey.trim();
@@ -99,21 +99,25 @@ export async function getAiProviderStatus(userId: string) {
         openai: false,
         gemini: false,
         openrouter: false,
+        groq: false,
       } as Record<AiProvider, boolean>,
       providerSources: {
         openai: "none",
         gemini: "none",
         openrouter: "none",
+        groq: "none",
       } as Record<AiProvider, AiProviderSource>,
       savedApiKeys: {
         openai: false,
         gemini: false,
         openrouter: false,
+        groq: false,
       } as Record<AiProvider, boolean>,
       providerHints: {
         openai: null,
         gemini: null,
         openrouter: null,
+        groq: null,
       } as Record<AiProvider, string | null>,
     },
   );
@@ -141,7 +145,7 @@ export async function resolveAiProviderKey(userId: string, provider: AiProvider)
 
 /** Check all providers and return the first one with a valid key */
 export async function getFirstAvailableProvider(userId: string): Promise<AiProvider | null> {
-  const order: AiProvider[] = ["gemini", "openai", "openrouter"];
+  const order: AiProvider[] = ["gemini", "openai", "groq", "openrouter"];
   for (const provider of order) {
     const key = await resolveAiProviderKey(userId, provider);
     if (key) return provider;
@@ -152,5 +156,6 @@ export async function getFirstAvailableProvider(userId: string): Promise<AiProvi
 function getEnvKey(provider: AiProvider) {
   if (provider === "openai") return "OPENAI_API_KEY";
   if (provider === "gemini") return "GEMINI_API_KEY";
+  if (provider === "groq") return "GROQ_API_KEY";
   return "OPENROUTER_API_KEY";
 }

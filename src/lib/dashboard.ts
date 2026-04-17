@@ -758,9 +758,9 @@ export async function getDashboardData(
   const safeProviderStatus =
     providerStatus ??
     ({
-      providers: { openai: false, gemini: false, openrouter: false },
-      providerSources: { openai: "none", gemini: "none", openrouter: "none" },
-      savedApiKeys: { openai: false, gemini: false, openrouter: false },
+      providers: { openai: false, gemini: false, openrouter: false, groq: false },
+      providerSources: { openai: "none", gemini: "none", openrouter: "none", groq: "none" },
+      savedApiKeys: { openai: false, gemini: false, openrouter: false, groq: false },
     } as const);
 
   return {

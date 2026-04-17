@@ -12,7 +12,7 @@ export type GithubActivity = {
   createdAt: string;
 };
 
-export type AiProvider = "openai" | "gemini" | "openrouter";
+export type AiProvider = "openai" | "gemini" | "openrouter" | "groq";
 
 export type AiProviderSource = "user" | "server" | "none";
 
@@ -102,16 +102,19 @@ export type DashboardData = {
       openai: boolean;
       gemini: boolean;
       openrouter: boolean;
+      groq: boolean;
     };
     providerSources: {
       openai: AiProviderSource;
       gemini: AiProviderSource;
       openrouter: AiProviderSource;
+      groq: AiProviderSource;
     };
     savedApiKeys: {
       openai: boolean;
       gemini: boolean;
       openrouter: boolean;
+      groq: boolean;
     };
   };
   planner: {
@@ -250,6 +253,7 @@ export const assistantContextPages = [
   "progress",
   "strategy",
   "settings",
+  "resume",
 ] as const;
 
 export type AssistantContextPage = (typeof assistantContextPages)[number];

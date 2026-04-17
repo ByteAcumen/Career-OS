@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { AiProvider, DashboardData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const providers: AiProvider[] = ["openai", "gemini", "openrouter"];
+const providers: AiProvider[] = ["openai", "gemini", "openrouter", "groq"];
 
 export function AiKeyManager({
   integrations,
@@ -21,6 +21,7 @@ export function AiKeyManager({
     openai: "",
     gemini: "",
     openrouter: "",
+    groq: "",
   });
 
   return (

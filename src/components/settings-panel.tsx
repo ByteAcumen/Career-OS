@@ -215,6 +215,7 @@ export function SettingsPanel({
                       openai: "gpt-4o-mini",
                       gemini: "gemini-2.5-flash",
                       openrouter: "openrouter/auto",
+                      groq: "llama-3.1-70b-versatile",
                     };
                     update("aiProvider", provider);
                     update("openAiModel", modelMap[provider]);
@@ -224,6 +225,7 @@ export function SettingsPanel({
                   <option value="openai">OpenAI</option>
                   <option value="gemini">Gemini</option>
                   <option value="openrouter">OpenRouter</option>
+                  <option value="groq">Groq (free tier)</option>
                 </select>
               </label>
 

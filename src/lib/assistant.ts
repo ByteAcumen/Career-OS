@@ -22,6 +22,7 @@ export function normalizeAssistantPage(value?: string | null): AssistantContextP
     case "progress":
     case "strategy":
     case "settings":
+    case "resume":
       return value;
     case "home":
     default:
@@ -119,6 +120,22 @@ export async function ensureAssistantConversation(
   } satisfies AssistantConversationSummary;
 }
 
+export async function deleteAssistantConversation(userId: string, conversationId: string) {
+  await client.batch(
+    [
+      {
+        sql: `DELETE FROM assistant_messages WHERE userId = ? AND conversationId = ?`,
+        args: [userId, conversationId],
+      },
+      {
+        sql: `DELETE FROM assistant_conversations WHERE userId = ? AND id = ?`,
+        args: [userId, conversationId],
+      },
+    ],
+    "write",
+  );
+}
+
 export async function appendAssistantConversationMessage(options: {
   userId: string;
   conversationId: string;
@@ -203,8 +220,8 @@ export function buildAssistantContext(
       nextTasks: getNextTasks(dashboard, 3),
       recentSignals: buildRecentSignals(dashboard),
       today: {
-        tomorrowTask: clipText(dashboard.today.tomorrowTask, 120),
-        note: clipText(dashboard.today.note, 180),
+        tomorrowTask: clipText(dashboard.today.tomorrowTask, 80),
+        note: clipText(dashboard.today.note, 100),
       },
     },
     planner: {
@@ -217,23 +234,23 @@ export function buildAssistantContext(
       },
       nextTasks: getNextTasks(dashboard, 6),
       today: {
-        tomorrowTask: clipText(dashboard.today.tomorrowTask, 120),
+        tomorrowTask: clipText(dashboard.today.tomorrowTask, 80),
       },
     },
     logger: {
       recentSignals: buildRecentSignals(dashboard),
       latestLogs: {
         dsa: dashboard.recentDsa.slice(0, 3).map((entry) => ({
-          title: clipText(entry.title, 72),
+          title: clipText(entry.title, 50),
           pattern: entry.pattern,
         })),
         builds: dashboard.recentBuilds.slice(0, 3).map((entry) => ({
-          title: clipText(entry.title, 72),
+          title: clipText(entry.title, 50),
           area: entry.area,
         })),
         applications: dashboard.recentApplications.slice(0, 3).map((entry) => ({
-          company: clipText(entry.company, 48),
-          role: clipText(entry.role, 68),
+          company: clipText(entry.company, 32),
+          role: clipText(entry.role, 48),
           status: entry.status,
         })),
       },
@@ -253,7 +270,7 @@ export function buildAssistantContext(
       ai: {
         provider: dashboard.settings.aiProvider,
         model: dashboard.settings.openAiModel,
-        customInstructions: clipText(dashboard.settings.customAiInstructions, 220),
+        customInstructions: clipText(dashboard.settings.customAiInstructions, 150),
       },
       plannerDefaults: {
         focusMinutes: dashboard.settings.timerFocusMinutes,
@@ -261,6 +278,21 @@ export function buildAssistantContext(
         weekdayTaskTarget: dashboard.settings.weekdayTaskTarget,
         weekendTaskTarget: dashboard.settings.weekendTaskTarget,
       },
+    },
+    resume: {
+      targetRole: dashboard.settings.targetRole,
+      recentBuilds: dashboard.recentBuilds.slice(0, 4).map((entry) => ({
+        title: clipText(entry.title, 60),
+        area: entry.area,
+        proof: clipText(entry.proof, 80),
+        impact: clipText(entry.impact, 80),
+      })),
+      recentDsa: dashboard.recentDsa.slice(0, 4).map((entry) => ({
+        title: clipText(entry.title, 50),
+        pattern: entry.pattern,
+        difficulty: entry.difficulty,
+      })),
+      links: buildProfileLinks(dashboard),
     },
   };
 
@@ -425,8 +457,8 @@ function getNextTasks(dashboard: DashboardData, limit: number) {
     })
     .slice(0, limit)
     .map((task) => ({
-      title: clipText(task.title, 80),
-      details: clipText(task.details, 140),
+      title: clipText(task.title, 60),
+      details: clipText(task.details, 80),
       scope: task.scope,
       priority: task.priority,
     }));
@@ -435,16 +467,16 @@ function getNextTasks(dashboard: DashboardData, limit: number) {
 function buildRecentSignals(dashboard: DashboardData) {
   return {
     recentDsa: dashboard.recentDsa.slice(0, 3).map((entry) => ({
-      title: clipText(entry.title, 64),
+      title: clipText(entry.title, 50),
       pattern: entry.pattern,
     })),
     recentBuilds: dashboard.recentBuilds.slice(0, 3).map((entry) => ({
-      title: clipText(entry.title, 64),
+      title: clipText(entry.title, 50),
       area: entry.area,
     })),
     recentApplications: dashboard.recentApplications.slice(0, 3).map((entry) => ({
-      company: clipText(entry.company, 40),
-      role: clipText(entry.role, 56),
+      company: clipText(entry.company, 32),
+      role: clipText(entry.role, 48),
       status: entry.status,
     })),
   };
@@ -478,6 +510,8 @@ function describePagePriority(pageContext: AssistantContextPage, dashboard: Dash
       return "Strategy should narrow your next week, not add more noise.";
     case "settings":
       return "Settings should only change what makes execution easier across the rest of the app.";
+    case "resume":
+      return `Resume builder uses your ${dashboard.recentBuilds.length} logged builds and ${dashboard.recentDsa.length} DSA entries to craft a targeted resume.`;
     case "home":
     default:
       return "Home should keep attention on the next concrete block, not the whole system at once.";

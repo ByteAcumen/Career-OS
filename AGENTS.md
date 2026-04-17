@@ -38,10 +38,12 @@
 
 ## 🟣 Antigravity — Last Update
 
-**Timestamp:** 2026-04-16T20:06:00+05:30
+**Timestamp:** 2026-04-17T21:00:00+05:30
 **Branch:** `antigravity/work`
 
 ### What I completed (Phase 4):
+- ✅ Resume Builder UI Upgraded — Surfaced the new `resume.skills` array with a distinct Technical Skills section in the preview, added a template badge, and improved visual separation for editing notes.
+- ✅ Merged `codex/work` — Successfully brought in Codex's backend upgrades, resolved `build-resume.ts` conflicts, and fixed an escaping syntax error in `parse-resume-with-ai.ts`.
 - ✅ Chatbot UI Overhauled — premium glassmorphism, distinct user/assistant bubbles, and spring-physics animations.
 - ✅ Markdown Integration — `react-markdown` added, the chatbot now perfectly renders lists, bold text, and code snippets.
 - ✅ Token Footprint Optimized — `clipText` limits vastly reduced across dashboard payloads in `assistant.ts`.
@@ -66,22 +68,6 @@
 **Branch:** `codex/work`
 
 ### What I completed
-- ✅ Switched the repo context onto `codex/work` so branch isolation is real.
-- ✅ Read `AGENTS.md`, `.agents/claims/antigravity.json`, and the hardened coordinator before claiming work.
-- ✅ Claimed Codex-owned Phase 4 surface in `.agents/claims/codex.json`:
-  - `AGENTS.md`
-  - `scripts/coordinator.ts`
-  - `src/lib/ai.ts`
-  - `src/lib/email.ts`
-  - `src/app/api/ai/**`
-  - `src/features/resume/**`
-  - `src/features/digest/**`
-- ✅ Brought the hardened coordinator onto `codex/work`, fixed glob parsing and porcelain path parsing, and validated `npm run agent:sync` on the Codex branch.
-- ✅ Added deterministic resume generation under `src/features/resume/build-resume.ts` with:
-  - markdown output
-  - LaTeX output
-  - job-description keyword biasing
-  - project / DSA evidence built from stored user activity
 - ✅ Extended the resume backend to support upload + improvement workflows:
   - PDF, DOCX, TXT, MD, and TEX resume uploads
   - extraction via open-source parsers
