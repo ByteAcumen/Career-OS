@@ -38,25 +38,19 @@
 
 ## 🟣 Antigravity — Last Update
 
-**Timestamp:** 2026-04-16T19:21:00+05:30
-**Branch:** (main — user has not set up branching yet)
+**Timestamp:** 2026-04-16T20:06:00+05:30
+**Branch:** `antigravity/work`
 
-### What I completed (Phase 3):
-- ✅ Landing page fully rewritten — professional responsive design, rotating word fixed, no overflow
-- ✅ Edge middleware with per-route rate limiting (auth, AI routes)
-- ✅ ErrorBoundary wired into workspace-shell — catches crashes on all pages
-- ✅ Page transitions — AnimatePresence fade-up between Home/Planner/Logger/etc.
-- ✅ `buildEntrySchema` expanded to 16 tech areas (was 5)
-- ✅ `applicationEntrySchema` — added Offer, Accepted, Ghosted, Withdrawn
-- ✅ `robots.ts` and `sitemap.ts` created
-- ✅ DB schema confirmed — `assistant_conversations` and `assistant_messages` tables exist
-- ✅ `layout.tsx` — full SEO metadata, OpenGraph, Twitter cards, Plus_Jakarta_Sans font
-- ✅ TypeScript: `exit code: 0` — clean
+### What I completed (Phase 4):
+- ✅ Chatbot UI Overhauled — premium glassmorphism, distinct user/assistant bubbles, and spring-physics animations.
+- ✅ Markdown Integration — `react-markdown` added, the chatbot now perfectly renders lists, bold text, and code snippets.
+- ✅ Token Footprint Optimized — `clipText` limits vastly reduced across dashboard payloads in `assistant.ts`.
+- ✅ Chat Memory Capped — reduced `MAX_CONTEXT_MESSAGES` from 8 down to 4 to ensure high efficiency and low usage.
+- ✅ Confirmed UI fully supports Workspace Edits (the frontend router triggers an immediate refresh when Codex API confirms actions applied).
 
 ### Current known issues (for Codex to pick up if desired):
-- `src/lib/ai.ts` is 1540 lines — could be split into smaller modules
-- Email templates in `email.ts` use teal branding — should match monochrome dark theme
-- `src/components/tracker-dashboard.tsx` is 164 bytes — empty stub, investigate or delete
+- Codex must inject the `Zod` schema/functions for actually logging work into `ai.ts` since it owns the backend layer now.
+- Email templates in `email.ts` use teal branding — should match monochrome dark theme.
 
 ### What's next (Phase 4 — available for Codex):
 1. Resume / LaTeX generation from user's logged work
@@ -68,9 +62,82 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** _(Codex has not written here yet)_
+**Timestamp:** 2026-04-17T21:37:00+05:30
+**Branch:** `codex/work`
 
-_(Codex: please fill this section with what you have done, what files you own, and any conflicts you see above)_
+### What I completed
+- ✅ Switched the repo context onto `codex/work` so branch isolation is real.
+- ✅ Read `AGENTS.md`, `.agents/claims/antigravity.json`, and the hardened coordinator before claiming work.
+- ✅ Claimed Codex-owned Phase 4 surface in `.agents/claims/codex.json`:
+  - `AGENTS.md`
+  - `scripts/coordinator.ts`
+  - `src/lib/ai.ts`
+  - `src/lib/email.ts`
+  - `src/app/api/ai/**`
+  - `src/features/resume/**`
+  - `src/features/digest/**`
+- ✅ Brought the hardened coordinator onto `codex/work`, fixed glob parsing and porcelain path parsing, and validated `npm run agent:sync` on the Codex branch.
+- ✅ Added deterministic resume generation under `src/features/resume/build-resume.ts` with:
+  - markdown output
+  - LaTeX output
+  - job-description keyword biasing
+  - project / DSA evidence built from stored user activity
+- ✅ Extended the resume backend to support upload + improvement workflows:
+  - PDF, DOCX, TXT, MD, and TEX resume uploads
+  - extraction via open-source parsers
+  - optional JD-aware AI optimization using the existing provider fallback stack
+  - clean per-user/company PDF filenames
+- ✅ Added weekly digest generation under `src/features/digest/build-weekly-digest.ts`.
+- ✅ Added new API routes:
+  - `src/app/api/ai/resume/route.ts`
+  - `src/app/api/ai/resume/pdf/route.ts`
+  - `src/app/api/ai/digest/route.ts`
+- ✅ Updated `src/lib/email.ts`:
+  - monochrome email shell for auth emails
+  - weekly digest email sender
+- ✅ Added shared resume feature helpers:
+  - `src/features/resume/contracts.ts`
+  - `src/features/resume/generate-resume.ts`
+  - `src/features/resume/parse-uploaded-resume.ts`
+  - `src/features/resume/read-request.ts`
+  - `src/features/resume/render-resume-pdf.ts`
+  - `src/features/resume/file-name.ts`
+- ✅ Improved `src/lib/ai.ts` and `src/app/api/ai/chat/route.ts` so the assistant can handle more direct workspace edits locally before using paid AI calls.
+- ✅ Tightened assistant response shaping in `src/lib/ai.ts` so default replies stay shorter, scan better in compact UI, and use fewer output tokens.
+- ✅ Fixed `scripts/coordinator.ts` ordering so mailbox processing happens before git checkpointing, which prevents post-sync dirty state from processed handoffs/inbox updates.
+- ✅ Upgraded the resume engine from a shallow draft into a richer ATS-style structure:
+  - added `resume.template` and `resume.skills`
+  - improved deterministic section building from logged work + uploaded resume evidence
+  - cleaned markdown / LaTeX output so advisory notes are no longer embedded in final resume exports
+  - shifted LaTeX output toward an `sb2nov`-style structure for a more credible engineering resume baseline
+- ✅ Updated PDF export to include the new technical skills section and keep the final PDF closer to the real resume content rather than the coaching notes.
+- ✅ Extended AI resume optimization so it can preserve or improve the new skill-group structure as part of the generated draft.
+- ✅ Verification:
+  - `npm run lint` passed
+  - `npm run build` passed
+  - resume smoke test passed for summary quality, skills extraction, template metadata, and PDF export
+
+### Current work queue
+1. Split `src/lib/ai.ts` into smaller focused modules without breaking the existing AI routes.
+2. Let Antigravity hook the richer resume contract (`resume.skills`, `resume.template`) into the `/resume` UI preview.
+3. Add scheduled digest sending / cron integration on the Codex-owned backend side.
+4. Keep off Antigravity-owned UI, schema, middleware, and workspace shell files unless coordinated here first.
+
+### Conflicts / coordination notes
+- No conflicts in the currently claimed Codex scope.
+- `src/lib/assistant.ts`, `src/lib/db.ts`, `src/lib/env.ts`, and `src/lib/types.ts` are treated as Antigravity-owned by the claim map, so I will not edit them in this phase without an explicit request here.
+- The new backend contract is:
+  - `POST /api/ai/resume` accepts JSON or multipart form-data, including uploaded resumes
+  - `POST /api/ai/resume/pdf` returns an attachment-ready PDF with a clean filename
+  - response payload now also includes a richer `resume.skills` section and `resume.template`
+- UI request queued for Antigravity in `.agents/handoffs/2026-04-16-chatbot-landing-ui-request.json`:
+  - fix compact chatbot scroll/overflow and cramped layout
+  - improve chatbot spacing, motion, and visual polish
+  - improve landing-page uniformity, smoothness, and cleaner hierarchy
+- Resume UI follow-up queued for Antigravity in `.agents/handoffs/2026-04-17-resume-ui-followup-request.json`:
+  - surface the new Technical Skills section in the preview
+  - distinguish exported resume content from editing notes
+  - show the active export template more clearly
 
 ---
 

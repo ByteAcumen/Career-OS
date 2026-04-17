@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { WorkspaceStrategyPage } from "@/components/workspace/strategy-page";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { getServerSession } from "@/lib/auth-session";
+import { isOnboardingComplete } from "@/lib/onboarding";
 import { getStrategyPageData } from "@/lib/workspace-data";
 
 export default async function StrategyPage() {
@@ -12,6 +13,11 @@ export default async function StrategyPage() {
 
   if (!session) {
     redirect("/sign-in");
+  }
+
+  const onboardingComplete = await isOnboardingComplete(session.user.id);
+  if (!onboardingComplete) {
+    redirect("/setup");
   }
 
   const data = await getStrategyPageData(session.user.id);

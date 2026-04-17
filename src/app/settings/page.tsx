@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { WorkspaceSettingsPage } from "@/components/workspace/settings-page";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { getServerSession } from "@/lib/auth-session";
+import { isOnboardingComplete } from "@/lib/onboarding";
 import { getSettingsPageData } from "@/lib/workspace-data";
 
 export default async function SettingsPage() {
@@ -12,6 +13,11 @@ export default async function SettingsPage() {
 
   if (!session) {
     redirect("/sign-in");
+  }
+
+  const onboardingComplete = await isOnboardingComplete(session.user.id);
+  if (!onboardingComplete) {
+    redirect("/setup");
   }
 
   const data = await getSettingsPageData(session.user.id);

@@ -12,6 +12,12 @@ import {
 import { resolveAiProviderKey } from "@/lib/ai-credentials";
 import { getConfiguredAppBaseUrl } from "@/lib/app-url";
 import { getDashboardData } from "@/lib/dashboard";
+import {
+  composeResumeDraft,
+  type ResumeDraft,
+  type ResumeProject,
+  type ResumeSkillGroup,
+} from "@/features/resume/build-resume";
 import type {
   AiProvider,
   DashboardData,
@@ -171,6 +177,29 @@ const PlannerSuggestionPackSchema = z.object({
   weekend: z.array(PlannerSuggestionItemSchema).min(1).max(8),
 });
 
+const ResumeProjectSchema = z.object({
+  title: z.string().min(1).max(160),
+  subtitle: z.string().min(1).max(160),
+  bullets: z.array(z.string().min(8).max(260)).min(1).max(4),
+  link: z.string().url().nullable().optional(),
+});
+
+const ResumeSkillGroupSchema = z.object({
+  label: z.string().min(1).max(60),
+  items: z.array(z.string().min(1).max(80)).min(1).max(12),
+});
+
+const ResumeOptimizationSchema = z.object({
+  matchedKeywords: z.array(z.string().min(1).max(80)).min(1).max(12),
+  summaryBullets: z.array(z.string().min(8).max(260)).min(2).max(4),
+  focusAreas: z.array(z.string().min(1).max(80)).min(4).max(10),
+  skills: z.array(ResumeSkillGroupSchema).max(6).optional(),
+  projectHighlights: z.array(ResumeProjectSchema).min(1).max(4),
+  problemSolvingHighlights: z.array(z.string().min(8).max(260)).min(1).max(5),
+  editingNotes: z.array(z.string().min(8).max(260)).min(2).max(6),
+  improvementSummary: z.string().min(12).max(260),
+});
+
 const AssistantSettingsUpdateSchema = z
   .object({
     primaryGoal: z.string().max(260).optional(),
@@ -210,6 +239,17 @@ const AssistantActionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("update_settings"),
     settings: AssistantSettingsUpdateSchema,
+  }),
+  z.object({
+    type: z.literal("update_task_status"),
+    taskId: z.string().min(8).max(120),
+    title: z.string().min(1).max(160),
+    status: z.enum(["todo", "in_progress", "done"]),
+  }),
+  z.object({
+    type: z.literal("delete_task"),
+    taskId: z.string().min(8).max(120),
+    title: z.string().min(1).max(160),
   }),
   z.object({
     type: z.literal("log_dsa"),
@@ -255,8 +295,9 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
 const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
 const CHAT_CONTEXT_MESSAGE_LIMIT = 8;
-const CHAT_MAX_OUTPUT_TOKENS = 420;
+const CHAT_MAX_OUTPUT_TOKENS = 320;
 const providerHealth = new Map<string, ProviderHealthEntry>();
+const LOCAL_ACTION_PREFIXES = /\b(add|create|log|save|set|update|change|plan|schedule|record|track|mark|complete|finish|start|resume|reopen|delete|remove)\b/i;
 const COACH_SYSTEM_PROMPT =
   "You are a strict but caring study coach for a final-year CS student targeting product engineering roles. Be direct, realistic, and actionable.";
 const COACH_JSON_PROMPT =
@@ -434,6 +475,84 @@ export async function generatePlannerSuggestionPack(
   });
 }
 
+export async function optimizeResumeDraftWithAi(options: {
+  userId: string;
+  dashboard: DashboardData;
+  baseDraft: ResumeDraft;
+  sourceResumeText?: string | null;
+  sourceFileName?: string | null;
+  jobDescription?: string | null;
+}): Promise<ResumeDraft> {
+  const resumeReference = clipText(options.sourceResumeText ?? "", 8_000);
+  const jobDescription = clipText(options.jobDescription ?? "", 6_000);
+  const customInstructions = clipText(options.dashboard.settings.customAiInstructions, 400);
+
+  if (!resumeReference && !jobDescription) {
+    return options.baseDraft;
+  }
+
+    const payload = compactObject({
+      header: options.baseDraft.header,
+      targetRole: options.baseDraft.targetRole,
+      company: options.baseDraft.company,
+      matchedKeywords: options.baseDraft.matchedKeywords,
+      summaryBullets: options.baseDraft.summaryBullets,
+      focusAreas: options.baseDraft.focusAreas,
+      skills: options.baseDraft.skills,
+      projectHighlights: options.baseDraft.projectHighlights,
+      problemSolvingHighlights: options.baseDraft.problemSolvingHighlights,
+      editingNotes: options.baseDraft.editingNotes,
+    sourceResumeFileName: options.sourceFileName?.trim(),
+    sourceResumeText: resumeReference || undefined,
+    jobDescription: jobDescription || undefined,
+    recentSignals: {
+      weeklyBuilds: options.dashboard.metrics.weekBuilds,
+      weeklyDsa: options.dashboard.metrics.weekDsa,
+      weeklyApplications: options.dashboard.metrics.weekApplications,
+      currentStreak: options.dashboard.metrics.currentStreak,
+    },
+    settings: {
+      primaryGoal: options.dashboard.settings.primaryGoal,
+      targetRole: options.dashboard.settings.targetRole,
+      targetCompanies: options.dashboard.settings.targetCompanies,
+      weeklyTheme: options.dashboard.settings.weeklyTheme,
+      planStyle: options.dashboard.settings.planStyle,
+      customInstructions,
+    },
+  });
+
+  const { data } = await dispatchWithFallback({
+    payload,
+    preferredProvider: options.dashboard.settings.aiProvider,
+    configuredModel: options.dashboard.settings.openAiModel,
+    schema: ResumeOptimizationSchema,
+    userId: options.userId,
+      systemPrompt:
+        "You are an elite technical resume editor for engineering students. Improve the resume only using truthful evidence from the provided draft, uploaded resume text, job description, and stored dashboard context. Keep ATS-friendly language, preserve concrete proof, prefer quantified outcomes, and never invent projects, companies, metrics, or skills that are not supported by the provided material.",
+      jsonPrompt:
+        "Return only JSON with matchedKeywords, summaryBullets, focusAreas, skills, projectHighlights, problemSolvingHighlights, editingNotes, and improvementSummary. Keep bullets sharp, outcome-focused, ATS-friendly, and recruiter-readable.",
+    });
+
+    return composeResumeDraft(options.baseDraft, {
+      mode: "ai-optimized",
+      matchedKeywords: data.matchedKeywords,
+      summaryBullets: data.summaryBullets,
+      focusAreas: data.focusAreas,
+      skills: data.skills?.map(normalizeResumeSkillGroup),
+      projectHighlights: data.projectHighlights.map(normalizeResumeProject),
+      problemSolvingHighlights: data.problemSolvingHighlights,
+      editingNotes: data.editingNotes,
+    improvementSummary: data.improvementSummary,
+    importedResume: {
+      used: options.baseDraft.importedResume.used || Boolean(resumeReference),
+      fileName:
+        options.sourceFileName?.trim() ||
+        options.baseDraft.importedResume.fileName ||
+        null,
+    },
+  });
+}
+
 export function buildChatContext(dashboard: DashboardData) {
   return stableJsonStringify(
     compactObject({
@@ -491,6 +610,12 @@ Guidelines:
 - Use the user's real momentum, planner, recent DSA work, builds, and applications.
 - Prefer next actions over long explanations.
 - If the user is behind, say so clearly and suggest the smallest meaningful recovery step.
+- When the user asks for a plan, return a tight plan that is immediately usable, not a giant brainstorm.
+- When the user asks for a workspace change, respond as if you are operating inside the app and be explicit about what changed or what still needs clarification.
+- Keep answers structured for scanning: one short opening sentence, then only the bullets or sections that actually help.
+- Default to 140 words or less unless the user explicitly asks for detail.
+- Prefer 2 to 4 bullets over long paragraphs.
+- Avoid nested lists, filler intros, and repeated context the user can already see on screen.
 - Use markdown lists only when they improve clarity.`;
 
   const boundedMessages = normalizeChatMessages(messages);
@@ -896,6 +1021,18 @@ export async function planAssistantActions(options: {
       timerBreakMinutes: options.dashboard.settings.timerBreakMinutes,
     },
     plannerSummary: options.dashboard.planner.summary,
+    plannerTasks: options.dashboard.planner.tasks
+      .filter((task) => task.status !== "done")
+      .slice(0, 12)
+      .map((task) => ({
+        id: task.id,
+        title: clipText(task.title, 90),
+        scope: task.scope,
+        category: task.category,
+        priority: task.priority,
+        status: task.status,
+        targetDateKey: task.targetDateKey,
+      })),
     today: {
       tomorrowTask: options.dashboard.today.tomorrowTask,
       note: clipText(options.dashboard.today.note, 220),
@@ -909,12 +1046,78 @@ export async function planAssistantActions(options: {
     schema: AssistantActionPlanSchema,
     userId: options.userId,
     systemPrompt:
-      "You are a safe workspace operator inside Career OS. Convert an explicit user request into zero or more non-destructive workspace actions. Only create actions when the user clearly asks to save, add, log, set, update, or plan something in the app. Never invent missing details, never delete data, never clear history, never remove tasks, and never make broad settings changes unless the user explicitly asked. If the request is advisory, ambiguous, or just conversational, return shouldAct false with no actions.",
+      "You are a safe workspace operator inside Career OS. Convert an explicit user request into zero or more workspace actions. Only create actions when the user clearly asks to save, add, log, set, update, complete, reopen, delete, or plan something inside the app. Use taskId only from the provided plannerTasks when changing or deleting an existing task. Never invent missing details, never clear history, never remove multiple tasks at once, and never make broad settings changes unless the user explicitly asked. If the request is advisory, ambiguous, or just conversational, return shouldAct false with no actions.",
     jsonPrompt:
-      "Return only JSON with shouldAct, actionReason, and actions. Use at most 3 actions. Allowed actions are create_task, save_review, update_settings, log_dsa, log_build, and log_application.",
+      "Return only JSON with shouldAct, actionReason, and actions. Use at most 3 actions. Allowed actions are create_task, save_review, update_settings, update_task_status, delete_task, log_dsa, log_build, and log_application.",
   });
 
   return data;
+}
+
+export function planAssistantActionsLocally(options: {
+  dashboard: DashboardData;
+  messages: ChatMessage[];
+}): AssistantActionPlan | null {
+  const latestUserMessage =
+    normalizeChatMessages(options.messages)
+      .filter((message) => message.role === "user")
+      .at(-1)?.content ?? "";
+
+  if (!latestUserMessage || !LOCAL_ACTION_PREFIXES.test(latestUserMessage)) {
+    return null;
+  }
+
+  const normalized = latestUserMessage.trim();
+  const reviewAction = parseReviewAction(normalized);
+  if (reviewAction) {
+    return {
+      shouldAct: true,
+      actionReason: "Parsed an explicit tomorrow-task or review update locally.",
+      actions: [reviewAction],
+    };
+  }
+
+  const settingsAction = parseSettingsAction(normalized);
+  if (settingsAction) {
+    return {
+      shouldAct: true,
+      actionReason: "Parsed a direct settings change locally.",
+      actions: [settingsAction],
+    };
+  }
+
+  const taskAction = parseTaskLifecycleAction(options.dashboard, normalized);
+  if (taskAction) {
+    return {
+      shouldAct: true,
+      actionReason: "Parsed a direct task lifecycle change locally.",
+      actions: [taskAction],
+    };
+  }
+
+  return null;
+}
+
+function normalizeResumeProject(project: ResumeProject): ResumeProject {
+  return {
+    title: clipText(project.title.trim(), 160),
+    subtitle: clipText(project.subtitle.trim(), 160) || "Project",
+    link: project.link?.trim() || null,
+    bullets: project.bullets
+      .map((bullet) => clipText(bullet.trim(), 260))
+      .filter(Boolean)
+      .slice(0, 4),
+  };
+}
+
+function normalizeResumeSkillGroup(group: ResumeSkillGroup): ResumeSkillGroup {
+  return {
+    label: clipText(group.label.trim(), 60),
+    items: group.items
+      .map((item) => clipText(item.trim(), 80))
+      .filter(Boolean)
+      .slice(0, 12),
+  };
 }
 
 async function streamGemini(
@@ -1426,6 +1629,222 @@ function aggregateHistory(history: DashboardData["history"]) {
     },
     { completed: 0, dsa: 0, builds: 0, applications: 0 },
   );
+}
+
+function parseReviewAction(message: string): AssistantAction | null {
+  const tomorrowMatch = message.match(
+    /(?:set|save|make|change|update)\s+(?:my\s+)?tomorrow(?:'s)?(?:\s+first)?\s+task\s+(?:to|as)\s+(.+)/i,
+  );
+  if (!tomorrowMatch) {
+    return null;
+  }
+
+  const tomorrowTask = cleanCommandValue(tomorrowMatch[1]);
+  if (!tomorrowTask) {
+    return null;
+  }
+
+  return {
+    type: "save_review",
+    tomorrowTask,
+  };
+}
+
+function parseSettingsAction(message: string): AssistantAction | null {
+  const weeklyThemeMatch = message.match(
+    /(?:set|change|update)\s+(?:the\s+)?weekly\s+theme\s+(?:to|as)\s+(.+)/i,
+  );
+  if (weeklyThemeMatch) {
+    const weeklyTheme = cleanCommandValue(weeklyThemeMatch[1]);
+    if (weeklyTheme) {
+      return {
+        type: "update_settings",
+        settings: { weeklyTheme },
+      };
+    }
+  }
+
+  const primaryGoalMatch = message.match(
+    /(?:set|change|update)\s+(?:the\s+)?primary\s+goal\s+(?:to|as)\s+(.+)/i,
+  );
+  if (primaryGoalMatch) {
+    const primaryGoal = cleanCommandValue(primaryGoalMatch[1]);
+    if (primaryGoal) {
+      return {
+        type: "update_settings",
+        settings: { primaryGoal },
+      };
+    }
+  }
+
+  const targetRoleMatch = message.match(
+    /(?:set|change|update)\s+(?:my\s+)?target\s+role\s+(?:to|as)\s+(.+)/i,
+  );
+  if (targetRoleMatch) {
+    const targetRole = cleanCommandValue(targetRoleMatch[1]);
+    if (targetRole) {
+      return {
+        type: "update_settings",
+        settings: { targetRole },
+      };
+    }
+  }
+
+  const timerMatch = message.match(
+    /(?:set|change|update)\s+(?:the\s+)?(?:focus\s+)?timer\s+(?:to|as)\s+(\d{1,3})(?:\s*(?:minutes|min|m))?(?:.*?(?:break|rest)(?:\s+timer)?\s*(?:to|as)?\s*(\d{1,2}))?/i,
+  );
+  if (timerMatch) {
+    const timerFocusMinutes = Number(timerMatch[1]);
+    const timerBreakMinutes = timerMatch[2] ? Number(timerMatch[2]) : undefined;
+    const settings: Record<string, number> = {};
+
+    if (Number.isFinite(timerFocusMinutes) && timerFocusMinutes >= 15 && timerFocusMinutes <= 180) {
+      settings.timerFocusMinutes = timerFocusMinutes;
+    }
+    if (
+      timerBreakMinutes !== undefined &&
+      Number.isFinite(timerBreakMinutes) &&
+      timerBreakMinutes >= 5 &&
+      timerBreakMinutes <= 60
+    ) {
+      settings.timerBreakMinutes = timerBreakMinutes;
+    }
+
+    if (Object.keys(settings).length > 0) {
+      return {
+        type: "update_settings",
+        settings,
+      } as AssistantAction;
+    }
+  }
+
+  const breakMatch = message.match(
+    /(?:set|change|update)\s+(?:the\s+)?break(?:\s+timer)?\s+(?:to|as)\s+(\d{1,2})/i,
+  );
+  if (breakMatch) {
+    const timerBreakMinutes = Number(breakMatch[1]);
+    if (Number.isFinite(timerBreakMinutes) && timerBreakMinutes >= 5 && timerBreakMinutes <= 60) {
+      return {
+        type: "update_settings",
+        settings: { timerBreakMinutes },
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseTaskLifecycleAction(
+  dashboard: DashboardData,
+  message: string,
+): AssistantAction | null {
+  const deleteTarget =
+    matchCommandValue(message, [
+      /(?:delete|remove)\s+(?:the\s+)?(?:task\s+)?(.+)/i,
+    ]) ?? null;
+
+  if (deleteTarget) {
+    const task = findPlannerTask(dashboard, deleteTarget);
+    if (task) {
+      return {
+        type: "delete_task",
+        taskId: task.id,
+        title: task.title,
+      };
+    }
+  }
+
+  const doneTarget =
+    matchCommandValue(message, [
+      /(?:mark|set)\s+(?:the\s+)?(?:task\s+)?(.+?)\s+as\s+(?:done|complete|completed)/i,
+      /(?:complete|finish)\s+(?:the\s+)?(?:task\s+)?(.+)/i,
+    ]) ?? null;
+
+  if (doneTarget) {
+    const task = findPlannerTask(dashboard, doneTarget);
+    if (task) {
+      return {
+        type: "update_task_status",
+        taskId: task.id,
+        title: task.title,
+        status: "done",
+      };
+    }
+  }
+
+  const inProgressTarget =
+    matchCommandValue(message, [
+      /(?:mark|set)\s+(?:the\s+)?(?:task\s+)?(.+?)\s+as\s+(?:in progress|doing|active)/i,
+      /(?:start|resume)\s+(?:the\s+)?(?:task\s+)?(.+)/i,
+    ]) ?? null;
+
+  if (inProgressTarget) {
+    const task = findPlannerTask(dashboard, inProgressTarget);
+    if (task) {
+      return {
+        type: "update_task_status",
+        taskId: task.id,
+        title: task.title,
+        status: "in_progress",
+      };
+    }
+  }
+
+  const todoTarget =
+    matchCommandValue(message, [
+      /(?:mark|set)\s+(?:the\s+)?(?:task\s+)?(.+?)\s+as\s+(?:todo|to do|not started)/i,
+      /(?:reopen|reset)\s+(?:the\s+)?(?:task\s+)?(.+)/i,
+    ]) ?? null;
+
+  if (todoTarget) {
+    const task = findPlannerTask(dashboard, todoTarget);
+    if (task) {
+      return {
+        type: "update_task_status",
+        taskId: task.id,
+        title: task.title,
+        status: "todo",
+      };
+    }
+  }
+
+  return null;
+}
+
+function matchCommandValue(message: string, patterns: RegExp[]) {
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) {
+      const value = cleanCommandValue(match[1]);
+      if (value) {
+        return value;
+      }
+    }
+  }
+
+  return "";
+}
+
+function cleanCommandValue(value: string) {
+  return value.replace(/\s+/g, " ").replace(/[.?!]+$/g, "").trim();
+}
+
+function findPlannerTask(dashboard: DashboardData, rawQuery: string) {
+  const query = normalizeForMatch(rawQuery);
+  if (!query) return null;
+
+  const tasks = dashboard.planner.tasks.filter((task) => task.status !== "done");
+  const exact = tasks.find((task) => normalizeForMatch(task.title) === query);
+  if (exact) return exact;
+
+  const contains = tasks.find((task) => normalizeForMatch(task.title).includes(query));
+  if (contains) return contains;
+
+  return tasks.find((task) => query.includes(normalizeForMatch(task.title))) ?? null;
+}
+
+function normalizeForMatch(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function normalizeChatMessages(messages: ChatMessage[]) {

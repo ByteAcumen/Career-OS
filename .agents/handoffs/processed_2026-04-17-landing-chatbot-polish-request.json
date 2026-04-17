@@ -1,0 +1,48 @@
+{
+  "from": "codex",
+  "to": "antigravity",
+  "timestamp": "2026-04-17T00:28:00+05:30",
+  "status": "handoff",
+  "message": "User requested a full visual polish pass for the public landing page and the in-app chatbot. Please prioritize cleaner hierarchy, stronger uniformity, better responsiveness, and reduced visual congestion while preserving the existing backend capabilities and workspace edit flow.",
+  "priority": "high",
+  "requestedByUser": true,
+  "scope": {
+    "landingPage": [
+      "Simplify the visual system to match the monochrome professional app direction more closely.",
+      "Reduce the number of competing accent colors. Current feature cards use many unrelated accent hues, which makes the page feel less premium and less uniform.",
+      "Tone down motion intensity: the rotating headline word, multiple animated glow orbs, magnetic CTA, and hover-reactive gradients are individually fine but collectively too busy.",
+      "Keep one clear hero, one concise value section, one trust band, and one closing CTA. The current page is strong structurally but needs calmer visual restraint.",
+      "Normalize card radii, spacing rhythm, and text density so the hero, feature bento, trust cards, and CTA feel designed as one system rather than adjacent sections.",
+      "Keep the dashboard preview, but make it feel more product-real and less decorative so the page looks more credible.",
+      "Check footer typography and symbol rendering carefully. There are signs of encoding inconsistency in rendered text output."
+    ],
+    "chatbot": [
+      "Fix compact-height usability. In small window sizes the assistant becomes too congested and hard to scroll comfortably.",
+      "Reduce duplicate status chips and repeated context labels. The header, subheader, body, and footer repeat the same ideas too many times.",
+      "Make the default compact state calmer: tighter but cleaner spacing, fewer stacked pills, and better breathing room around messages and input.",
+      "Ensure the history pane behaves well on small screens. It should not crowd the message area or create multiple competing scroll regions.",
+      "Strengthen responsive rules for narrow desktop and tablet widths so the panel stays readable without overlap or clipped affordances.",
+      "Upgrade message rendering polish: clearer assistant/user separation, cleaner timestamps, smoother loading state, and less visual noise in the empty state.",
+      "Preserve saved chat history, workspace edits, and backend response handling already implemented by Codex."
+    ]
+  },
+  "technicalNotes": [
+    "Files remain Antigravity-owned: src/components/landing-page.tsx, src/components/career-assistant.tsx, src/app/globals.css.",
+    "Backend resume, digest, and assistant routes are already live on codex/work and do not require UI contract changes for this polish pass.",
+    "Current chatbot code still shows MAX_CONTEXT_MESSAGES = 8 in the component; please reconcile UI assumptions with the intended lightweight focused-mode behavior.",
+    "Please preserve the existing API routes and assistant action flow. The visual pass should not break workspace refresh after actions are applied."
+  ],
+  "acceptanceCriteria": [
+    "Landing page feels calmer, more premium, and more consistent with the monochrome workspace direction.",
+    "Chatbot is comfortably usable in compact height/width scenarios without cramped scrolling or overlapping regions.",
+    "Animations remain smooth but are noticeably less busy and more intentional.",
+    "Typography, spacing, and card treatments feel uniform across both surfaces.",
+    "No regressions to auth routes, assistant history, assistant actions, or existing backend integrations."
+  ],
+  "relevantFilesReviewed": [
+    "src/components/landing-page.tsx",
+    "src/components/career-assistant.tsx",
+    "AGENTS.md",
+    ".agents/claims/antigravity.json"
+  ]
+}
