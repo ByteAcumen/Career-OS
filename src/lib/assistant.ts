@@ -22,6 +22,7 @@ export function normalizeAssistantPage(value?: string | null): AssistantContextP
     case "progress":
     case "strategy":
     case "settings":
+    case "resume":
       return value;
     case "home":
     default:
@@ -278,6 +279,21 @@ export function buildAssistantContext(
         weekendTaskTarget: dashboard.settings.weekendTaskTarget,
       },
     },
+    resume: {
+      targetRole: dashboard.settings.targetRole,
+      recentBuilds: dashboard.recentBuilds.slice(0, 4).map((entry) => ({
+        title: clipText(entry.title, 60),
+        area: entry.area,
+        proof: clipText(entry.proof, 80),
+        impact: clipText(entry.impact, 80),
+      })),
+      recentDsa: dashboard.recentDsa.slice(0, 4).map((entry) => ({
+        title: clipText(entry.title, 50),
+        pattern: entry.pattern,
+        difficulty: entry.difficulty,
+      })),
+      links: buildProfileLinks(dashboard),
+    },
   };
 
   return stableJsonStringify(compactObject({ pageContext, ...shared, page: contextByPage[pageContext] }));
@@ -494,6 +510,8 @@ function describePagePriority(pageContext: AssistantContextPage, dashboard: Dash
       return "Strategy should narrow your next week, not add more noise.";
     case "settings":
       return "Settings should only change what makes execution easier across the rest of the app.";
+    case "resume":
+      return `Resume builder uses your ${dashboard.recentBuilds.length} logged builds and ${dashboard.recentDsa.length} DSA entries to craft a targeted resume.`;
     case "home":
     default:
       return "Home should keep attention on the next concrete block, not the whole system at once.";

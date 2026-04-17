@@ -38,10 +38,12 @@
 
 ## 🟣 Antigravity — Last Update
 
-**Timestamp:** 2026-04-16T20:06:00+05:30
+**Timestamp:** 2026-04-17T21:00:00+05:30
 **Branch:** `antigravity/work`
 
 ### What I completed (Phase 4):
+- ✅ Resume Builder UI Upgraded — Surfaced the new `resume.skills` array with a distinct Technical Skills section in the preview, added a template badge, and improved visual separation for editing notes.
+- ✅ Merged `codex/work` — Successfully brought in Codex's backend upgrades, resolved `build-resume.ts` conflicts, and fixed an escaping syntax error in `parse-resume-with-ai.ts`.
 - ✅ Chatbot UI Overhauled — premium glassmorphism, distinct user/assistant bubbles, and spring-physics animations.
 - ✅ Markdown Integration — `react-markdown` added, the chatbot now perfectly renders lists, bold text, and code snippets.
 - ✅ Token Footprint Optimized — `clipText` limits vastly reduced across dashboard payloads in `assistant.ts`.

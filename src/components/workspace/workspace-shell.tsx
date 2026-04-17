@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   ClipboardEdit,
+  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -42,6 +43,7 @@ export type WorkspacePageId =
   | "logger"
   | "progress"
   | "strategy"
+  | "resume"
   | "settings";
 
 const navGroups = [
@@ -53,6 +55,7 @@ const navGroups = [
       { id: "logger" as const, label: "Logger", href: "/logger", icon: ClipboardEdit },
       { id: "progress" as const, label: "Progress", href: "/progress", icon: Activity },
       { id: "strategy" as const, label: "Strategy", href: "/strategy", icon: WandSparkles },
+      { id: "resume" as const, label: "Resume", href: "/resume", icon: FileText },
     ],
   },
   {
@@ -81,6 +84,10 @@ const pageCopy: Record<WorkspacePageId, { title: string; description: string }> 
   strategy: {
     title: "Strategy",
     description: "Use AI as a focused strategist for your next moves, weak spots, and weekly direction.",
+  },
+  resume: {
+    title: "Resume Builder",
+    description: "Generate a tailored resume from your logged work, upload an existing one for AI improvement, and export to PDF or LaTeX.",
   },
   settings: {
     title: "Settings",

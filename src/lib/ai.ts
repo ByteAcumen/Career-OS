@@ -293,7 +293,8 @@ export type AssistantActionPlan = z.infer<typeof AssistantActionPlanSchema>;
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
-const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
+const DEFAULT_GROQ_MODEL = "llama-3.1-70b-versatile";
+const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "groq", "openrouter"];
 const CHAT_CONTEXT_MESSAGE_LIMIT = 8;
 const CHAT_MAX_OUTPUT_TOKENS = 320;
 const providerHealth = new Map<string, ProviderHealthEntry>();
@@ -654,6 +655,15 @@ Guidelines:
         };
       }
 
+      if (provider === "groq") {
+        clearProviderCooldown(userId, provider);
+        return {
+          stream: await streamGroq(apiKey, model, systemMessage, boundedMessages),
+          provider,
+          model,
+        };
+      }
+
       clearProviderCooldown(userId, provider);
       return {
         stream: await streamOpenRouter(apiKey, model, systemMessage, boundedMessages),
@@ -809,6 +819,9 @@ async function dispatchToProvider<T extends z.ZodTypeAny>(
   }
   if (provider === "gemini") {
     return generateWithGemini(payload, model, systemPrompt, jsonPrompt, schema, apiKey);
+  }
+  if (provider === "groq") {
+    return generateWithGroq(payload, model, systemPrompt, jsonPrompt, schema, apiKey);
   }
   return generateWithOpenRouter(payload, model, systemPrompt, jsonPrompt, schema, apiKey);
 }
@@ -1311,6 +1324,7 @@ function buildOpenRouterModelCandidates(requestedModel: string) {
 }
 
 function resolveProviderModel(provider: AiProvider, configuredModel: string) {
+  if (provider === "groq") return configuredModel || DEFAULT_GROQ_MODEL;
   if (provider === "openai") {
     return configuredModel && configuredModel.startsWith("gpt")
       ? configuredModel
@@ -1954,5 +1968,71 @@ function getApplicationOrigin() {
     return new URL(getConfiguredAppBaseUrl()).origin;
   } catch {
     return "http://localhost:3000";
+  }
+}
+
+
+async function generateWithGroq<T extends z.ZodTypeAny>(
+  payload: unknown,
+  model: string,
+  systemPrompt: string,
+  jsonPrompt: string,
+  schema: T,
+  apiKey: string,
+): Promise<z.infer<T>> {
+  try {
+    const client = new OpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" });
+    const response = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `${jsonPrompt}\n${stableJsonStringify(payload)}` },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    });
+
+    const text = response.choices[0]?.message?.content ?? "";
+    try {
+      return parseJsonWithSchema(text, schema);
+    } catch {
+      throw new AiError("PARSE_ERROR", "Groq", `Failed to parse Groq response: ${text.slice(0, 200)}`);
+    }
+  } catch (error) {
+    throw normalizeProviderError(error, "Groq");
+  }
+}
+
+async function streamGroq(
+  apiKey: string,
+  model: string,
+  systemMessage: string,
+  messages: ChatMessage[],
+): Promise<ReadableStream<Uint8Array>> {
+  try {
+    const client = new OpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" });
+    const stream = await client.chat.completions.create({
+      model,
+      messages: [{ role: "system", content: systemMessage }, ...messages],
+      stream: true,
+      temperature: 0.35,
+      max_completion_tokens: CHAT_MAX_OUTPUT_TOKENS,
+    });
+
+    const encoder = new TextEncoder();
+
+    return new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content || "";
+          if (text) {
+            controller.enqueue(encoder.encode(text));
+          }
+        }
+        controller.close();
+      },
+    });
+  } catch (error) {
+    throw normalizeProviderError(error, "Groq");
   }
 }

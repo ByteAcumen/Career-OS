@@ -21,7 +21,7 @@ export const settingsSchema = z.object({
   graduationYear: z.string().max(20),
   planStyle: z.string().max(220),
   customAiInstructions: z.string().max(1500),
-  aiProvider: z.enum(["openai", "gemini", "openrouter"]),
+  aiProvider: z.enum(["openai", "gemini", "openrouter", "groq"]),
   googleAppsScriptUrl: optionalUrl,
   openAiModel: z.string().min(1),
   weekendDsaMinutes: z.number().int().min(60).max(480),
@@ -39,12 +39,12 @@ export const settingsSchema = z.object({
 });
 
 export const aiKeySchema = z.object({
-  provider: z.enum(["openai", "gemini", "openrouter"]),
+  provider: z.enum(["openai", "gemini", "openrouter", "groq"]),
   apiKey: z.string().min(10).max(500),
 });
 
 export const aiKeyDeleteSchema = z.object({
-  provider: z.enum(["openai", "gemini", "openrouter"]),
+  provider: z.enum(["openai", "gemini", "openrouter", "groq"]),
 });
 
 export const checkinSchema = z.object({

@@ -1,0 +1,87 @@
+{
+  "_comment": "Sample resume reference for AI resume generation. Career OS uses this structure as a quality benchmark.",
+  "name": "Hemant Kumar",
+  "email": "hemant@example.com",
+  "phone": "+91-9876543210",
+  "links": {
+    "linkedin": "https://linkedin.com/in/hemant",
+    "github": "https://github.com/hemant",
+    "leetcode": "https://leetcode.com/hemant",
+    "portfolio": "https://hemant.dev"
+  },
+  "education": {
+    "university": "Indian Institute of Technology Delhi",
+    "degree": "B.Tech in Computer Science and Engineering",
+    "gpa": "8.9/10",
+    "location": "New Delhi, India",
+    "year": "Aug. 2022 – May 2026"
+  },
+  "experience": [
+    {
+      "company": "Google",
+      "role": "Software Engineer Intern",
+      "location": "Bangalore, India",
+      "dates": "May 2024 – Aug. 2024",
+      "bullets": [
+        "Reduced end-to-end API latency by 42% by migrating 3 internal microservices from REST to gRPC, serving 2M+ daily active users.",
+        "Built a real-time event-processing pipeline using Google Pub/Sub and Cloud Run, handling 50K events/sec with <100 ms P95 latency.",
+        "Authored go/migration-guide adopted by 12 teams as the internal standard for service modernisation."
+      ]
+    },
+    {
+      "company": "Zepto",
+      "role": "Backend Engineer Intern",
+      "location": "Mumbai, India",
+      "dates": "Dec. 2023 – Feb. 2024",
+      "bullets": [
+        "Designed and shipped a coupon-eligibility engine that evaluated 30+ business rules in <10 ms, increasing checkout conversion by 8%.",
+        "Instrumented distributed tracing (OpenTelemetry + Jaeger) across 6 order services, cutting mean time-to-debug from 4 hours to 22 minutes.",
+        "Optimised PostgreSQL queries with composite indexes, reducing p99 dashboard load from 3.1 s to 0.4 s for 200+ merchants."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "title": "Career OS",
+      "tech": "Next.js 15, Turso (SQLite), Better Auth, Gemini Flash",
+      "link": "https://github.com/hemant/career-os",
+      "dates": "Jan. 2025 – Present",
+      "bullets": [
+        "Built a full-stack career management SaaS with 8 workspace pages (Planner, Logger, Progress, Strategy, Resume Builder) serving real users.",
+        "Integrated Gemini Flash as an AI coaching assistant with RAG over logged DSA/build data, generating personalised daily strategies.",
+        "Implemented resume generation pipeline (parse → tailor → render) that exports ATS-safe PDF, LaTeX, and Markdown from a single API call."
+      ]
+    },
+    {
+      "title": "DistributedKV",
+      "tech": "Go, Raft consensus, gRPC",
+      "link": "https://github.com/hemant/distributedkv",
+      "dates": "Aug. 2024",
+      "bullets": [
+        "Implemented a linearisable key-value store using Raft consensus with leader election, log replication, and snapshotting from scratch in Go.",
+        "Achieved 98k reads/sec and 41k writes/sec in benchmarks, with fault-tolerance tested against random node failures."
+      ]
+    },
+    {
+      "title": "AlgoVault — DSA Tracker",
+      "tech": "React, TypeScript, Supabase",
+      "link": "https://github.com/hemant/algovault",
+      "dates": "Mar. 2024",
+      "bullets": [
+        "Shipped a DSA progress tracker with pattern tagging, difficulty heatmaps, and streak analytics used by 300+ students."
+      ]
+    }
+  ],
+  "skills": {
+    "languages": ["TypeScript", "Go", "Python", "Java", "C++", "SQL"],
+    "frameworks": ["React", "Next.js", "Node.js", "FastAPI", "Spring Boot"],
+    "databases": ["PostgreSQL", "Redis", "SQLite (Turso)", "MongoDB"],
+    "tools": ["Docker", "Kubernetes", "AWS (EC2, S3, Lambda)", "Git", "Linux"],
+    "concepts": ["System Design", "Distributed Systems", "REST/gRPC", "CI/CD", "Raft Consensus"]
+  },
+  "dsaHighlights": [
+    "500+ LeetCode problems solved (150+ medium, 60+ hard)",
+    "Codeforces: Expert (1700+ rating)",
+    "Strong in: Trees, Graphs, DP, Sliding Window, Binary Search, Divide & Conquer"
+  ]
+}
