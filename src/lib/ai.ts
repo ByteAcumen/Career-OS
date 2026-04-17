@@ -298,6 +298,8 @@ const CHAT_CONTEXT_MESSAGE_LIMIT = 8;
 const CHAT_MAX_OUTPUT_TOKENS = 320;
 const providerHealth = new Map<string, ProviderHealthEntry>();
 const LOCAL_ACTION_PREFIXES = /\b(add|create|log|save|set|update|change|plan|schedule|record|track|mark|complete|finish|start|resume|reopen|delete|remove)\b/i;
+const WORK_LOG_REQUEST_PATTERN =
+  /\b(log|record|save|track)\b[\s\S]{0,120}\b(today|todays|today's|work|progress|activity)\b/i;
 const COACH_SYSTEM_PROMPT =
   "You are a strict but caring study coach for a final-year CS student targeting product engineering roles. Be direct, realistic, and actionable.";
 const COACH_JSON_PROMPT =
@@ -1058,10 +1060,9 @@ export function planAssistantActionsLocally(options: {
   dashboard: DashboardData;
   messages: ChatMessage[];
 }): AssistantActionPlan | null {
+  const normalizedMessages = normalizeChatMessages(options.messages);
   const latestUserMessage =
-    normalizeChatMessages(options.messages)
-      .filter((message) => message.role === "user")
-      .at(-1)?.content ?? "";
+    normalizedMessages.filter((message) => message.role === "user").at(-1)?.content ?? "";
 
   if (!latestUserMessage || !LOCAL_ACTION_PREFIXES.test(latestUserMessage)) {
     return null;
@@ -1092,6 +1093,19 @@ export function planAssistantActionsLocally(options: {
       shouldAct: true,
       actionReason: "Parsed a direct task lifecycle change locally.",
       actions: [taskAction],
+    };
+  }
+
+  const workLogActions = parseWorkLogActions({
+    dashboard: options.dashboard,
+    normalizedMessages,
+    latestUserMessage: normalized,
+  });
+  if (workLogActions.length > 0) {
+    return {
+      shouldAct: true,
+      actionReason: "Parsed a direct work-log request and extracted concrete entries.",
+      actions: workLogActions.slice(0, 3),
     };
   }
 
@@ -1629,6 +1643,291 @@ function aggregateHistory(history: DashboardData["history"]) {
     },
     { completed: 0, dsa: 0, builds: 0, applications: 0 },
   );
+}
+
+function parseWorkLogActions(options: {
+  dashboard: DashboardData;
+  normalizedMessages: ChatMessage[];
+  latestUserMessage: string;
+}): AssistantAction[] {
+  const latestMessage = options.latestUserMessage.trim();
+  if (!WORK_LOG_REQUEST_PATTERN.test(latestMessage) && !containsWorkEvidence(latestMessage)) {
+    return [];
+  }
+
+  const contextSource = chooseWorkLogSource(options.normalizedMessages, latestMessage);
+  if (!contextSource) {
+    return [];
+  }
+
+  const actions: AssistantAction[] = [];
+  const dsaAction = parseDsaLogActionFromText(contextSource);
+  if (dsaAction) {
+    actions.push(dsaAction);
+  }
+
+  const featureAction = parseFeatureBuildActionFromText(contextSource);
+  if (featureAction) {
+    actions.push(featureAction);
+  }
+
+  const reviewAction = parseCodeReviewBuildActionFromText(contextSource);
+  if (reviewAction) {
+    actions.push(reviewAction);
+  }
+
+  const applicationAction = parseApplicationLogActionFromText(contextSource);
+  if (applicationAction && actions.length < 3) {
+    actions.push(applicationAction);
+  }
+
+  return dedupeActions(actions).slice(0, 3);
+}
+
+function chooseWorkLogSource(messages: ChatMessage[], latestUserMessage: string) {
+  if (containsWorkEvidence(latestUserMessage)) {
+    return latestUserMessage;
+  }
+
+  const allMessages = [...messages].reverse();
+  const previousUser = allMessages.find(
+    (message) => message.role === "user" && message.content !== latestUserMessage,
+  );
+  if (previousUser && containsWorkEvidence(previousUser.content)) {
+    return previousUser.content;
+  }
+
+  const previousAssistant = allMessages.find((message) => {
+    if (message.role !== "assistant") return false;
+    if (
+      /\bhere(?:'|’)s what i can log\b/i.test(message.content) ||
+      /\bbased on your current context\b/i.test(message.content)
+    ) {
+      return containsWorkEvidence(message.content);
+    }
+    return false;
+  });
+
+  if (previousAssistant) {
+    return previousAssistant.content;
+  }
+
+  return containsWorkEvidence(latestUserMessage) ? latestUserMessage : "";
+}
+
+function containsWorkEvidence(text: string) {
+  return /\b(leetcode|problem|project|feature|pull request|pr|code review|applied|application)\b/i.test(
+    text,
+  );
+}
+
+function extractWorkLogSegments(text: string) {
+  const normalized = text.replace(/\r/g, "\n");
+  const segments = normalized
+    .split(/\n+/)
+    .flatMap((line) => line.split(/\s+-\s+/))
+    .map((segment) => cleanCommandValue(segment))
+    .filter(Boolean);
+
+  return Array.from(new Set(segments));
+}
+
+function parseDsaLogActionFromText(text: string): AssistantAction | null {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!/\b(leetcode|problem|dsa)\b/i.test(normalized)) {
+    return null;
+  }
+
+  const quotedTitles = Array.from(normalized.matchAll(/["“]([^"”]{2,90})["”]/g))
+    .map((match) => cleanCommandValue(match[1] ?? ""))
+    .filter(Boolean);
+
+  const uniqueTitles = Array.from(new Set(quotedTitles)).slice(0, 4);
+  const countMatch = normalized.match(/\b(?:completed|solved|did)\s+(\d{1,2})\s+(?:leetcode|dsa)\s+problems?/i);
+  const totalCount = countMatch ? Number(countMatch[1]) : uniqueTitles.length;
+
+  const titleBase =
+    uniqueTitles.length > 0
+      ? `LeetCode: ${uniqueTitles.join(", ")}`
+      : totalCount > 0
+        ? `LeetCode practice (${totalCount} problem${totalCount > 1 ? "s" : ""})`
+        : "";
+
+  if (!titleBase) {
+    return null;
+  }
+
+  const difficulty = inferDsaDifficulty(normalized);
+  const pattern = inferDsaPattern(uniqueTitles, normalized);
+  const insight =
+    uniqueTitles.length > 0
+      ? `Completed ${uniqueTitles.length} tracked problem${uniqueTitles.length > 1 ? "s" : ""} in this session.`
+      : totalCount > 0
+        ? `Completed ${totalCount} LeetCode problem${totalCount > 1 ? "s" : ""} in this session.`
+        : undefined;
+
+  return {
+    type: "log_dsa",
+    title: clipText(titleBase, 160),
+    difficulty,
+    pattern,
+    insight,
+  };
+}
+
+function inferDsaDifficulty(text: string): "Easy" | "Medium" | "Hard" {
+  if (/\bhard\b/i.test(text)) return "Hard";
+  if (/\beasy\b/i.test(text)) return "Easy";
+  return "Medium";
+}
+
+function inferDsaPattern(problemTitles: string[], text: string) {
+  const corpus = `${problemTitles.join(" ")} ${text}`.toLowerCase();
+  const patternFlags = [
+    corpus.includes("linked list") ? "linked-list" : "",
+    corpus.includes("tree") ? "tree" : "",
+    corpus.includes("graph") ? "graph" : "",
+    corpus.includes("dp") || corpus.includes("dynamic programming") ? "dp" : "",
+    corpus.includes("array") || corpus.includes("two sum") || corpus.includes("hash")
+      ? "array-hash"
+      : "",
+  ].filter(Boolean);
+
+  if (patternFlags.length > 1) {
+    return "Mixed Patterns";
+  }
+
+  if (patternFlags[0] === "linked-list") return "Linked List";
+  if (patternFlags[0] === "tree") return "Trees";
+  if (patternFlags[0] === "graph") return "Graphs";
+  if (patternFlags[0] === "dp") return "Dynamic Programming";
+  if (patternFlags[0] === "array-hash") return "Array / Hashing";
+
+  return "Mixed Patterns";
+}
+
+function parseFeatureBuildActionFromText(text: string): AssistantAction | null {
+  const segments = extractWorkLogSegments(text);
+  for (const segment of segments) {
+    const featureMatch = segment.match(
+      /\bworked on (?:a|an|my)?\s*([^.,;:\n]+?)\s+project(?:,|;|:)?\s*(?:and\s*)?(?:added|built|implemented)\s+(?:a\s+new\s+feature[:\-]?\s*)?(.+)/i,
+    );
+
+    if (!featureMatch) {
+      continue;
+    }
+
+    const project = cleanCommandValue(featureMatch[1] ?? "");
+    const feature = cleanCommandValue(featureMatch[2] ?? "");
+
+    if (!project || !feature) {
+      continue;
+    }
+
+    return {
+      type: "log_build",
+      title: clipText(`${toTitleCase(project)}: ${feature}`, 160),
+      area: inferBuildArea(feature),
+      proof: clipText(`Implemented ${feature} in ${project}.`, 500),
+      impact: clipText(`Expanded ${project} scope with a production-facing feature.`, 500),
+    };
+  }
+
+  return null;
+}
+
+function inferBuildArea(featureText: string) {
+  const normalized = featureText.toLowerCase();
+  if (/(auth|register|registration|signup|sign up|login|oauth)/.test(normalized)) {
+    return "Authentication";
+  }
+  if (/(ui|frontend|design|layout|animation)/.test(normalized)) {
+    return "Frontend UX";
+  }
+  if (/(api|backend|server|route|database|db)/.test(normalized)) {
+    return "Backend";
+  }
+  return "Product Build";
+}
+
+function parseCodeReviewBuildActionFromText(text: string): AssistantAction | null {
+  const segments = extractWorkLogSegments(text);
+  for (const segment of segments) {
+    if (
+      /\b(reviewed|provided feedback on|gave feedback on)\b/i.test(segment) &&
+      /\b(pull request|pr)\b/i.test(segment)
+    ) {
+      return {
+        type: "log_build",
+        title: "Code review: teammate pull request",
+        area: "Code Review",
+        proof: "Reviewed and provided implementation feedback on a teammate pull request.",
+        impact: "Improved merge quality and reduced downstream defects before integration.",
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseApplicationLogActionFromText(text: string): AssistantAction | null {
+  const segments = extractWorkLogSegments(text);
+  for (const segment of segments) {
+    const applicationMatch = segment.match(
+      /\bappl(?:y|ied)\s+(?:to\s+)?([^.,;\n]+?)\s+(?:for|as)\s+([^.,;\n]+)/i,
+    );
+
+    if (!applicationMatch) {
+      continue;
+    }
+
+    const company = cleanCommandValue(applicationMatch[1] ?? "");
+    const role = cleanCommandValue(applicationMatch[2] ?? "");
+
+    if (!company || !role) {
+      continue;
+    }
+
+    return {
+      type: "log_application",
+      company: clipText(company, 120),
+      role: clipText(role, 160),
+      status: "Applied",
+      note: "Captured through assistant work-log command.",
+    };
+  }
+
+  return null;
+}
+
+function dedupeActions(actions: AssistantAction[]) {
+  const seen = new Set<string>();
+
+  return actions.filter((action) => {
+    const key =
+      action.type === "log_dsa"
+        ? `${action.type}:${normalizeForMatch(action.title)}`
+        : action.type === "log_build"
+          ? `${action.type}:${normalizeForMatch(action.title)}:${normalizeForMatch(action.area)}`
+          : action.type === "log_application"
+            ? `${action.type}:${normalizeForMatch(action.company)}:${normalizeForMatch(action.role)}`
+            : JSON.stringify(action);
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((chunk) => chunk[0]?.toUpperCase() + chunk.slice(1))
+    .join(" ");
 }
 
 function parseReviewAction(message: string): AssistantAction | null {
