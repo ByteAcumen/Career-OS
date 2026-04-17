@@ -131,11 +131,11 @@ function RotatingWord() {
   }, []);
 
   return (
-    <span className="relative inline-flex overflow-hidden pb-4 -mb-4" style={{ minWidth: "1ch" }}>
+    <span className="relative inline-flex overflow-hidden py-4 -my-4" style={{ minWidth: "1ch" }}>
       <AnimatePresence mode="wait">
         <motion.span
           key={index}
-          className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent"
+          className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent px-2 py-3 -mx-2 -my-3"
           initial={{ y: "110%", opacity: 0 }}
           animate={{ y: "0%", opacity: 1 }}
           exit={{ y: "-110%", opacity: 0 }}
