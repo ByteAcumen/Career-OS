@@ -131,7 +131,7 @@ function RotatingWord() {
   }, []);
 
   return (
-    <span className="relative inline-flex overflow-hidden" style={{ minWidth: "1ch" }}>
+    <span className="relative inline-flex overflow-hidden pb-4 -mb-4" style={{ minWidth: "1ch" }}>
       <AnimatePresence mode="wait">
         <motion.span
           key={index}
@@ -250,13 +250,13 @@ function DashboardPreview() {
   return (
     <motion.div
       variants={scaleIn}
-      className="relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#050505]/80 backdrop-blur-3xl shadow-[0_0_120px_-24px_rgba(139,92,246,0.15)] ring-1 ring-white/[0.05]"
+      className="relative overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#0c0c0e]/80 backdrop-blur-3xl shadow-[0_0_140px_-24px_rgba(139,92,246,0.25)] ring-1 ring-white/[0.05]"
     >
       {/* Subtle top glow */}
-      <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-72 -translate-x-1/2 rounded-full bg-violet-500/[0.10] blur-[60px]" />
+      <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-72 -translate-x-1/2 rounded-full bg-violet-400/[0.25] blur-[60px]" />
 
       {/* Browser chrome */}
-      <div className="flex items-center gap-1.5 border-b border-white/[0.06] bg-[#0a0a0a] px-4 py-3">
+      <div className="flex items-center gap-1.5 border-b border-white/[0.1] bg-white/[0.02] px-4 py-3">
         <div className="size-2.5 rounded-full bg-[#ff5f56]" />
         <div className="size-2.5 rounded-full bg-[#febc2e]" />
         <div className="size-2.5 rounded-full bg-[#28c840]" />
@@ -268,7 +268,7 @@ function DashboardPreview() {
 
       <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[130px_1fr]">
         {/* Sidebar */}
-        <div className="border-r border-white/[0.05] bg-[#080808]">
+        <div className="border-r border-white/[0.08] bg-white/[0.01]">
           <div className="p-3">
             <div className="mb-3 flex items-center gap-2 rounded-lg px-2 py-1.5">
               <div className="flex size-5 items-center justify-center rounded-[6px] border border-white/[0.10] bg-white/[0.06]">
@@ -313,7 +313,7 @@ function DashboardPreview() {
                     initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: i * 0.05 }}
-                    className="rounded-[10px] border border-white/[0.06] bg-white/[0.025] p-2.5"
+                    className="rounded-[10px] border border-white/[0.1] bg-white/[0.04] p-3 shadow-sm"
                   >
                     <div className="text-[8px] uppercase tracking-[0.14em] text-white/35">{tile.name}</div>
                     <div className="mt-1 flex items-baseline gap-1">
