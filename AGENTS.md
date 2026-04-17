@@ -62,7 +62,7 @@
 
 ## 🟢 Codex — Last Update
 
-**Timestamp:** 2026-04-16T22:43:00+05:30
+**Timestamp:** 2026-04-17T21:37:00+05:30
 **Branch:** `codex/work`
 
 ### What I completed
@@ -105,13 +105,21 @@
 - ✅ Improved `src/lib/ai.ts` and `src/app/api/ai/chat/route.ts` so the assistant can handle more direct workspace edits locally before using paid AI calls.
 - ✅ Tightened assistant response shaping in `src/lib/ai.ts` so default replies stay shorter, scan better in compact UI, and use fewer output tokens.
 - ✅ Fixed `scripts/coordinator.ts` ordering so mailbox processing happens before git checkpointing, which prevents post-sync dirty state from processed handoffs/inbox updates.
+- ✅ Upgraded the resume engine from a shallow draft into a richer ATS-style structure:
+  - added `resume.template` and `resume.skills`
+  - improved deterministic section building from logged work + uploaded resume evidence
+  - cleaned markdown / LaTeX output so advisory notes are no longer embedded in final resume exports
+  - shifted LaTeX output toward an `sb2nov`-style structure for a more credible engineering resume baseline
+- ✅ Updated PDF export to include the new technical skills section and keep the final PDF closer to the real resume content rather than the coaching notes.
+- ✅ Extended AI resume optimization so it can preserve or improve the new skill-group structure as part of the generated draft.
 - ✅ Verification:
   - `npm run lint` passed
   - `npm run build` passed
+  - resume smoke test passed for summary quality, skills extraction, template metadata, and PDF export
 
 ### Current work queue
 1. Split `src/lib/ai.ts` into smaller focused modules without breaking the existing AI routes.
-2. Let Antigravity hook the new resume upload/export endpoints into UI-owned screens if desired.
+2. Let Antigravity hook the richer resume contract (`resume.skills`, `resume.template`) into the `/resume` UI preview.
 3. Add scheduled digest sending / cron integration on the Codex-owned backend side.
 4. Keep off Antigravity-owned UI, schema, middleware, and workspace shell files unless coordinated here first.
 
@@ -121,11 +129,15 @@
 - The new backend contract is:
   - `POST /api/ai/resume` accepts JSON or multipart form-data, including uploaded resumes
   - `POST /api/ai/resume/pdf` returns an attachment-ready PDF with a clean filename
-  - frontend/UI work can consume these routes without any schema change
+  - response payload now also includes a richer `resume.skills` section and `resume.template`
 - UI request queued for Antigravity in `.agents/handoffs/2026-04-16-chatbot-landing-ui-request.json`:
   - fix compact chatbot scroll/overflow and cramped layout
   - improve chatbot spacing, motion, and visual polish
   - improve landing-page uniformity, smoothness, and cleaner hierarchy
+- Resume UI follow-up queued for Antigravity in `.agents/handoffs/2026-04-17-resume-ui-followup-request.json`:
+  - surface the new Technical Skills section in the preview
+  - distinguish exported resume content from editing notes
+  - show the active export template more clearly
 
 ---
 

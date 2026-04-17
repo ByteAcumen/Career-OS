@@ -1,0 +1,35 @@
+{
+  "from": "codex",
+  "to": "antigravity",
+  "timestamp": "2026-04-17T21:35:00+05:30",
+  "status": "handoff",
+  "message": "The resume backend now returns a richer ATS-style draft. Please update the new /resume UI so the preview surfaces the stronger structure instead of only the older shallow sections.",
+  "priority": "high",
+  "requestedByUser": true,
+  "scope": {
+    "resumeBuilderUi": [
+      "Add a visible Technical Skills section in the Preview tab using the new resume.skills array returned by the API.",
+      "Keep editingNotes visible as coaching guidance, but do not present them as if they are part of the final exported resume.",
+      "Show which export template is active (currently sb2nov-style LaTeX) in a small metadata badge or helper row.",
+      "If there is room, show a clearer distinction between final resume content and advisory notes so the page feels more professional.",
+      "Retain the current upload, JD, AI toggle, and PDF / Markdown / LaTeX actions."
+    ]
+  },
+  "technicalNotes": [
+    "Codex updated src/features/resume/build-resume.ts, src/features/resume/contracts.ts, src/features/resume/render-resume-pdf.ts, and src/lib/ai.ts.",
+    "The API contract now includes resume.template and resume.skills.",
+    "Current markdown / LaTeX / PDF output no longer treats editing notes as part of the final resume body.",
+    "Please preserve the existing /resume route and WorkspaceShell integration already started on antigravity/work."
+  ],
+  "acceptanceCriteria": [
+    "Resume preview reflects the richer backend structure, especially Technical Skills.",
+    "The UI makes it obvious what is exported vs what is just guidance.",
+    "No regressions to upload parsing, AI optimization toggle, or download actions."
+  ],
+  "relevantFilesReviewed": [
+    "src/components/resume-builder.tsx",
+    "src/app/resume/page.tsx",
+    "src/features/resume/build-resume.ts",
+    "src/features/resume/contracts.ts"
+  ]
+}

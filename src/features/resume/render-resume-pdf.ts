@@ -35,16 +35,18 @@ export async function renderResumePdf(resume: ResumeDraft) {
   drawHeader(cursor, resume);
   addGap(cursor, 12);
 
+  if (resume.header.education) {
+    drawSectionTitle(cursor, "Education");
+    drawParagraph(cursor, resume.header.education, {
+      size: 10.5,
+      color: BODY_COLOR,
+    });
+  }
+
   drawSectionTitle(cursor, "Summary");
   drawBulletList(cursor, resume.summaryBullets);
 
-  drawSectionTitle(cursor, "Focus Areas");
-  drawParagraph(cursor, resume.focusAreas.join(" | "), {
-    size: 10.5,
-    color: MUTED_COLOR,
-  });
-
-  drawSectionTitle(cursor, "Selected Projects");
+  drawSectionTitle(cursor, "Projects");
   for (const project of resume.projectHighlights) {
     ensureSpace(cursor, 72);
     drawParagraph(cursor, project.title, {
@@ -71,8 +73,17 @@ export async function renderResumePdf(resume: ResumeDraft) {
   drawSectionTitle(cursor, "Problem Solving");
   drawBulletList(cursor, resume.problemSolvingHighlights);
 
-  drawSectionTitle(cursor, "Editing Notes");
-  drawBulletList(cursor, resume.editingNotes, { compact: true });
+  if (resume.skills.length) {
+    drawSectionTitle(cursor, "Technical Skills");
+    for (const group of resume.skills) {
+      drawParagraph(cursor, `${group.label}: ${group.items.join(", ")}`, {
+        size: 10,
+        lineHeight: 12.5,
+        color: BODY_COLOR,
+      });
+      addGap(cursor, 2);
+    }
+  }
 
   return pdfDoc.save();
 }
