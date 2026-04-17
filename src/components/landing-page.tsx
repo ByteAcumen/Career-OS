@@ -250,42 +250,44 @@ function DashboardPreview() {
   return (
     <motion.div
       variants={scaleIn}
-      className="relative overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#0c0c0e]/80 backdrop-blur-3xl shadow-[0_0_140px_-24px_rgba(139,92,246,0.25)] ring-1 ring-white/[0.05]"
+      className="relative overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#09090b]/80 backdrop-blur-[40px] shadow-2xl ring-1 ring-white/[0.03]"
     >
       {/* Subtle top glow */}
-      <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-72 -translate-x-1/2 rounded-full bg-violet-400/[0.25] blur-[60px]" />
+      <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-72 -translate-x-1/2 rounded-full bg-violet-400/[0.15] blur-[60px]" />
 
       {/* Browser chrome */}
-      <div className="flex items-center gap-1.5 border-b border-white/[0.1] bg-white/[0.02] px-4 py-3">
-        <div className="size-2.5 rounded-full bg-[#ff5f56]" />
-        <div className="size-2.5 rounded-full bg-[#febc2e]" />
-        <div className="size-2.5 rounded-full bg-[#28c840]" />
-        <div className="ml-3 flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1">
-          <div className="size-1.5 rounded-full bg-emerald-400/60" />
-          <span className="text-[10px] text-white/40">career-os.app/home</span>
+      <div className="flex items-center gap-2 border-b border-white/[0.05] bg-transparent px-4 py-3.5 sm:px-5">
+        <div className="flex gap-1.5">
+           <div className="size-3 rounded-full bg-[#ff5f56]" />
+           <div className="size-3 rounded-full bg-[#febc2e]" />
+           <div className="size-3 rounded-full bg-[#28c840]" />
+        </div>
+        <div className="ml-4 flex items-center gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-4 py-1.5">
+          <div className="size-1.5 rounded-full bg-emerald-500/80" />
+          <span className="text-xs text-white/40">career-os.app/home</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[130px_1fr]">
+      <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[180px_1fr]">
         {/* Sidebar */}
-        <div className="border-r border-white/[0.08] bg-white/[0.01]">
-          <div className="p-3">
-            <div className="mb-3 flex items-center gap-2 rounded-lg px-2 py-1.5">
-              <div className="flex size-5 items-center justify-center rounded-[6px] border border-white/[0.10] bg-white/[0.06]">
-                <Target className="size-2.5 text-white" />
+        <div className="border-r border-white/[0.05] bg-transparent">
+          <div className="p-4 sm:p-5">
+            <div className="mb-5 flex items-center gap-2.5 rounded-lg px-2">
+              <div className="flex size-6 items-center justify-center rounded-[6px] border border-white/[0.10] bg-white/[0.08]">
+                <Target className="size-3.5 text-white" />
               </div>
-              <span className="text-[10px] font-semibold text-white/70">Career OS</span>
+              <span className="text-sm font-semibold text-white/90">Career OS</span>
             </div>
-            <div className="mb-1 px-2 text-[8px] font-bold uppercase tracking-[0.16em] text-white/25">Workspace</div>
+            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">Workspace</div>
             {NAV_ITEMS.slice(0, 5).map((item, i) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setActiveNav(i < 2 ? i : 0)}
-                className={`mb-0.5 w-full rounded-[8px] px-2 py-1.5 text-left text-[10px] transition-all ${
+                className={`mb-1 w-full rounded-[8px] px-3 py-2 text-left text-xs font-semibold transition-all ${
                   i === activeNav % previewContent.length
-                    ? "bg-white font-semibold text-black"
-                    : "text-white/45 hover:bg-white/[0.05] hover:text-white/70"
+                    ? "bg-white text-black"
+                    : "text-white/40 hover:bg-white/[0.05] hover:text-white/80"
                 }`}
               >
                 {item}
@@ -295,8 +297,8 @@ function DashboardPreview() {
         </div>
 
         {/* Main area */}
-        <div className="p-4">
-          <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">{current.label}</div>
+        <div className="p-5 sm:p-8">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">{current.label}</div>
           <AnimatePresence mode="wait">
             <motion.div
               key={current.label}
@@ -305,22 +307,22 @@ function DashboardPreview() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.25 }}
             >
-              <div className="mb-3 text-[15px] font-semibold tracking-tight text-white">{current.title}</div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="mb-6 text-xl font-bold tracking-tight text-white">{current.title}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {current.tiles.map((tile, i) => (
                   <motion.div
                     key={tile.name}
-                    initial={{ opacity: 0, scale: 0.97 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: i * 0.05 }}
-                    className="rounded-[10px] border border-white/[0.1] bg-white/[0.04] p-3 shadow-sm"
+                    className="flex flex-col justify-between rounded-[16px] border border-white/[0.06] bg-[#121214]/60 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                   >
-                    <div className="text-[8px] uppercase tracking-[0.14em] text-white/35">{tile.name}</div>
-                    <div className="mt-1 flex items-baseline gap-1">
-                      <span className="text-[17px] font-semibold leading-none text-white">{tile.val}</span>
-                      <span className="text-[9px] text-white/30">{tile.unit}</span>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">{tile.name}</div>
+                    <div className="mt-4 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold tracking-tight text-white">{tile.val}</span>
+                      <span className="text-xs font-medium text-white/40">{tile.unit}</span>
                     </div>
-                    <div className={`mt-1.5 text-[8px] font-medium ${tile.up ? "text-emerald-400/80" : "text-rose-400/80"}`}>
+                    <div className={`mt-3 text-[11px] font-semibold ${tile.up ? "text-emerald-400" : "text-rose-400"}`}>
                       {tile.trend}
                     </div>
                   </motion.div>
