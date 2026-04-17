@@ -485,7 +485,7 @@ export function CareerAssistant({
             )}
           >
             <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-4 sm:px-5">
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3 sm:px-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.05]">
                     <Bot className="size-4.5 text-white" />
@@ -531,7 +531,7 @@ export function CareerAssistant({
                       "z-[2] flex shrink-0 flex-col border-white/[0.08] bg-[rgba(255,255,255,0.02)] max-md:max-h-[270px] max-md:border-b md:w-[258px] md:border-r",
                     )}
                   >
-                    <div className="space-y-4 border-b border-white/[0.08] px-4 py-4">
+                    <div className="space-y-4 border-b border-white/[0.08] px-4 py-3">
                       <button
                         type="button"
                         onClick={startFreshConversation}
@@ -620,7 +620,7 @@ export function CareerAssistant({
                 ) : null}
 
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <div className="shrink-0 border-b border-white/[0.08] px-4 py-3 sm:px-5">
+                  <div className="shrink-0 border-b border-white/[0.08] px-4 py-2 sm:px-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/58">
                           {activeConversationId
@@ -636,7 +636,7 @@ export function CareerAssistant({
                       </div>
                     </div>
 
-                    <div className="flex-[1_1_0%] overflow-y-auto px-4 py-5 pb-6 sm:px-5" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.14) transparent" }}>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-4" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.14) transparent" }}>
                       {loadingConversation ? (
                         <div className="space-y-4">
                           <div className="ml-auto skeleton-block h-[54px] w-[62%] rounded-[22px]" />
@@ -738,7 +738,7 @@ export function CareerAssistant({
                       )}
                     </div>
 
-                    <div className="border-t border-white/[0.08] px-4 py-4 sm:px-5">
+                    <div className="shrink-0 border-t border-white/[0.08] p-3 sm:p-4">
                       <form
                         onSubmit={(event) => {
                           event.preventDefault();
@@ -756,7 +756,7 @@ export function CareerAssistant({
                                 void sendCurrentMessage();
                               }
                             }}
-                            className="field-area min-h-[88px] max-h-[180px] flex-1 resize-none rounded-[22px]"
+                            className="field-area min-h-[56px] max-h-[140px] flex-1 resize-none py-3 rounded-[20px]"
                             placeholder="Ask for a review, next step, task creation, log update, or settings change..."
                           />
                           <button

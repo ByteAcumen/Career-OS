@@ -250,7 +250,7 @@ function DashboardPreview() {
   return (
     <motion.div
       variants={scaleIn}
-      className="relative overflow-hidden rounded-[24px] border border-white/[0.09] bg-[#0c0c0c] shadow-[0_40px_100px_-24px_rgba(0,0,0,0.9)]"
+      className="relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#050505]/80 backdrop-blur-3xl shadow-[0_0_120px_-24px_rgba(139,92,246,0.15)] ring-1 ring-white/[0.05]"
     >
       {/* Subtle top glow */}
       <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-72 -translate-x-1/2 rounded-full bg-violet-500/[0.10] blur-[60px]" />
@@ -406,7 +406,7 @@ export function LandingPage() {
             {/* Headline — fixed sizing so rotation never overflows */}
             <motion.h1
               variants={fadeUp}
-              className="mt-5 text-[clamp(2.4rem,5vw,3.8rem)] font-semibold leading-[1.08] tracking-[-0.04em] text-white"
+              className="mt-6 text-[clamp(2.8rem,6vw,4.5rem)] font-bold leading-[1.05] tracking-tight text-white/95"
             >
               A cleaner way to run your{" "}
               <span className="inline-flex items-baseline">
@@ -442,7 +442,7 @@ export function LandingPage() {
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
               <Link
                 href="/sign-up"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-[15px] font-bold text-black shadow-[0_0_28px_rgba(255,255,255,0.15)] transition-all hover:bg-neutral-100 hover:shadow-[0_0_36px_rgba(255,255,255,0.22)] hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[15px] font-bold text-black shadow-[0_0_32px_rgba(255,255,255,0.15)] transition-all hover:bg-neutral-100 hover:shadow-[0_0_48px_rgba(255,255,255,0.25)] hover:scale-105"
               >
                 Start free workspace
                 <ArrowRight className="size-4" />
@@ -494,7 +494,7 @@ export function LandingPage() {
               <Star className="size-3" />
               What&apos;s inside
             </span>
-            <h2 className="mt-5 text-[clamp(1.75rem,4vw,2.6rem)] font-semibold tracking-[-0.04em] text-white">
+            <h2 className="mt-5 text-[clamp(2rem,4.5vw,3rem)] font-bold tracking-tight text-white">
               Everything you need.{" "}
               <span className="text-white/40">Nothing you don&apos;t.</span>
             </h2>
@@ -549,8 +549,8 @@ export function LandingPage() {
 
       {/* ── CTA ── */}
       <section className="relative z-10 border-t border-white/[0.05]">
-        <div className="relative mx-auto max-w-[1280px] overflow-hidden px-4 py-24 text-center sm:px-6 lg:px-8">
-          <div className="pointer-events-none absolute left-1/2 top-0 h-72 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/[0.12] blur-[80px]" />
+        <div className="relative mx-auto max-w-[1280px] overflow-hidden px-4 py-28 text-center sm:px-6 lg:px-8">
+          <div className="pointer-events-none absolute left-1/2 top-0 h-96 w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/[0.15] blur-[120px]" />
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}>
             <motion.div variants={fadeUp}>
               <TrendingUp className="mx-auto mb-5 size-8 text-white/20" />
