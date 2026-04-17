@@ -16,6 +16,7 @@ import {
   composeResumeDraft,
   type ResumeDraft,
   type ResumeProject,
+  type ResumeSkillGroup,
 } from "@/features/resume/build-resume";
 import type {
   AiProvider,
@@ -183,10 +184,16 @@ const ResumeProjectSchema = z.object({
   link: z.string().url().nullable().optional(),
 });
 
+const ResumeSkillGroupSchema = z.object({
+  label: z.string().min(1).max(60),
+  items: z.array(z.string().min(1).max(80)).min(1).max(12),
+});
+
 const ResumeOptimizationSchema = z.object({
   matchedKeywords: z.array(z.string().min(1).max(80)).min(1).max(12),
   summaryBullets: z.array(z.string().min(8).max(260)).min(2).max(4),
   focusAreas: z.array(z.string().min(1).max(80)).min(4).max(10),
+  skills: z.array(ResumeSkillGroupSchema).max(6).optional(),
   projectHighlights: z.array(ResumeProjectSchema).min(1).max(4),
   problemSolvingHighlights: z.array(z.string().min(8).max(260)).min(1).max(5),
   editingNotes: z.array(z.string().min(8).max(260)).min(2).max(6),
@@ -288,7 +295,7 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
 const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "openrouter"];
 const CHAT_CONTEXT_MESSAGE_LIMIT = 8;
-const CHAT_MAX_OUTPUT_TOKENS = 420;
+const CHAT_MAX_OUTPUT_TOKENS = 320;
 const providerHealth = new Map<string, ProviderHealthEntry>();
 const LOCAL_ACTION_PREFIXES = /\b(add|create|log|save|set|update|change|plan|schedule|record|track|mark|complete|finish|start|resume|reopen|delete|remove)\b/i;
 const COACH_SYSTEM_PROMPT =
@@ -484,16 +491,17 @@ export async function optimizeResumeDraftWithAi(options: {
     return options.baseDraft;
   }
 
-  const payload = compactObject({
-    header: options.baseDraft.header,
-    targetRole: options.baseDraft.targetRole,
-    company: options.baseDraft.company,
-    matchedKeywords: options.baseDraft.matchedKeywords,
-    summaryBullets: options.baseDraft.summaryBullets,
-    focusAreas: options.baseDraft.focusAreas,
-    projectHighlights: options.baseDraft.projectHighlights,
-    problemSolvingHighlights: options.baseDraft.problemSolvingHighlights,
-    editingNotes: options.baseDraft.editingNotes,
+    const payload = compactObject({
+      header: options.baseDraft.header,
+      targetRole: options.baseDraft.targetRole,
+      company: options.baseDraft.company,
+      matchedKeywords: options.baseDraft.matchedKeywords,
+      summaryBullets: options.baseDraft.summaryBullets,
+      focusAreas: options.baseDraft.focusAreas,
+      skills: options.baseDraft.skills,
+      projectHighlights: options.baseDraft.projectHighlights,
+      problemSolvingHighlights: options.baseDraft.problemSolvingHighlights,
+      editingNotes: options.baseDraft.editingNotes,
     sourceResumeFileName: options.sourceFileName?.trim(),
     sourceResumeText: resumeReference || undefined,
     jobDescription: jobDescription || undefined,
@@ -519,20 +527,21 @@ export async function optimizeResumeDraftWithAi(options: {
     configuredModel: options.dashboard.settings.openAiModel,
     schema: ResumeOptimizationSchema,
     userId: options.userId,
-    systemPrompt:
-      "You are an elite technical resume editor for engineering students. Improve the resume only using truthful evidence from the provided draft, uploaded resume text, job description, and stored dashboard context. Keep ATS-friendly language, preserve concrete proof, prefer quantified outcomes, and never invent projects, companies, metrics, or skills that are not supported by the provided material.",
-    jsonPrompt:
-      "Return only JSON with matchedKeywords, summaryBullets, focusAreas, projectHighlights, problemSolvingHighlights, editingNotes, and improvementSummary. Keep bullets sharp, outcome-focused, and recruiter-readable.",
-  });
+      systemPrompt:
+        "You are an elite technical resume editor for engineering students. Improve the resume only using truthful evidence from the provided draft, uploaded resume text, job description, and stored dashboard context. Keep ATS-friendly language, preserve concrete proof, prefer quantified outcomes, and never invent projects, companies, metrics, or skills that are not supported by the provided material.",
+      jsonPrompt:
+        "Return only JSON with matchedKeywords, summaryBullets, focusAreas, skills, projectHighlights, problemSolvingHighlights, editingNotes, and improvementSummary. Keep bullets sharp, outcome-focused, ATS-friendly, and recruiter-readable.",
+    });
 
-  return composeResumeDraft(options.baseDraft, {
-    mode: "ai-optimized",
-    matchedKeywords: data.matchedKeywords,
-    summaryBullets: data.summaryBullets,
-    focusAreas: data.focusAreas,
-    projectHighlights: data.projectHighlights.map(normalizeResumeProject),
-    problemSolvingHighlights: data.problemSolvingHighlights,
-    editingNotes: data.editingNotes,
+    return composeResumeDraft(options.baseDraft, {
+      mode: "ai-optimized",
+      matchedKeywords: data.matchedKeywords,
+      summaryBullets: data.summaryBullets,
+      focusAreas: data.focusAreas,
+      skills: data.skills?.map(normalizeResumeSkillGroup),
+      projectHighlights: data.projectHighlights.map(normalizeResumeProject),
+      problemSolvingHighlights: data.problemSolvingHighlights,
+      editingNotes: data.editingNotes,
     improvementSummary: data.improvementSummary,
     importedResume: {
       used: options.baseDraft.importedResume.used || Boolean(resumeReference),
@@ -603,7 +612,10 @@ Guidelines:
 - If the user is behind, say so clearly and suggest the smallest meaningful recovery step.
 - When the user asks for a plan, return a tight plan that is immediately usable, not a giant brainstorm.
 - When the user asks for a workspace change, respond as if you are operating inside the app and be explicit about what changed or what still needs clarification.
-- Keep answers structured for scanning: short opening sentence, then only the bullets or sections that actually help.
+- Keep answers structured for scanning: one short opening sentence, then only the bullets or sections that actually help.
+- Default to 140 words or less unless the user explicitly asks for detail.
+- Prefer 2 to 4 bullets over long paragraphs.
+- Avoid nested lists, filler intros, and repeated context the user can already see on screen.
 - Use markdown lists only when they improve clarity.`;
 
   const boundedMessages = normalizeChatMessages(messages);
@@ -1095,6 +1107,16 @@ function normalizeResumeProject(project: ResumeProject): ResumeProject {
       .map((bullet) => clipText(bullet.trim(), 260))
       .filter(Boolean)
       .slice(0, 4),
+  };
+}
+
+function normalizeResumeSkillGroup(group: ResumeSkillGroup): ResumeSkillGroup {
+  return {
+    label: clipText(group.label.trim(), 60),
+    items: group.items
+      .map((item) => clipText(item.trim(), 80))
+      .filter(Boolean)
+      .slice(0, 12),
   };
 }
 

@@ -2,6 +2,7 @@ import type { DashboardData } from "@/lib/types";
 
 export type ResumeMode = "deterministic" | "ai-optimized";
 export type ResumeEmphasis = "balanced" | "projects" | "dsa";
+export type ResumeTemplate = "sb2nov";
 
 export type ResumeOptions = {
   user: {
@@ -21,6 +22,11 @@ export type ResumeLink = {
   url: string;
 };
 
+export type ResumeSkillGroup = {
+  label: string;
+  items: string[];
+};
+
 export type ResumeProject = {
   title: string;
   subtitle: string;
@@ -31,6 +37,7 @@ export type ResumeProject = {
 export type ResumeDraft = {
   mode: ResumeMode;
   generatedAt: string;
+  template: ResumeTemplate;
   targetRole: string;
   company: string | null;
   matchedKeywords: string[];
@@ -43,6 +50,7 @@ export type ResumeDraft = {
   };
   summaryBullets: string[];
   focusAreas: string[];
+  skills: ResumeSkillGroup[];
   projectHighlights: ResumeProject[];
   problemSolvingHighlights: string[];
   editingNotes: string[];
@@ -59,12 +67,25 @@ type ResumeRenderableSections = {
   header: ResumeDraft["header"];
   summaryBullets: string[];
   focusAreas: string[];
+  skills: ResumeSkillGroup[];
   projectHighlights: ResumeProject[];
   problemSolvingHighlights: string[];
-  editingNotes: string[];
+};
+
+type ResumeEvidence = {
+  bullets: string[];
+};
+
+type SkillDefinition = {
+  label: string;
+  items: Array<{
+    name: string;
+    aliases: string[];
+  }>;
 };
 
 const TECH_STOP_WORDS = new Set([
+  "and",
   "about",
   "after",
   "again",
@@ -87,9 +108,13 @@ const TECH_STOP_WORDS = new Set([
   "more",
   "most",
   "need",
-  "next",
+  "looking",
   "only",
+  "planning",
+  "product",
   "role",
+  "roles",
+  "software",
   "student",
   "system",
   "team",
@@ -100,11 +125,65 @@ const TECH_STOP_WORDS = new Set([
   "these",
   "they",
   "this",
+  "thinking",
   "using",
   "week",
   "with",
   "work",
 ]);
+
+const SKILL_DEFINITIONS: SkillDefinition[] = [
+  {
+    label: "Languages",
+    items: [
+      { name: "TypeScript", aliases: ["typescript", "ts"] },
+      { name: "JavaScript", aliases: ["javascript", "js"] },
+      { name: "Python", aliases: ["python"] },
+      { name: "Java", aliases: ["java"] },
+      { name: "C++", aliases: ["c++", "cpp"] },
+      { name: "C", aliases: [" c "] },
+      { name: "Go", aliases: [" golang ", " go "] },
+      { name: "Rust", aliases: ["rust"] },
+      { name: "SQL", aliases: ["sql", "postgresql", "mysql", "sqlite", "turso"] },
+    ],
+  },
+  {
+    label: "Frameworks",
+    items: [
+      { name: "React", aliases: ["react"] },
+      { name: "Next.js", aliases: ["next.js", "nextjs", "next js"] },
+      { name: "Node.js", aliases: ["node.js", "nodejs", "node js"] },
+      { name: "Express", aliases: ["express"] },
+      { name: "Tailwind CSS", aliases: ["tailwind", "tailwindcss", "tailwind css"] },
+      { name: "REST APIs", aliases: ["rest api", "restful", "api route", "api routes"] },
+      { name: "Authentication", aliases: ["oauth", "auth", "session", "better-auth", "better auth"] },
+    ],
+  },
+  {
+    label: "Data and Infra",
+    items: [
+      { name: "PostgreSQL", aliases: ["postgres", "postgresql"] },
+      { name: "Turso / SQLite", aliases: ["turso", "sqlite"] },
+      { name: "Redis", aliases: ["redis"] },
+      { name: "Docker", aliases: ["docker"] },
+      { name: "Vercel", aliases: ["vercel"] },
+      { name: "GitHub Actions", aliases: ["github actions", "ci", "workflow"] },
+      { name: "AWS", aliases: ["aws", "amazon web services"] },
+      { name: "GCP", aliases: ["gcp", "google cloud"] },
+    ],
+  },
+  {
+    label: "AI and Product Systems",
+    items: [
+      { name: "OpenAI API", aliases: ["openai", "gpt", "responses api"] },
+      { name: "Gemini API", aliases: ["gemini"] },
+      { name: "Prompt Engineering", aliases: ["prompt", "prompting"] },
+      { name: "Fallback Routing", aliases: ["fallback", "provider routing", "multi provider"] },
+      { name: "Streaming UX", aliases: ["streaming", "stream"] },
+      { name: "LLM Tooling", aliases: ["tool calling", "tool use", "structured output"] },
+    ],
+  },
+];
 
 export function buildResumeDraft(
   dashboard: DashboardData,
@@ -113,7 +192,9 @@ export function buildResumeDraft(
   const targetRole =
     options.targetRole?.trim() || dashboard.settings.targetRole || "Software Engineer";
   const company = options.company?.trim() || null;
+  const emphasis = options.emphasis ?? "balanced";
   const sourceResumeText = cleanResumeSourceText(options.sourceResumeText);
+  const evidence = extractResumeEvidence(sourceResumeText);
   const keywords = extractKeywords([
     options.jobDescription ?? "",
     options.company ?? "",
@@ -121,15 +202,24 @@ export function buildResumeDraft(
     sourceResumeText ?? "",
   ]);
   const links = buildLinks(dashboard.settings);
-  const scoredBuilds = scoreBuilds(dashboard, keywords, options.emphasis ?? "balanced");
-  const projectHighlights = scoredBuilds.slice(0, 3).map((entry) => buildProjectHighlight(entry));
-  const focusAreas = buildFocusAreas(dashboard, keywords, sourceResumeText);
+  const skills = buildSkillGroups(
+    dashboard,
+    keywords,
+    options.jobDescription ?? "",
+    sourceResumeText,
+  );
+  const scoredBuilds = scoreBuilds(dashboard, keywords, emphasis, sourceResumeText);
+  const projectHighlights = scoredBuilds
+    .slice(0, emphasis === "projects" ? 4 : 3)
+    .map((entry) => buildProjectHighlight(entry, evidence));
+  const focusAreas = buildFocusAreas(dashboard, keywords, skills, sourceResumeText);
   const problemSolvingHighlights = buildProblemSolvingHighlights(dashboard, keywords);
   const summaryBullets = buildSummaryBullets(
     dashboard,
     targetRole,
     company,
     focusAreas,
+    skills,
     keywords,
     projectHighlights.length,
     Boolean(sourceResumeText),
@@ -140,6 +230,7 @@ export function buildResumeDraft(
     projectHighlights.length,
     keywords,
     Boolean(sourceResumeText),
+    skills,
   );
   const header = {
     name: options.user.name?.trim() || "Career OS Student",
@@ -152,17 +243,19 @@ export function buildResumeDraft(
   return finalizeResumeDraft({
     mode: "deterministic",
     generatedAt: new Date().toISOString(),
+    template: "sb2nov",
     targetRole,
     company,
     matchedKeywords: keywords,
     header,
     summaryBullets,
     focusAreas,
+    skills,
     projectHighlights,
     problemSolvingHighlights,
     editingNotes,
     improvementSummary: sourceResumeText
-      ? "Imported an existing resume so stronger quantified bullets can be merged into this draft."
+      ? "Imported an existing resume so stronger evidence and stack signals can be preserved in this draft."
       : null,
     importedResume: {
       used: Boolean(sourceResumeText),
@@ -178,9 +271,11 @@ export function composeResumeDraft(
       ResumeDraft,
       | "mode"
       | "generatedAt"
+      | "template"
       | "matchedKeywords"
       | "summaryBullets"
       | "focusAreas"
+      | "skills"
       | "projectHighlights"
       | "problemSolvingHighlights"
       | "editingNotes"
@@ -192,12 +287,14 @@ export function composeResumeDraft(
   return finalizeResumeDraft({
     mode: overrides.mode ?? baseDraft.mode,
     generatedAt: overrides.generatedAt ?? new Date().toISOString(),
+    template: overrides.template ?? baseDraft.template,
     targetRole: baseDraft.targetRole,
     company: baseDraft.company,
     matchedKeywords: uniqueStrings(overrides.matchedKeywords ?? baseDraft.matchedKeywords).slice(0, 12),
     header: baseDraft.header,
     summaryBullets: uniqueStrings(overrides.summaryBullets ?? baseDraft.summaryBullets).slice(0, 4),
     focusAreas: uniqueStrings(overrides.focusAreas ?? baseDraft.focusAreas).slice(0, 10),
+    skills: normalizeSkillGroups(overrides.skills ?? baseDraft.skills).slice(0, 6),
     projectHighlights: normalizeProjects(overrides.projectHighlights ?? baseDraft.projectHighlights).slice(
       0,
       4,
@@ -232,10 +329,7 @@ export function renderResumeMarkdown(input: ResumeRenderableSections) {
     lines.push(`- ${bullet}`);
   }
 
-  lines.push("", "## Focus Areas");
-  lines.push(input.focusAreas.join(" | "));
-
-  lines.push("", "## Selected Projects");
+  lines.push("", "## Projects");
   for (const project of input.projectHighlights) {
     lines.push(`### ${project.title}`);
     lines.push(project.subtitle);
@@ -248,61 +342,40 @@ export function renderResumeMarkdown(input: ResumeRenderableSections) {
     lines.push("");
   }
 
-  lines.push("## Problem Solving");
-  for (const bullet of input.problemSolvingHighlights) {
-    lines.push(`- ${bullet}`);
+  if (input.problemSolvingHighlights.length) {
+    lines.push("## Problem Solving");
+    for (const bullet of input.problemSolvingHighlights) {
+      lines.push(`- ${bullet}`);
+    }
+    lines.push("");
   }
 
-  lines.push("", "## Editing Notes");
-  for (const note of input.editingNotes) {
-    lines.push(`- ${note}`);
+  if (input.skills.length) {
+    lines.push("## Technical Skills");
+    for (const group of input.skills) {
+      lines.push(`- **${group.label}:** ${group.items.join(", ")}`);
+    }
   }
 
   return lines.join("\n").trim();
 }
 
 export function renderResumeLatex(input: ResumeRenderableSections) {
-  const L = latexEscape;
-
-  const linkStr = input.header.links
-    .map((link) => `\\href{${L(link.url)}}{\\underline{${L(link.label)}}}`)
-    .join(" $|$ ");
-
-  const contactParts = [L(input.header.email), linkStr].filter(Boolean).join(" $|$ ");
-
-  const projectSection: string[] = ["\\section{Projects}", "  \\resumeSubHeadingListStart"];
-  for (const p of input.projectHighlights) {
-    const linkPart = p.link
-      ? `\\href{${L(p.link)}}{\\underline{${L(p.link.replace(/^https?:\/\//, ""))}}}`
-      : "";
-    projectSection.push(
-      `    \\resumeProjectHeading{\\textbf{${L(p.title)}} $|$ \\emph{${L(p.subtitle)}}}{${linkPart}}`,
-      "    \\resumeItemListStart",
-      ...p.bullets.map((b) => `      \\resumeItem{${L(b)}}`),
-      "    \\resumeItemListEnd",
-    );
-  }
-  projectSection.push("  \\resumeSubHeadingListEnd");
-
-  const parts: string[] = [
-    "%--------------------------",
-    "% Career OS — Resume",
-    "% Jake's Resume Style — paste into Overleaf and compile with pdfLaTeX",
-    "%--------------------------",
-    "\\documentclass[letterpaper,11pt]{article}",
+  const lines: string[] = [
+    "%-------------------------",
+    "% Resume in Latex",
+    "% Generated by Career OS",
+    "% Based on the open-source sb2nov/resume structure",
+    "%------------------------",
     "",
+    "\\documentclass[letterpaper,11pt]{article}",
     "\\usepackage{latexsym}",
     "\\usepackage[empty]{fullpage}",
     "\\usepackage{titlesec}",
-    "\\usepackage{marvosym}",
-    "\\usepackage[usenames,dvipsnames]{color}",
-    "\\usepackage{verbatim}",
+    "\\usepackage[dvipsnames]{xcolor}",
     "\\usepackage{enumitem}",
     "\\usepackage[hidelinks]{hyperref}",
     "\\usepackage{fancyhdr}",
-    "\\usepackage[english]{babel}",
-    "\\usepackage{tabularx}",
-    "\\input{glyphtounicode}",
     "",
     "\\pagestyle{fancy}",
     "\\fancyhf{}",
@@ -310,8 +383,8 @@ export function renderResumeLatex(input: ResumeRenderableSections) {
     "\\renewcommand{\\headrulewidth}{0pt}",
     "\\renewcommand{\\footrulewidth}{0pt}",
     "",
-    "\\addtolength{\\oddsidemargin}{-0.5in}",
-    "\\addtolength{\\evensidemargin}{-0.5in}",
+    "\\addtolength{\\oddsidemargin}{-0.375in}",
+    "\\addtolength{\\evensidemargin}{-0.375in}",
     "\\addtolength{\\textwidth}{1in}",
     "\\addtolength{\\topmargin}{-.5in}",
     "\\addtolength{\\textheight}{1.0in}",
@@ -321,68 +394,80 @@ export function renderResumeLatex(input: ResumeRenderableSections) {
     "\\raggedright",
     "\\setlength{\\tabcolsep}{0in}",
     "",
-    "\\titleformat{\\section}{",
-    "  \\vspace{-4pt}\\scshape\\raggedright\\large",
-    "}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]",
-    "",
-    "\\pdfgentounicode=1",
-    "",
-    "\\newcommand{\\resumeItem}[1]{",
-    "  \\item\\small{",
-    "    {#1 \\vspace{-2pt}}",
-    "  }",
-    "}",
-    "",
-    "\\newcommand{\\resumeProjectHeading}[2]{",
-    "  \\item",
-    "  \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}",
-    "    \\small#1 & #2 \\\\",
-    "  \\end{tabular*}\\vspace{-7pt}",
-    "}",
-    "",
-    "\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}",
-    "",
-    "\\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}",
-    "\\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}",
-    "\\newcommand{\\resumeItemListStart}{\\begin{itemize}}",
-    "\\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}",
+    "\\titleformat{\\section}{\\vspace{-4pt}\\scshape\\raggedright\\large}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]",
+    "\\newcommand{\\resumeItem}[1]{\\item\\small{{#1 \\vspace{-2pt}}}}",
+    "\\newcommand{\\resumeHeading}[2]{\\textbf{#1}\\hfill #2\\\\}",
+    "\\newcommand{\\resumeSubheading}[1]{\\textit{\\small #1}\\\\}",
     "",
     "\\begin{document}",
     "",
-    "%----------HEADING----------",
     "\\begin{center}",
-    `  {\\Huge \\scshape ${L(input.header.name)}} \\\\ \\vspace{1pt}`,
-    `  \\small ${contactParts}`,
-    input.header.education ? `  \\\\ \\vspace{2pt} \\small ${L(input.header.education)}` : "",
-    "\\end{center}",
-    "",
-    "%-----------SUMMARY-----------",
-    "\\section{Summary}",
-    "  \\resumeSubHeadingListStart",
-    ...input.summaryBullets.map((b) => `    \\resumeItem{${L(b)}}`),
-    "  \\resumeSubHeadingListEnd",
-    "",
-    "%-----------TECHNICAL SKILLS-----------",
-    "\\section{Technical Skills}",
-    " \\begin{itemize}[leftmargin=0.15in, label={}]",
-    "  \\small{\\item{",
-    `    \\textbf{Focus Areas}{: ${L(input.focusAreas.join(", "))}} \\\\`,
-    "  }}",
-    " \\end{itemize}",
-    "",
-    "%-----------PROJECTS-----------",
-    ...projectSection,
-    "",
-    "%-----------PROBLEM SOLVING-----------",
-    "\\section{Problem Solving (DSA)}",
-    "  \\resumeSubHeadingListStart",
-    ...input.problemSolvingHighlights.map((b) => `    \\resumeItem{${L(b)}}`),
-    "  \\resumeSubHeadingListEnd",
-    "",
-    "\\end{document}",
-  ].filter((line) => line !== undefined);
+    `{\\Large \\textbf{${latexEscape(input.header.name)}}}\\\\`,
+    `${latexEscape(input.header.title)}\\\\`,
+    `${latexEscape(input.header.email)}\\\\`,
+  ];
 
-  return parts.join("\n");
+  if (input.header.links.length) {
+    lines.push(
+      input.header.links
+        .map((link) => `\\href{${latexEscapeUrl(link.url)}}{${latexEscape(link.label)}}`)
+        .join(" $\\vert$ ") + "\\\\",
+    );
+  }
+
+  lines.push("\\end{center}", "");
+
+  if (input.header.education) {
+    lines.push("\\section{Education}");
+    lines.push("\\begin{itemize}[leftmargin=*]");
+    lines.push(`\\resumeItem{${latexEscape(input.header.education)}}`);
+    lines.push("\\end{itemize}", "");
+  }
+
+  lines.push("\\section{Summary}");
+  lines.push("\\begin{itemize}[leftmargin=*]");
+  for (const bullet of input.summaryBullets) {
+    lines.push(`\\resumeItem{${latexEscape(bullet)}}`);
+  }
+  lines.push("\\end{itemize}", "");
+
+  lines.push("\\section{Projects}");
+  for (const project of input.projectHighlights) {
+    const rightText = project.link
+      ? `\\href{${latexEscapeUrl(project.link)}}{Repository}`
+      : "";
+    lines.push(`\\resumeHeading{${latexEscape(project.title)}}{${rightText}}`);
+    lines.push(`\\resumeSubheading{${latexEscape(project.subtitle)}}`);
+    lines.push("\\begin{itemize}[leftmargin=*]");
+    for (const bullet of project.bullets) {
+      lines.push(`\\resumeItem{${latexEscape(bullet)}}`);
+    }
+    lines.push("\\end{itemize}");
+  }
+  lines.push("");
+
+  if (input.problemSolvingHighlights.length) {
+    lines.push("\\section{Problem Solving}");
+    lines.push("\\begin{itemize}[leftmargin=*]");
+    for (const bullet of input.problemSolvingHighlights) {
+      lines.push(`\\resumeItem{${latexEscape(bullet)}}`);
+    }
+    lines.push("\\end{itemize}", "");
+  }
+
+  if (input.skills.length) {
+    lines.push("\\section{Technical Skills}");
+    lines.push("\\begin{itemize}[leftmargin=*]");
+    for (const group of input.skills) {
+      lines.push(
+        `\\item \\small{\\textbf{${latexEscape(group.label)}}: ${latexEscape(group.items.join(", "))}}`,
+      );
+    }
+    lines.push("\\end{itemize}", "");
+  }
+
+  lines.push("\\end{document}");
+  return lines.join("\n");
 }
 
 function finalizeResumeDraft(
@@ -392,14 +477,15 @@ function finalizeResumeDraft(
     header: input.header,
     summaryBullets: uniqueStrings(input.summaryBullets).slice(0, 4),
     focusAreas: uniqueStrings(input.focusAreas).slice(0, 10),
+    skills: normalizeSkillGroups(input.skills).slice(0, 6),
     projectHighlights: normalizeProjects(input.projectHighlights).slice(0, 4),
     problemSolvingHighlights: uniqueStrings(input.problemSolvingHighlights).slice(0, 5),
-    editingNotes: uniqueStrings(input.editingNotes).slice(0, 6),
   };
 
   return {
     ...input,
     matchedKeywords: uniqueStrings(input.matchedKeywords).slice(0, 12),
+    editingNotes: uniqueStrings(input.editingNotes).slice(0, 6),
     ...sections,
     markdown: renderResumeMarkdown(sections),
     latex: renderResumeLatex(sections),
@@ -415,6 +501,15 @@ function normalizeProjects(projects: ResumeProject[]) {
       bullets: uniqueStrings(project.bullets.map((bullet) => normalizeSentence(bullet))).slice(0, 4),
     }))
     .filter((project) => project.title && project.bullets.length > 0);
+}
+
+function normalizeSkillGroups(groups: ResumeSkillGroup[]) {
+  return groups
+    .map((group) => ({
+      label: group.label.trim(),
+      items: uniqueStrings(group.items),
+    }))
+    .filter((group) => group.label && group.items.length > 0);
 }
 
 function buildLinks(settings: DashboardData["settings"]) {
@@ -443,6 +538,7 @@ function buildEducationLine(settings: DashboardData["settings"]) {
 function buildFocusAreas(
   dashboard: DashboardData,
   keywords: string[],
+  skills: ResumeSkillGroup[],
   sourceResumeText: string | null,
 ) {
   const areaCounts = new Map<string, number>();
@@ -456,6 +552,12 @@ function buildFocusAreas(
     registerFocusValue(areaCounts, dsa.pattern);
   }
 
+  for (const group of skills) {
+    for (const item of group.items) {
+      areaCounts.set(item.toLowerCase(), (areaCounts.get(item.toLowerCase()) ?? 0) + 3);
+    }
+  }
+
   for (const keyword of keywords) {
     if (keyword.length >= 4) {
       areaCounts.set(keyword, (areaCounts.get(keyword) ?? 0) + 3);
@@ -463,7 +565,7 @@ function buildFocusAreas(
   }
 
   if (sourceResumeText) {
-    for (const token of tokenize(sourceResumeText).slice(0, 180)) {
+    for (const token of tokenize(sourceResumeText).slice(0, 220)) {
       if (token.length < 3 || TECH_STOP_WORDS.has(token)) continue;
       areaCounts.set(token, (areaCounts.get(token) ?? 0) + 1);
     }
@@ -471,7 +573,8 @@ function buildFocusAreas(
 
   return [...areaCounts.entries()]
     .sort((left, right) => right[1] - left[1])
-    .map(([label]) => label)
+    .map(([label]) => humanizeFocusArea(label))
+    .filter(Boolean)
     .slice(0, 8);
 }
 
@@ -482,10 +585,76 @@ function registerFocusValue(areaCounts: Map<string, number>, value: string) {
   }
 }
 
+function buildSkillGroups(
+  dashboard: DashboardData,
+  keywords: string[],
+  jobDescription: string,
+  sourceResumeText: string | null,
+) {
+  const signals = [
+    jobDescription,
+    sourceResumeText ?? "",
+    dashboard.settings.customAiInstructions,
+    dashboard.settings.primaryGoal,
+    dashboard.settings.targetRole,
+    dashboard.settings.weeklyTheme,
+    ...dashboard.recentBuilds.map((entry) =>
+      [entry.title, entry.area, entry.proof ?? "", entry.impact ?? ""].join(" "),
+    ),
+    ...dashboard.recentDsa.map((entry) => [entry.title, entry.pattern, entry.insight ?? ""].join(" ")),
+  ]
+    .join(" \n ")
+    .toLowerCase();
+
+  const groups: ResumeSkillGroup[] = [];
+
+  for (const definition of SKILL_DEFINITIONS) {
+    const items = definition.items
+      .filter((item) => {
+        if (keywords.some((keyword) => item.aliases.includes(keyword))) {
+          return true;
+        }
+
+        return item.aliases.some((alias) => containsSkillAlias(signals, alias));
+      })
+      .map((item) => item.name)
+      .slice(0, 8);
+
+    if (items.length) {
+      groups.push({ label: definition.label, items });
+    }
+  }
+
+  if (!groups.length) {
+    const fallback = keywords
+      .map((keyword) => humanizeFocusArea(keyword))
+      .filter(Boolean)
+      .slice(0, 6);
+
+    if (fallback.length) {
+      groups.push({ label: "Tools and Topics", items: fallback });
+    }
+  }
+
+  return groups.slice(0, 5);
+}
+
+function containsSkillAlias(haystack: string, alias: string) {
+  const normalizedAlias = alias.toLowerCase();
+  if (normalizedAlias.startsWith(" ") || normalizedAlias.endsWith(" ")) {
+    return haystack.includes(normalizedAlias);
+  }
+
+  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(normalizedAlias)}([^a-z0-9]|$)`, "i").test(
+    haystack,
+  );
+}
+
 function scoreBuilds(
   dashboard: DashboardData,
   keywords: string[],
   emphasis: ResumeEmphasis,
+  sourceResumeText: string | null,
 ) {
   const buildWeight = emphasis === "projects" ? 5 : 2;
   const dsaWeight = emphasis === "dsa" ? 1 : 2;
@@ -497,9 +666,11 @@ function scoreBuilds(
         ...entry,
         score:
           scoreText(text, keywords) * buildWeight +
+          scoreText(sourceResumeText ?? "", tokenize(entry.title).slice(0, 4)) +
           Math.max(0, 8 - index) +
           (entry.impact ? 4 : 0) +
-          (entry.proof ? 2 : 0) +
+          (entry.proof ? 3 : 0) +
+          (entry.repositoryUrl ? 2 : 0) +
           dsaWeight,
       };
     })
@@ -508,24 +679,40 @@ function scoreBuilds(
 
 function buildProjectHighlight(
   entry: DashboardData["recentBuilds"][number] & { score: number },
+  evidence: ResumeEvidence,
 ): ResumeProject {
+  const supportBullets = selectSupportingResumeBullets(
+    evidence.bullets,
+    [entry.title, entry.area, entry.proof ?? "", entry.impact ?? ""].join(" "),
+  );
+
   const bullets = [
-    normalizeSentence(
-      `Shipped ${entry.title} with visible product work in ${entry.area || "a focused engineering area"}.`,
-    ),
-    entry.proof ? normalizeSentence(entry.proof) : null,
+    entry.proof
+      ? normalizeSentence(entry.proof)
+      : normalizeSentence(
+          `Built ${entry.title} in ${entry.area || "a focused product engineering area"} with reviewable implementation details.`,
+        ),
     entry.impact ? normalizeSentence(entry.impact) : null,
+    ...supportBullets,
     entry.repositoryUrl
-      ? "Maintained a reviewable code and proof trail through the linked repository."
+      ? "Maintained a public proof trail with repository history, implementation context, and shipped artifacts."
       : null,
   ].filter((bullet): bullet is string => Boolean(bullet));
 
   return {
     title: entry.title,
-    subtitle: entry.area || "Product build",
-    bullets: uniqueStrings(bullets).slice(0, 3),
+    subtitle: buildProjectSubtitle(entry),
+    bullets: uniqueStrings(bullets).slice(0, 4),
     link: entry.repositoryUrl,
   };
+}
+
+function buildProjectSubtitle(entry: DashboardData["recentBuilds"][number]) {
+  if (entry.area?.trim()) {
+    return entry.area.trim();
+  }
+
+  return "Product build";
 }
 
 function buildProblemSolvingHighlights(dashboard: DashboardData, keywords: string[]) {
@@ -553,38 +740,42 @@ function buildSummaryBullets(
   targetRole: string,
   company: string | null,
   focusAreas: string[],
+  skills: ResumeSkillGroup[],
   keywords: string[],
   projectCount: number,
   hasImportedResume: boolean,
 ) {
+  const strongestSkills = skills.flatMap((group) => group.items).slice(0, 5);
   const summary = [
     normalizeSentence(
       `${dashboard.settings.degree ? "Final-year" : "Focused"} CS student targeting ${targetRole}${
         company ? ` roles at ${company}` : ""
-      } with consistent DSA practice, shipped product work, and deliberate application momentum.`,
+      } with shipped engineering work, consistent DSA practice, and a clean proof-of-work trail across Career OS.`,
     ),
     normalizeSentence(
-      `Recent work emphasizes ${formatList(focusAreas.slice(0, 4)) || "product execution and problem solving"} across ${projectCount || 1} resume-worthy build tracks and ${dashboard.recentDsa.length} logged DSA checkpoints.`,
+      `Recent work emphasizes ${formatList(focusAreas.slice(0, 4)) || "product execution and problem solving"} across ${
+        projectCount || 1
+      } resume-ready build tracks, supported by ${dashboard.recentDsa.length} logged problem-solving entries.`,
     ),
   ];
 
-  if (keywords.length > 0) {
+  if (strongestSkills.length > 0) {
     summary.push(
       normalizeSentence(
-        `This draft is biased toward ${formatList(keywords.slice(0, 5))} so tailoring starts from the strongest matching evidence already stored in Career OS.`,
+        `Core stack signals include ${formatList(strongestSkills)}, chosen from the tools and systems already evidenced in your logged work and uploaded resume material.`,
       ),
     );
   } else if (dashboard.settings.weeklyTheme.trim()) {
     summary.push(
       normalizeSentence(
-        `Current weekly theme: ${dashboard.settings.weeklyTheme}. The draft keeps that thread visible without turning the resume into a journal.`,
+        `Current weekly theme: ${dashboard.settings.weeklyTheme}. The draft keeps that thread visible without sounding generic.`,
       ),
     );
   }
 
   if (hasImportedResume) {
     summary.push(
-      "An uploaded resume was used as reference so stronger quantified language can be preserved where it still matches your current work.",
+      "An uploaded resume was used as supporting evidence so stronger existing bullets and terminology can be preserved where they remain truthful.",
     );
   }
 
@@ -596,22 +787,78 @@ function buildEditingNotes(
   projectCount: number,
   keywords: string[],
   hasImportedResume: boolean,
+  skills: ResumeSkillGroup[],
 ) {
+  const flatSkills = skills.flatMap((group) => group.items).slice(0, 4);
   const notes = [
     projectCount === 0
       ? "Log at least one shipped build with proof and impact so the projects section becomes stronger."
-      : "Replace generic verbs with stack-specific nouns once you choose the target posting.",
+      : "Before sending, replace any generic stack wording with the exact technologies that best match the posting.",
     hasImportedResume
-      ? "Merge only truthful quantified outcomes from the uploaded resume and drop stale claims before exporting."
+      ? "Keep quantified bullets from the uploaded resume only when they still match your current truthful evidence."
       : dashboard.settings.resumeUrl
-        ? "Compare this draft against your saved resume link and pull over any quantified outcomes that are stronger."
-        : "If you have an older resume, merge its best quantified outcomes into the bullets below.",
+        ? "Compare this draft against your saved resume link and pull over any stronger quantified outcomes."
+        : "If you already have an older resume, merge its best quantified outcomes into the strongest matching bullets.",
     keywords.length
-      ? `Mirror the exact phrasing from the job description for ${formatList(keywords.slice(0, 4))} where it is truthful.`
-      : "Paste a job description into the resume API later to bias project ordering toward the role.",
+      ? `Mirror the job description phrasing for ${formatList(keywords.slice(0, 4))} where it is truthful and visible in your work.`
+      : "Paste a job description into the resume flow to bias project ordering and keyword coverage before exporting.",
+    flatSkills.length
+      ? `Verify the technical skills line reflects the tools you can actually defend in an interview: ${formatList(flatSkills)}.`
+      : `Add more concrete stack details to recent build logs so the technical skills section becomes more specific.`,
   ];
 
-  return notes.filter(Boolean);
+  return notes.filter(Boolean).slice(0, 4);
+}
+
+function extractResumeEvidence(sourceResumeText: string | null): ResumeEvidence {
+  if (!sourceResumeText) {
+    return { bullets: [] };
+  }
+
+  const bullets = sourceResumeText
+    .split("\n")
+    .map((line) => line.replace(/^[\s\-*•]+/, "").trim())
+    .filter((line) => line.length >= 28 && line.length <= 240)
+    .filter((line) => /[a-z]/i.test(line))
+    .filter((line) => !isLikelySectionHeading(line))
+    .map((line) => normalizeSentence(line));
+
+  return {
+    bullets: uniqueStrings(bullets).slice(0, 24),
+  };
+}
+
+function selectSupportingResumeBullets(bullets: string[], targetText: string) {
+  const targetTokens = new Set(
+    tokenize(targetText).filter((token) => token.length >= 3 && !TECH_STOP_WORDS.has(token)),
+  );
+
+  return bullets
+    .map((bullet) => ({
+      bullet,
+      score: scoreEvidenceBullet(bullet, targetTokens),
+    }))
+    .filter((entry) => entry.score >= 2)
+    .sort((left, right) => right.score - left.score)
+    .map((entry) => entry.bullet)
+    .slice(0, 1);
+}
+
+function scoreEvidenceBullet(value: string, targetTokens: Set<string>) {
+  const tokens = tokenize(value);
+  let score = 0;
+
+  for (const token of tokens) {
+    if (targetTokens.has(token)) {
+      score += 2;
+    }
+  }
+
+  if (/\b\d+[%xkmb]?\b/i.test(value)) {
+    score += 1;
+  }
+
+  return score;
 }
 
 function cleanResumeSourceText(value: string | null | undefined) {
@@ -687,4 +934,36 @@ function latexEscape(value: string) {
     .replace(/}/g, "\\}")
     .replace(/~/g, "\\textasciitilde{}")
     .replace(/\^/g, "\\textasciicircum{}");
+}
+
+function latexEscapeUrl(value: string) {
+  return value.replace(/%/g, "\\%").replace(/#/g, "\\#").replace(/_/g, "\\_");
+}
+
+function humanizeFocusArea(value: string) {
+  if (!value) return "";
+  const known = SKILL_DEFINITIONS.flatMap((definition) => definition.items).find((item) =>
+    item.aliases.includes(value.toLowerCase()),
+  );
+  if (known) {
+    return known.name;
+  }
+
+  return value
+    .split(/[\s._-]+/)
+    .map((part) => (part ? `${part.charAt(0).toUpperCase()}${part.slice(1)}` : part))
+    .join(" ");
+}
+
+function isLikelySectionHeading(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (trimmed.length <= 18 && trimmed === trimmed.toUpperCase()) return true;
+  return /^(summary|education|experience|projects|skills|achievements|certifications)$/i.test(
+    trimmed,
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

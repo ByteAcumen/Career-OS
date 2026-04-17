@@ -3,6 +3,7 @@
   "claimedAt": "2026-04-16T19:40:10+05:30",
   "files": [
     "AGENTS.md",
+    ".agents/handoffs/**",
     "package.json",
     "package-lock.json",
     "scripts/coordinator.ts",

@@ -24,9 +24,15 @@ export const ResumeLinkSchema = z.object({
   url: z.string().url(),
 });
 
+export const ResumeSkillGroupSchema = z.object({
+  label: z.string().min(1).max(60),
+  items: z.array(z.string().min(1).max(80)).min(1).max(12),
+});
+
 export const ResumeDraftSchema = z.object({
   mode: z.enum(["deterministic", "ai-optimized"]),
   generatedAt: z.string(),
+  template: z.enum(["sb2nov"]).default("sb2nov"),
   targetRole: z.string().min(1).max(160),
   company: z.string().nullable(),
   matchedKeywords: z.array(z.string().min(1).max(60)).max(12),
@@ -39,6 +45,7 @@ export const ResumeDraftSchema = z.object({
   }),
   summaryBullets: z.array(z.string().min(4).max(260)).min(1).max(4),
   focusAreas: z.array(z.string().min(1).max(60)).min(1).max(10),
+  skills: z.array(ResumeSkillGroupSchema).max(6).default([]),
   projectHighlights: z.array(ResumeProjectSchema).min(1).max(4),
   problemSolvingHighlights: z.array(z.string().min(4).max(260)).min(1).max(5),
   editingNotes: z.array(z.string().min(4).max(260)).min(1).max(6),
