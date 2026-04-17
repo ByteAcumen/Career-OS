@@ -389,58 +389,63 @@ export function LandingPage() {
       </nav>
 
       {/* ── Hero ── */}
+      {/* ── Hero ── */}
       <section className="relative z-10 mx-auto max-w-[1280px] px-4 pt-20 pb-20 sm:px-6 sm:pt-28 lg:px-8 lg:pt-36 lg:pb-32">
-        <div className="flex flex-col items-center text-center">
+        <div className="grid items-center gap-16 lg:grid-cols-2 lg:gap-8">
+          {/* Left Text Column */}
+          <div className="flex max-w-xl flex-col items-start text-left">
+            {/* Badge */}
+            <motion.div variants={fadeUp} initial="hidden" animate="show">
+              <span className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/8 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-300">
+                <Sparkles className="size-3.5" />
+                The ultimate student workspace
+              </span>
+            </motion.div>
 
-          {/* Badge */}
-          <motion.div variants={fadeUp} initial="hidden" animate="show">
-            <span className="inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/8 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-300">
-              <Sparkles className="size-3.5" />
-              The ultimate student workspace
-            </span>
-          </motion.div>
-
-          {/* Headline */}
-          <motion.h1
-            variants={fadeUp} initial="hidden" animate="show"
-            className="mt-8 max-w-4xl text-[clamp(2.8rem,7vw,5.5rem)] font-bold leading-[1.05] tracking-tight text-white/95"
-          >
-            A smarter way to run your{" "}
-            <span className="inline-flex items-baseline">
-              <RotatingWord />
-            </span>
-          </motion.h1>
-
-          {/* Sub-copy */}
-          <motion.p
-            variants={fadeUp} initial="hidden" animate="show"
-            className="mt-8 max-w-2xl text-[16px] leading-[1.85] text-white/55 sm:text-[18px]"
-          >
-            Plan the week, log real proof of work, track your momentum, and use AI that reads your actual data — not generic prompts.
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div variants={fadeUp} initial="hidden" animate="show" className="mt-10 flex flex-col sm:flex-row items-center gap-4">
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-[16px] font-bold text-black shadow-[0_0_32px_rgba(255,255,255,0.15)] transition-all hover:bg-neutral-100 hover:shadow-[0_0_48px_rgba(255,255,255,0.25)] hover:scale-105"
+            {/* Headline */}
+            <motion.h1
+              variants={fadeUp} initial="hidden" animate="show"
+              className="mt-8 text-[clamp(2.8rem,6vw,5rem)] font-bold leading-[1.05] tracking-tight text-white/95"
             >
-              Start free workspace
-              <ArrowRight className="size-4.5" />
-            </Link>
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.04] px-8 py-4 text-[16px] font-medium text-white/70 transition-all hover:border-white/[0.18] hover:bg-white/[0.07] hover:text-white"
-            >
-              Sign in
-            </Link>
-          </motion.div>
+              A smarter way to run your{" "}
+              <span className="inline-flex items-baseline">
+                <RotatingWord />
+              </span>
+            </motion.h1>
 
-          {/* Large Dashboard Preview Showcase */}
-          <motion.div initial="hidden" animate="show" variants={scaleIn} transition={{ delay: 0.15 }} className="mt-20 w-full max-w-[1080px]">
-             <div className="relative">
-                <div className="absolute -inset-1 rounded-[28px] bg-gradient-to-b from-white/10 to-transparent opacity-30 blur-sm"></div>
-                <DashboardPreview />
+            {/* Sub-copy */}
+            <motion.p
+              variants={fadeUp} initial="hidden" animate="show"
+              className="mt-8 text-[16px] leading-[1.85] text-white/55 sm:text-[18px]"
+            >
+              Plan the week, log real proof of work, track your momentum, and use AI that reads your actual data — not generic prompts.
+            </motion.p>
+
+            {/* CTAs */}
+            <motion.div variants={fadeUp} initial="hidden" animate="show" className="mt-10 flex flex-col items-start gap-4 sm:flex-row">
+              <Link
+                href="/sign-up"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-[16px] font-bold text-black shadow-[0_0_32px_rgba(255,255,255,0.15)] transition-all hover:bg-neutral-100 hover:shadow-[0_0_48px_rgba(255,255,255,0.25)] hover:scale-105"
+              >
+                Start free workspace
+                <ArrowRight className="size-4.5" />
+              </Link>
+              <Link
+                href="/sign-in"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.04] px-8 py-4 text-[16px] font-medium text-white/70 transition-all hover:border-white/[0.18] hover:bg-white/[0.07] hover:text-white"
+              >
+                Sign in
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Right Presentation Column */}
+          <motion.div initial="hidden" animate="show" variants={scaleIn} transition={{ delay: 0.15 }} className="w-full max-w-[1080px] lg:mx-0">
+             <div className="relative perspective-[2000px]">
+                <div className="absolute -inset-1 rounded-[28px] bg-gradient-to-b from-violet-500/20 to-transparent opacity-40 blur-xl"></div>
+                <div className="transform-gpu transition-transform duration-500 hover:rotate-y-0 lg:-rotate-y-12">
+                   <DashboardPreview />
+                </div>
              </div>
           </motion.div>
 
