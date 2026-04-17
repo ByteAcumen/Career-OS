@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 
 import { getServerSession } from "@/lib/auth-session";
+import { isOnboardingComplete } from "@/lib/onboarding";
 import { LandingPage } from "@/components/landing-page";
 
 export default async function Home() {
@@ -12,5 +13,6 @@ export default async function Home() {
     return <LandingPage />;
   }
 
-  redirect("/home");
+  const onboardingComplete = await isOnboardingComplete(session.user.id);
+  redirect(onboardingComplete ? "/home" : "/setup");
 }
